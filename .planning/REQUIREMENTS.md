@@ -123,44 +123,44 @@ Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 0: Foundation | Pending |
-| FOUND-02 | Phase 0: Foundation | Pending |
-| FOUND-03 | Phase 0: Foundation | Pending |
-| FOUND-04 | Phase 0: Foundation | Pending |
-| FOUND-05 | Phase 0: Foundation | Pending |
-| AUTH-01 | Phase 1: Jellyfin Connection | Pending |
-| AUTH-02 | Phase 1: Jellyfin Connection | Pending |
-| AUTH-03 | Phase 1: Jellyfin Connection | Pending |
-| AUTH-04 | Phase 1: Jellyfin Connection | Pending |
-| AUTH-05 | Phase 1: Jellyfin Connection | Pending |
-| DATA-01 | Phase 2: Jellyfin Data & Repositories | Pending |
-| DATA-02 | Phase 2: Jellyfin Data & Repositories | Pending |
-| DATA-03 | Phase 2: Jellyfin Data & Repositories | Pending |
-| DATA-04 | Phase 2: Jellyfin Data & Repositories | Pending |
-| HOME-01 | Phase 3: Cinematic Home | Pending |
-| HOME-02 | Phase 3: Cinematic Home | Pending |
-| HOME-03 | Phase 3: Cinematic Home | Pending |
-| DET-01 | Phase 4: Media Details | Pending |
-| DET-02 | Phase 4: Media Details | Pending |
-| DET-03 | Phase 4: Media Details | Pending |
-| PLAY-01 | Phase 5: Player Foundation | Pending |
-| PLAY-02 | Phase 5: Player Foundation | Pending |
-| PLAY-03 | Phase 5: Player Foundation | Pending |
-| PLAY-04 | Phase 5: Player Foundation | Pending |
-| PPL-01 | Phase 6: Premium Player Experience | Pending |
-| PPL-02 | Phase 6: Premium Player Experience | Pending |
-| PPL-03 | Phase 6: Premium Player Experience | Pending |
-| PPL-04 | Phase 6: Premium Player Experience | Pending |
-| PPL-05 | Phase 6: Premium Player Experience | Pending |
-| PPL-06 | Phase 6: Premium Player Experience | Pending |
-| SRCH-01 | Phase 7: Search & Library | Pending |
-| SRCH-02 | Phase 7: Search & Library | Pending |
-| UX-01 | Phase 8: UX Polish & Accessibility | Pending |
-| UX-02 | Phase 8: UX Polish & Accessibility | Pending |
-| OFFL-01 | Phase 9: Offline Subsystem | Pending |
-| OFFL-02 | Phase 9: Offline Subsystem | Pending |
-| OFFL-03 | Phase 9: Offline Subsystem | Pending |
-| DIAG-01 | Phase 1: Jellyfin Connection | Pending |
+| FOUND-01 | Phase 1: Foundation | Pending |
+| FOUND-02 | Phase 1: Foundation | Pending |
+| FOUND-03 | Phase 1: Foundation | Pending |
+| FOUND-04 | Phase 1: Foundation | Pending |
+| FOUND-05 | Phase 1: Foundation | Pending |
+| AUTH-01 | Phase 2: Jellyfin Connection | Pending |
+| AUTH-02 | Phase 2: Jellyfin Connection | Pending |
+| AUTH-03 | Phase 2: Jellyfin Connection | Pending |
+| AUTH-04 | Phase 2: Jellyfin Connection | Pending |
+| AUTH-05 | Phase 2: Jellyfin Connection | Pending |
+| DIAG-01 | Phase 2: Jellyfin Connection | Pending |
+| DATA-01 | Phase 3: Jellyfin Data & Repositories | Pending |
+| DATA-02 | Phase 3: Jellyfin Data & Repositories | Pending |
+| DATA-03 | Phase 3: Jellyfin Data & Repositories | Pending |
+| DATA-04 | Phase 3: Jellyfin Data & Repositories | Pending |
+| HOME-01 | Phase 4: Cinematic Home | Pending |
+| HOME-02 | Phase 4: Cinematic Home | Pending |
+| HOME-03 | Phase 4: Cinematic Home | Pending |
+| DET-01 | Phase 5: Media Details | Pending |
+| DET-02 | Phase 5: Media Details | Pending |
+| DET-03 | Phase 5: Media Details | Pending |
+| PLAY-01 | Phase 6: Player Foundation | Pending |
+| PLAY-02 | Phase 6: Player Foundation | Pending |
+| PLAY-03 | Phase 6: Player Foundation | Pending |
+| PLAY-04 | Phase 6: Player Foundation | Pending |
+| PPL-01 | Phase 7: Premium Player Experience | Pending |
+| PPL-02 | Phase 7: Premium Player Experience | Pending |
+| PPL-03 | Phase 7: Premium Player Experience | Pending |
+| PPL-04 | Phase 7: Premium Player Experience | Pending |
+| PPL-05 | Phase 7: Premium Player Experience | Pending |
+| PPL-06 | Phase 7: Premium Player Experience | Pending |
+| SRCH-01 | Phase 8: Search & Library | Pending |
+| SRCH-02 | Phase 8: Search & Library | Pending |
+| UX-01 | Phase 9: UX Polish & Accessibility | Pending |
+| UX-02 | Phase 9: UX Polish & Accessibility | Pending |
+| OFFL-01 | Phase 10: Offline Subsystem | Pending |
+| OFFL-02 | Phase 10: Offline Subsystem | Pending |
+| OFFL-03 | Phase 10: Offline Subsystem | Pending |
 
 **Coverage:**
 - v1 requirements: 35 total
