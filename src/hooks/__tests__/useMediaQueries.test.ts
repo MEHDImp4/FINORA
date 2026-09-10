@@ -19,6 +19,19 @@ describe("useMediaQueries", () => {
         "user-1",
         "item-99"
       ]);
+      expect(mediaKeys.seasons("series-1", "user-1")).toEqual([
+        "media",
+        "seasons",
+        "series-1",
+        "user-1"
+      ]);
+      expect(mediaKeys.episodes("series-1", "season-1", "user-1")).toEqual([
+        "media",
+        "episodes",
+        "series-1",
+        "season-1",
+        "user-1"
+      ]);
       expect(mediaKeys.items("user-1", "parent-2", { limit: 5 })).toEqual([
         "media",
         "items",

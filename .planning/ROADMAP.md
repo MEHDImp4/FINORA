@@ -10,7 +10,7 @@ FINORA is built incrementally from a rock-solid, production-grade native foundat
 - [x] **Phase 2: Jellyfin Connection** - Server discovery, URL & TLS validation, authentication, keystore session persistence, multi-server switcher, and server diagnostics
 - [x] **Phase 3: Jellyfin Data & Repositories** - Decoupled repository layer, TanStack Query caching, display-matched image optimization, and progress synchronization
 - [x] **Phase 4: Cinematic Home** - Dynamic Hero banner, virtualized horizontal carousels, isolated render trees, and 60/90/120 Hz scroll performance
-- [ ] **Phase 5: Media Details** - Movie & Series detail screens, season picker, episode cards, and card-to-details micro-interactions
+- [x] **Phase 5: Media Details** - Movie & Series detail screens, season picker, episode cards, and card-to-details micro-interactions
 - [ ] **Phase 6: Player Foundation** - FinoraPlayerEngine abstraction, expo-video integration, PlaybackPlanner (Direct Play first), and session progress reporting
 - [ ] **Phase 7: Premium Player Experience** - Auto-fading controls, swipe/tap gestures, audio/subtitle tracks, trickplay thumbnails, skip intro/credits, and stats for nerds
 - [ ] **Phase 8: Search & Library** - Debounced global search, category filtering, library browser, sorting, and collections
@@ -94,8 +94,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: Implement Movie Details screen with cinematic backdrop header, metadata badges, cast list, and action buttons.
-- [ ] 05-02: Implement Series Details screen with season selector, episode list, thumbnails, and quick episode playback.
+- [x] 05-01: Implement Movie Details screen with cinematic backdrop header, metadata badges, cast list, and action buttons.
+- [x] 05-02: Implement Series Details screen with season selector, episode list, thumbnails, and quick episode playback.
 
 ### Phase 6: Player Foundation
 **Goal**: Implement the core streaming engine using `expo-video` wrapped in `FinoraPlayerEngine`, negotiate playback mode via `PlaybackPlanner` (preferring Direct Play), report playback sessions to Jellyfin, and maintain playback across lifecycle events.
@@ -185,7 +185,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 2. Jellyfin Connection | 3/3 | Complete | 2026-09-10 |
 | 3. Jellyfin Data & Repositories | 3/3 | Complete | 2026-09-10 |
 | 4. Cinematic Home | 2/2 | Complete | 2026-09-11 |
-| 5. Media Details | 0/2 | Not started | - |
+| 5. Media Details | 2/2 | Complete | 2026-09-11 |
 | 6. Player Foundation | 0/3 | Not started | - |
 | 7. Premium Player Experience | 0/3 | Not started | - |
 | 8. Search & Library | 0/2 | Not started | - |

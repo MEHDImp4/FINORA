@@ -12,7 +12,11 @@ export const mediaKeys = {
   recentlyAdded: (userId: string, parentId?: string, limit?: number) =>
     [...mediaKeys.all, "recentlyAdded", userId, parentId, limit] as const,
   detail: (userId: string, itemId: string) =>
-    [...mediaKeys.all, "detail", userId, itemId] as const
+    [...mediaKeys.all, "detail", userId, itemId] as const,
+  seasons: (seriesId: string, userId: string) =>
+    [...mediaKeys.all, "seasons", seriesId, userId] as const,
+  episodes: (seriesId: string, seasonId: string, userId: string) =>
+    [...mediaKeys.all, "episodes", seriesId, seasonId, userId] as const
 };
 
 export function useLibraries(userId?: string) {
@@ -56,5 +60,21 @@ export function useItemDetails(userId?: string, itemId?: string) {
     queryKey: mediaKeys.detail(userId || "", itemId || ""),
     queryFn: () => mediaRepository.getItem(userId!, itemId!),
     enabled: Boolean(userId && itemId)
+  });
+}
+
+export function useSeasons(seriesId?: string, userId?: string) {
+  return useQuery<MediaItem[]>({
+    queryKey: mediaKeys.seasons(seriesId || "", userId || ""),
+    queryFn: () => mediaRepository.getSeasons(userId!, seriesId!),
+    enabled: Boolean(seriesId && userId)
+  });
+}
+
+export function useEpisodes(seriesId?: string, seasonId?: string, userId?: string) {
+  return useQuery<MediaItem[]>({
+    queryKey: mediaKeys.episodes(seriesId || "", seasonId || "", userId || ""),
+    queryFn: () => mediaRepository.getEpisodes(userId!, seriesId!, seasonId),
+    enabled: Boolean(seriesId && userId)
   });
 }

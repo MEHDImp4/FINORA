@@ -40,9 +40,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Media Details (DET)
 
-- [ ] **DET-01**: Build Movie Details screen with cinematic backdrop, logo, synopsis, metadata, cast/crew, specs, and play/resume actions.
-- [ ] **DET-02**: Build Series Details screen with season switcher, episode cards, thumbnails, progress, and quick next-episode play.
-- [ ] **DET-03**: Implement smooth card-to-details transition continuity and touch feedback (<50ms).
+- [x] **DET-01**: Build Movie Details screen with cinematic backdrop, logo, synopsis, metadata, cast/crew, specs, and play/resume actions.
+- [x] **DET-02**: Build Series Details screen with season switcher, episode cards, thumbnails, progress, and quick next-episode play.
+- [x] **DET-03**: Implement smooth card-to-details transition continuity and touch feedback (<50ms).
 
 ### Playback Foundation (PLAY)
 
@@ -141,9 +141,9 @@ Which phases cover which requirements.
 | HOME-01 | Phase 4: Cinematic Home | Complete |
 | HOME-02 | Phase 4: Cinematic Home | Complete |
 | HOME-03 | Phase 4: Cinematic Home | Complete |
-| DET-01 | Phase 5: Media Details | Pending |
-| DET-02 | Phase 5: Media Details | Pending |
-| DET-03 | Phase 5: Media Details | Pending |
+| DET-01 | Phase 5: Media Details | Complete |
+| DET-02 | Phase 5: Media Details | Complete |
+| DET-03 | Phase 5: Media Details | Complete |
 | PLAY-01 | Phase 6: Player Foundation | Pending |
 | PLAY-02 | Phase 6: Player Foundation | Pending |
 | PLAY-03 | Phase 6: Player Foundation | Pending |
@@ -165,7 +165,7 @@ Which phases cover which requirements.
 **Coverage:**
 - v1 requirements: 35 total
 - Mapped to phases: 35
-- Completed: 18
+- Completed: 21
 - Unmapped: 0 ✓
 
 ---

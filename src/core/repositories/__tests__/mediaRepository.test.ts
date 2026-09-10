@@ -122,6 +122,50 @@ describe("MediaRepository", () => {
     expect(item.name).toBe("Specific Film");
   });
 
+  it("getSeasons calls /Shows/{seriesId}/Seasons and maps season list", async () => {
+    mockHttpClient.request.mockResolvedValue({
+      Items: [
+        { Id: "season-1", Name: "Season 1", Type: "Season" },
+        { Id: "season-2", Name: "Season 2", Type: "Season" }
+      ]
+    });
+
+    const seasons = await repository.getSeasons("user-123", "series-1", mockHttpClient);
+
+    expect(mockHttpClient.request).toHaveBeenCalledWith(
+      "/Shows/series-1/Seasons",
+      expect.objectContaining({
+        params: expect.objectContaining({
+          UserId: "user-123"
+        })
+      })
+    );
+    expect(seasons).toHaveLength(2);
+    expect(seasons[0].name).toBe("Season 1");
+  });
+
+  it("getEpisodes calls /Shows/{seriesId}/Episodes and maps episode list", async () => {
+    mockHttpClient.request.mockResolvedValue({
+      Items: [
+        { Id: "ep-1", Name: "Pilot", Type: "Episode", IndexNumber: 1, ParentIndexNumber: 1 }
+      ]
+    });
+
+    const episodes = await repository.getEpisodes("user-123", "series-1", "season-1", mockHttpClient);
+
+    expect(mockHttpClient.request).toHaveBeenCalledWith(
+      "/Shows/series-1/Episodes",
+      expect.objectContaining({
+        params: expect.objectContaining({
+          UserId: "user-123",
+          SeasonId: "season-1"
+        })
+      })
+    );
+    expect(episodes).toHaveLength(1);
+    expect(episodes[0].name).toBe("Pilot");
+  });
+
   it("throws FinoraError on missing userId parameter", async () => {
     await expect(repository.getLibraries("", mockHttpClient)).rejects.toThrow(FinoraError);
   });

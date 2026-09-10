@@ -146,6 +146,55 @@ export class MediaRepository {
     });
     return mapJellyfinItemToMediaItem(dto);
   }
+
+  public async getSeasons(
+    userId: string,
+    seriesId: string,
+    customClient?: HttpClient
+  ): Promise<MediaItem[]> {
+    if (!userId || !seriesId) {
+      throw new FinoraError("Both userId and seriesId are required", "INVALID_PARAMS");
+    }
+
+    const http = this.getHttp(customClient);
+    const response = await http.request<{ Items?: any[] }>(`/Shows/${seriesId}/Seasons`, {
+      params: {
+        UserId: userId,
+        Fields:
+          "Overview,ProductionYear,CommunityRating,ImageTags,BackdropImageTags,ImageBlurHashes,UserData,ItemCounts"
+      }
+    });
+
+    const items = response?.Items || [];
+    return items.map(mapJellyfinItemToMediaItem);
+  }
+
+  public async getEpisodes(
+    userId: string,
+    seriesId: string,
+    seasonId?: string,
+    customClient?: HttpClient
+  ): Promise<MediaItem[]> {
+    if (!userId || !seriesId) {
+      throw new FinoraError("Both userId and seriesId are required", "INVALID_PARAMS");
+    }
+
+    const http = this.getHttp(customClient);
+    const params: Record<string, string | number | boolean | undefined> = {
+      UserId: userId,
+      SeasonId: seasonId,
+      Fields:
+        "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber",
+      EnableImageTypes: "Primary,Backdrop,Thumb"
+    };
+
+    const response = await http.request<{ Items?: any[] }>(`/Shows/${seriesId}/Episodes`, {
+      params
+    });
+
+    const items = response?.Items || [];
+    return items.map(mapJellyfinItemToMediaItem);
+  }
 }
 
 export const mediaRepository = new MediaRepository();

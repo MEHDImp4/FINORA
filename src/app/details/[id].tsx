@@ -5,6 +5,7 @@ import { useAuthStore } from "../../stores/authStore";
 import { useItemDetails } from "../../hooks/useMediaQueries";
 import { useToggleFavorite, useMarkPlayed } from "../../hooks/useUserDataMutations";
 import { MovieDetailsView } from "../../features/details/components/MovieDetailsView";
+import { SeriesDetailsView } from "../../features/details/components/SeriesDetailsView";
 import { FinoraText } from "../../design-system/components/FinoraText";
 import { FinoraButton } from "../../design-system/components/FinoraButton";
 import { colors, spacing } from "../../design-system/tokens";
@@ -17,7 +18,7 @@ export default function DetailsScreen() {
   const userId = session?.userId || "";
   const serverUrl = session?.serverUrl || "";
 
-  const { data: item, isLoading, isError } = useItemDetails(id, userId);
+  const { data: item, isLoading, isError } = useItemDetails(userId, id);
   const toggleFavorite = useToggleFavorite(userId);
   const markPlayed = useMarkPlayed(userId);
 
@@ -67,14 +68,25 @@ export default function DetailsScreen() {
 
   return (
     <View style={styles.container} testID="details-screen">
-      <MovieDetailsView
-        item={item}
-        serverUrl={serverUrl}
-        onPlay={handlePlay}
-        onBack={() => router.back()}
-        onToggleFavorite={handleToggleFavorite}
-        onTogglePlayed={handleTogglePlayed}
-      />
+      {item.type === "Series" ? (
+        <SeriesDetailsView
+          series={item}
+          serverUrl={serverUrl}
+          userId={userId}
+          onPlayEpisode={handlePlay}
+          onBack={() => router.back()}
+          onToggleFavorite={handleToggleFavorite}
+        />
+      ) : (
+        <MovieDetailsView
+          item={item}
+          serverUrl={serverUrl}
+          onPlay={handlePlay}
+          onBack={() => router.back()}
+          onToggleFavorite={handleToggleFavorite}
+          onTogglePlayed={handleTogglePlayed}
+        />
+      )}
     </View>
   );
 }

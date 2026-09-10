@@ -1,5 +1,6 @@
 import React from "react";
 import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
+import { useRouter } from "expo-router";
 import { FinoraScreen } from "../../design-system/components/FinoraScreen";
 import { HeroBanner } from "../../features/home/components/HeroBanner";
 import { MediaCarousel } from "../../features/home/components/MediaCarousel";
@@ -14,6 +15,7 @@ import { colors } from "../../design-system/tokens";
 import { MediaItem } from "../../types/media";
 
 export default function HomeScreen() {
+  const router = useRouter();
   const session = useAuthStore((state) => state.session);
   const userId = session?.userId;
   const serverUrl = session?.serverUrl || "";
@@ -58,6 +60,10 @@ export default function HomeScreen() {
     // Playback trigger will connect to FinoraPlayerEngine in Phase 6
   };
 
+  const handleItemPress = (item: MediaItem) => {
+    router.push({ pathname: "/details/[id]", params: { id: item.id } });
+  };
+
   const handleToggleFavorite = (item: MediaItem) => {
     toggleFavorite.mutate({ itemId: item.id, isFavorite: !item.isFavorite });
   };
@@ -83,6 +89,7 @@ export default function HomeScreen() {
           serverUrl={serverUrl}
           onPlay={handlePlay}
           onToggleFavorite={handleToggleFavorite}
+          onPressDetails={handleItemPress}
         />
 
         {/* Continue Watching Section (Thumbnails with progress bars) */}
@@ -92,7 +99,7 @@ export default function HomeScreen() {
             items={resumeItems}
             serverUrl={serverUrl}
             variant="thumbnail"
-            onItemPress={handlePlay}
+            onItemPress={handleItemPress}
           />
         ) : null}
 
@@ -103,7 +110,7 @@ export default function HomeScreen() {
             items={recentItems}
             serverUrl={serverUrl}
             variant="poster"
-            onItemPress={handlePlay}
+            onItemPress={handleItemPress}
           />
         ) : null}
       </ScrollView>
