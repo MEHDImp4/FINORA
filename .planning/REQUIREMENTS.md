@@ -11,11 +11,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Foundation & Architecture (FOUND)
 
-- [ ] **FOUND-01**: Initialize Expo React Native project with New Architecture, Hermes, TypeScript strict, and Expo Router v4.
-- [ ] **FOUND-02**: Establish clean layered folder architecture (app, components, features, core, design-system, hooks, stores, types, utils).
-- [ ] **FOUND-03**: Implement centralized network client with timeouts, retry backoff, sanitized logging, and typed error hierarchy.
-- [ ] **FOUND-04**: Implement secure storage abstraction using expo-secure-store for tokens and AsyncStorage for non-sensitive preferences.
-- [ ] **FOUND-05**: Implement core FINORA Design System tokens (cinematic dark palette, typography, spacing, FinoraScreen, buttons, icons).
+- [x] **FOUND-01**: Initialize Expo React Native project with New Architecture, Hermes, TypeScript strict, and Expo Router v4.
+- [x] **FOUND-02**: Establish clean layered folder architecture (app, components, features, core, design-system, hooks, stores, types, utils).
+- [x] **FOUND-03**: Implement centralized network client with timeouts, retry backoff, sanitized logging, and typed error hierarchy.
+- [x] **FOUND-04**: Implement secure storage abstraction using expo-secure-store for tokens and AsyncStorage for non-sensitive preferences.
+- [x] **FOUND-05**: Implement core FINORA Design System tokens (cinematic dark palette, typography, spacing, FinoraScreen, buttons, icons).
 
 ### Authentication & Multi-Server (AUTH)
 
@@ -123,11 +123,11 @@ Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 1: Foundation | Pending |
-| FOUND-02 | Phase 1: Foundation | Pending |
-| FOUND-03 | Phase 1: Foundation | Pending |
-| FOUND-04 | Phase 1: Foundation | Pending |
-| FOUND-05 | Phase 1: Foundation | Pending |
+| FOUND-01 | Phase 1: Foundation | Complete |
+| FOUND-02 | Phase 1: Foundation | Complete |
+| FOUND-03 | Phase 1: Foundation | Complete |
+| FOUND-04 | Phase 1: Foundation | Complete |
+| FOUND-05 | Phase 1: Foundation | Complete |
 | AUTH-01 | Phase 2: Jellyfin Connection | Pending |
 | AUTH-02 | Phase 2: Jellyfin Connection | Pending |
 | AUTH-03 | Phase 2: Jellyfin Connection | Pending |
@@ -165,8 +165,9 @@ Which phases cover which requirements.
 **Coverage:**
 - v1 requirements: 35 total
 - Mapped to phases: 35
+- Completed: 5
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-10*  
-*Last updated: 2026-09-10 after initial definition*
+*Last updated: 2026-09-10 after Phase 1 completion*
