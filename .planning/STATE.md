@@ -2,11 +2,11 @@
 gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: Jellyfin Connection
-status: planning
-stopped_at: Phase 1 Foundation executed, verified (23/23 tests green, 0 tsc errors), and marked complete.
-last_updated: "2026-09-10T17:54:00.000Z"
+status: ready_to_execute
+stopped_at: Phase 2 Jellyfin Connection plans drafted, validated, and ready for execution.
+last_updated: "2026-09-10T18:18:00.000Z"
 last_activity: 2026-09-10
-last_activity_desc: Phase 1 Foundation completed and verified
+last_activity_desc: Phase 2 Jellyfin Connection planned (3 plans ready)
 state_head: 246db1f60dcbf53a3013ea8a74653d50ed974e38
 progress:
   total_phases: 10
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-10)
 
 ## Current Position
 
-Phase: 2 of 10 (Jellyfin Connection) — READY TO PLAN
+Phase: 2 of 10 (Jellyfin Connection) — READY TO EXECUTE
 Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-09-10 — Phase 1 Foundation completed and verified
+Status: Ready to execute
+Last activity: 2026-09-10 — Phase 2 Jellyfin Connection planned (3 plans ready)
 
 Progress: [█░░░░░░░░░] 12%
 
@@ -47,6 +47,7 @@ Progress: [█░░░░░░░░░] 12%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Foundation | 3/3 | Complete | 5 min |
+| 2. Jellyfin Connection | 0/3 | Ready | - |
 
 **Recent Trend:**
 
@@ -66,6 +67,12 @@ Recent decisions affecting current work:
 - [Phase 1]: Configured `logger.ts` to automatically scrub Authorization, X-Emby-Token, passwords, and cookies
 - [Phase 1]: Enforced hardware keystore token isolation (`SecureTokenStorage`) with invariant preventing tokens in AsyncStorage
 - [Phase 1]: Implemented `FinoraScreen`, `FinoraButton`, `FinoraIconButton`, and `FinoraText` with dark OLED palette
+- [Phase 2]: Strictly enforce TLS validation; display explicit security warning for unencrypted HTTP connections (AUTH-01)
+- [Phase 2]: Generate persistent installation UUID once via `expo-crypto` and store in SecureStore for client identification (AUTH-02)
+- [Phase 2]: Immediate in-memory purging of passwords post-auth; tokens strictly in SecureStore (AUTH-03)
+- [Phase 2]: Key secure tokens by `${serverId}_${userId}` in SecureStore to prevent multi-server cross-contamination (AUTH-04)
+- [Phase 2]: Remote `/Sessions/Logout` dispatch followed by local keystore token eviction (AUTH-05)
+- [Phase 2]: Settings diagnostic panel reporting ping latency, TLS status, and server metadata (DIAG-01)
 
 ### Pending Todos
 
@@ -86,5 +93,5 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-09-10
-Stopped at: Phase 1 Foundation executed and verified. Phase 2 Jellyfin Connection ready to plan.
-Resume file: None
+Stopped at: Phase 2 Jellyfin Connection plans drafted (02-01, 02-02, 02-03) and ready to execute.
+Resume file: .planning/phases/02-jellyfin-connection/02-01-PLAN.md
