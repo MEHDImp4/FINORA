@@ -2,12 +2,12 @@
 gsd_state_version: "1.0"
 current_phase: 4
 current_phase_name: Cinematic Home
-status: planning
-stopped_at: Phase 3 Jellyfin Data & Repositories executed, verified (71/71 tests green, 0 tsc errors), and marked complete.
-last_updated: "2026-09-10T22:52:00.000Z"
+status: ready_to_execute
+stopped_at: Phase 4 Cinematic Home plans drafted, validated, and ready for execution.
+last_updated: "2026-09-10T22:59:00.000Z"
 last_activity: 2026-09-10
-last_activity_desc: Phase 3 Jellyfin Data & Repositories completed and verified
-state_head: 6f389bb0dcbf53a3013ea8a74653d50ed974e38
+last_activity_desc: Phase 4 Cinematic Home planned (2 plans ready)
+state_head: 8cba6240dcbf53a3013ea8a74653d50ed974e38
 progress:
   total_phases: 10
   completed_phases: 3
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-10)
 
 ## Current Position
 
-Phase: 4 of 10 (Cinematic Home) — READY TO PLAN
+Phase: 4 of 10 (Cinematic Home) — READY TO EXECUTE
 Plan: 0 of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-09-10 — Phase 3 Jellyfin Data & Repositories completed and verified (71/71 tests green)
+Status: Ready to execute
+Last activity: 2026-09-10 — Phase 4 Cinematic Home planned (2 plans ready)
 
 Progress: [███░░░░░░░] 35%
 
@@ -49,6 +49,7 @@ Progress: [███░░░░░░░] 35%
 | 1. Foundation | 3/3 | Complete | 5 min |
 | 2. Jellyfin Connection | 3/3 | Complete | 5 min |
 | 3. Jellyfin Data & Repositories | 3/3 | Complete | 5 min |
+| 4. Cinematic Home | 0/2 | Ready | - |
 
 **Recent Trend:**
 
@@ -78,6 +79,9 @@ Recent decisions affecting current work:
 - [Phase 3]: TanStack Query configured with 1-min staleTime, 15-min cache retention, and hierarchical query keys (DATA-02)
 - [Phase 3]: Dynamic image endpoint downscaling matched to device pixel density with blurhash placeholders (DATA-03)
 - [Phase 3]: Optimistic UI mutations for favorite toggling and bidirectional watch progress sync (DATA-04)
+- [Phase 4]: Dynamic Hero banner with backdrop, linear gradient overlay, logo/typography fallback, and quick play/watchlist actions (HOME-01)
+- [Phase 4]: Horizontal virtualized carousels with 2:3 posters and 16:9 thumbnail cards with active progress bars (HOME-02)
+- [Phase 4]: Isolated component trees preventing carousel re-renders on Hero state changes for 60/90/120 Hz scrolling (HOME-03)
 
 ### Pending Todos
 
@@ -98,5 +102,5 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-09-10
-Stopped at: Phase 3 Jellyfin Data & Repositories completed and verified. Phase 4 Cinematic Home ready to plan.
-Resume file: None
+Stopped at: Phase 4 Cinematic Home plans drafted (04-01, 04-02) and ready to execute.
+Resume file: .planning/phases/04-cinematic-home/04-01-PLAN.md
