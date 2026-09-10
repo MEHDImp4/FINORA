@@ -26,11 +26,16 @@ const ScrollView = React.forwardRef((props, ref) =>
 );
 ScrollView.displayName = "ScrollView";
 
+const RefreshControl = (props) => React.createElement("RefreshControl", props);
+RefreshControl.displayName = "RefreshControl";
+
 const FlatList = React.forwardRef((props, ref) => {
   const items = Array.isArray(props.data)
-    ? props.data.map((item, index) =>
-        props.renderItem ? props.renderItem({ item, index }) : null
-      )
+    ? props.data.map((item, index) => {
+        const key = props.keyExtractor ? props.keyExtractor(item, index) : String(index);
+        const element = props.renderItem ? props.renderItem({ item, index }) : null;
+        return element ? React.cloneElement(element, { key }) : null;
+      })
     : null;
   return React.createElement("FlatList", { ...props, ref }, items);
 });
@@ -73,6 +78,7 @@ module.exports = {
   Text,
   Pressable,
   ScrollView,
+  RefreshControl,
   FlatList,
   ActivityIndicator,
   StyleSheet,

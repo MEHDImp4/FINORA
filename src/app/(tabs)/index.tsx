@@ -1,38 +1,122 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, StyleSheet, ScrollView, RefreshControl } from "react-native";
+import { FinoraScreen } from "../../design-system/components/FinoraScreen";
+import { HeroBanner } from "../../features/home/components/HeroBanner";
+import { MediaCarousel } from "../../features/home/components/MediaCarousel";
+import { useAuthStore } from "../../stores/authStore";
+import {
+  useResumeItems,
+  useRecentlyAdded,
+  useLibraries
+} from "../../hooks/useMediaQueries";
+import { useToggleFavorite } from "../../hooks/useUserDataMutations";
+import { colors } from "../../design-system/tokens";
+import { MediaItem } from "../../types/media";
 
 export default function HomeScreen() {
+  const session = useAuthStore((state) => state.session);
+  const userId = session?.userId;
+  const serverUrl = session?.serverUrl || "";
+
+  // Data queries
+  const {
+    data: resumeItems,
+    isLoading: isResumeLoading,
+    refetch: refetchResume
+  } = useResumeItems(userId);
+
+  const {
+    data: recentItems,
+    isLoading: isRecentLoading,
+    refetch: refetchRecent
+  } = useRecentlyAdded(userId);
+
+  const {
+    data: libraries,
+    isLoading: isLibrariesLoading,
+    refetch: refetchLibraries
+  } = useLibraries(userId);
+
+  const toggleFavorite = useToggleFavorite(userId || "");
+
+  const isRefreshing = isResumeLoading || isRecentLoading || isLibrariesLoading;
+
+  const onRefresh = () => {
+    refetchResume();
+    refetchRecent();
+    refetchLibraries();
+  };
+
+  // Derive featured hero item (prefer first recently added with backdrop or first resume item)
+  const featuredItem =
+    recentItems?.find((i) => i.backdropImageTag) ||
+    resumeItems?.find((i) => i.backdropImageTag) ||
+    recentItems?.[0] ||
+    null;
+
+  const handlePlay = (item: MediaItem) => {
+    // Playback trigger will connect to FinoraPlayerEngine in Phase 6
+  };
+
+  const handleToggleFavorite = (item: MediaItem) => {
+    toggleFavorite.mutate({ itemId: item.id, isFavorite: !item.isFavorite });
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>FINORA</Text>
-        <Text style={styles.subtitle}>Watch your way</Text>
-      </View>
-    </SafeAreaView>
+    <FinoraScreen>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
+        {/* Dynamic Hero Banner */}
+        <HeroBanner
+          item={featuredItem}
+          serverUrl={serverUrl}
+          onPlay={handlePlay}
+          onToggleFavorite={handleToggleFavorite}
+        />
+
+        {/* Continue Watching Section (Thumbnails with progress bars) */}
+        {resumeItems && resumeItems.length > 0 ? (
+          <MediaCarousel
+            title="Continue Watching"
+            items={resumeItems}
+            serverUrl={serverUrl}
+            variant="thumbnail"
+            onItemPress={handlePlay}
+          />
+        ) : null}
+
+        {/* Recently Added Section (Posters) */}
+        {recentItems && recentItems.length > 0 ? (
+          <MediaCarousel
+            title="Recently Added"
+            items={recentItems}
+            serverUrl={serverUrl}
+            variant="poster"
+            onItemPress={handlePlay}
+          />
+        ) : null}
+      </ScrollView>
+    </FinoraScreen>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0A0A0C"
+    backgroundColor: colors.background
   },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#E50914",
-    letterSpacing: 2
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#8A8A9E",
-    marginTop: 8
+  contentContainer: {
+    paddingBottom: 60
   }
 });

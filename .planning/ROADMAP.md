@@ -9,7 +9,7 @@ FINORA is built incrementally from a rock-solid, production-grade native foundat
 - [x] **Phase 1: Foundation** - Expo New Architecture, TypeScript strict, Expo Router v4, design tokens, networking, secure storage, and polyfills
 - [x] **Phase 2: Jellyfin Connection** - Server discovery, URL & TLS validation, authentication, keystore session persistence, multi-server switcher, and server diagnostics
 - [x] **Phase 3: Jellyfin Data & Repositories** - Decoupled repository layer, TanStack Query caching, display-matched image optimization, and progress synchronization
-- [ ] **Phase 4: Cinematic Home** - Dynamic Hero banner, virtualized horizontal carousels, isolated render trees, and 60/90/120 Hz scroll performance
+- [x] **Phase 4: Cinematic Home** - Dynamic Hero banner, virtualized horizontal carousels, isolated render trees, and 60/90/120 Hz scroll performance
 - [ ] **Phase 5: Media Details** - Movie & Series detail screens, season picker, episode cards, and card-to-details micro-interactions
 - [ ] **Phase 6: Player Foundation** - FinoraPlayerEngine abstraction, expo-video integration, PlaybackPlanner (Direct Play first), and session progress reporting
 - [ ] **Phase 7: Premium Player Experience** - Auto-fading controls, swipe/tap gestures, audio/subtitle tracks, trickplay thumbnails, skip intro/credits, and stats for nerds
@@ -80,8 +80,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: Build dynamic Hero banner with backdrop, typography, logo fallback, and transition animations.
-- [ ] 04-02: Build high-performance virtualized horizontal carousels (Continue Watching, Next Up, Media sections) with isolated render boundaries.
+- [x] 04-01: Build dynamic Hero banner with backdrop, typography, logo fallback, and transition animations.
+- [x] 04-02: Build high-performance virtualized horizontal carousels (Continue Watching, Next Up, Media sections) with isolated render boundaries.
 
 ### Phase 5: Media Details
 **Goal**: Build comprehensive, cinematic details screens for movies and television series with smooth card-to-details transitions and instant user interaction feedback.
@@ -184,7 +184,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 1. Foundation | 3/3 | Complete | 2026-09-10 |
 | 2. Jellyfin Connection | 3/3 | Complete | 2026-09-10 |
 | 3. Jellyfin Data & Repositories | 3/3 | Complete | 2026-09-10 |
-| 4. Cinematic Home | 0/2 | Not started | - |
+| 4. Cinematic Home | 2/2 | Complete | 2026-09-11 |
 | 5. Media Details | 0/2 | Not started | - |
 | 6. Player Foundation | 0/3 | Not started | - |
 | 7. Premium Player Experience | 0/3 | Not started | - |

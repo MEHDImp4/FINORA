@@ -34,9 +34,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Home & Browsing (HOME)
 
-- [ ] **HOME-01**: Build dynamic cinematic Hero banner with backdrop, logo, metadata badges, quick play, and watchlist toggle.
-- [ ] **HOME-02**: Build virtualized horizontal carousels (Continue Watching with progress bars, Next Up, Recently Added, Movies, Series).
-- [ ] **HOME-03**: Maintain 60/90/120 Hz scroll performance with isolated render trees preventing carousel re-renders on Hero changes.
+- [x] **HOME-01**: Build dynamic cinematic Hero banner with backdrop, logo, metadata badges, quick play, and watchlist toggle.
+- [x] **HOME-02**: Build virtualized horizontal carousels (Continue Watching with progress bars, Next Up, Recently Added, Movies, Series).
+- [x] **HOME-03**: Maintain 60/90/120 Hz scroll performance with isolated render trees preventing carousel re-renders on Hero changes.
 
 ### Media Details (DET)
 
@@ -138,9 +138,9 @@ Which phases cover which requirements.
 | DATA-02 | Phase 3: Jellyfin Data & Repositories | Complete |
 | DATA-03 | Phase 3: Jellyfin Data & Repositories | Complete |
 | DATA-04 | Phase 3: Jellyfin Data & Repositories | Complete |
-| HOME-01 | Phase 4: Cinematic Home | Pending |
-| HOME-02 | Phase 4: Cinematic Home | Pending |
-| HOME-03 | Phase 4: Cinematic Home | Pending |
+| HOME-01 | Phase 4: Cinematic Home | Complete |
+| HOME-02 | Phase 4: Cinematic Home | Complete |
+| HOME-03 | Phase 4: Cinematic Home | Complete |
 | DET-01 | Phase 5: Media Details | Pending |
 | DET-02 | Phase 5: Media Details | Pending |
 | DET-03 | Phase 5: Media Details | Pending |
@@ -165,7 +165,7 @@ Which phases cover which requirements.
 **Coverage:**
 - v1 requirements: 35 total
 - Mapped to phases: 35
-- Completed: 15
+- Completed: 18
 - Unmapped: 0 ✓
 
 ---
