@@ -2,12 +2,12 @@
 gsd_state_version: "1.0"
 current_phase: 3
 current_phase_name: Jellyfin Data & Repositories
-status: planning
-stopped_at: Phase 2 Jellyfin Connection executed, verified (47/47 tests green, 0 tsc errors), and marked complete.
-last_updated: "2026-09-10T18:24:00.000Z"
+status: ready_to_execute
+stopped_at: Phase 3 Jellyfin Data & Repositories plans drafted, validated, and ready for execution.
+last_updated: "2026-09-10T19:01:00.000Z"
 last_activity: 2026-09-10
-last_activity_desc: Phase 2 Jellyfin Connection completed and verified
-state_head: 677217620dcbf53a3013ea8a74653d50ed974e38
+last_activity_desc: Phase 3 Jellyfin Data & Repositories planned (3 plans ready)
+state_head: b3bde530dcbf53a3013ea8a74653d50ed974e38
 progress:
   total_phases: 10
   completed_phases: 2
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-10)
 
 ## Current Position
 
-Phase: 3 of 10 (Jellyfin Data & Repositories) — READY TO PLAN
+Phase: 3 of 10 (Jellyfin Data & Repositories) — READY TO EXECUTE
 Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-09-10 — Phase 2 Jellyfin Connection completed and verified (47/47 tests green)
+Status: Ready to execute
+Last activity: 2026-09-10 — Phase 3 Jellyfin Data & Repositories planned (3 plans ready)
 
 Progress: [██░░░░░░░░] 23%
 
@@ -48,6 +48,7 @@ Progress: [██░░░░░░░░] 23%
 |-------|-------|-------|----------|
 | 1. Foundation | 3/3 | Complete | 5 min |
 | 2. Jellyfin Connection | 3/3 | Complete | 5 min |
+| 3. Jellyfin Data & Repositories | 0/3 | Ready | - |
 
 **Recent Trend:**
 
@@ -73,6 +74,10 @@ Recent decisions affecting current work:
 - [Phase 2]: Isolated multi-server auth tokens by `${serverId}_${userId}` in SecureStore to prevent credential cross-contamination
 - [Phase 2]: Implemented remote `/Sessions/Logout` revocation and local token wiping
 - [Phase 2]: Integrated Server Diagnostics panel in Settings reporting ping latency, TLS status, and server health
+- [Phase 3]: Strict separation of domain models (`MediaItem`, `MediaLibrary`) from raw backend DTOs (DATA-01)
+- [Phase 3]: TanStack Query configured with 1-min staleTime, 15-min cache retention, and hierarchical query keys (DATA-02)
+- [Phase 3]: Dynamic image endpoint downscaling matched to device pixel density with blurhash placeholders (DATA-03)
+- [Phase 3]: Optimistic UI mutations for favorite toggling and bidirectional watch progress sync (DATA-04)
 
 ### Pending Todos
 
@@ -93,5 +98,5 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-09-10
-Stopped at: Phase 2 Jellyfin Connection completed and verified. Phase 3 Jellyfin Data & Repositories ready to plan.
-Resume file: None
+Stopped at: Phase 3 Jellyfin Data & Repositories plans drafted (03-01, 03-02, 03-03) and ready to execute.
+Resume file: .planning/phases/03-jellyfin-data-and-repositories/03-01-PLAN.md
