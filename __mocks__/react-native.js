@@ -21,13 +21,35 @@ const Pressable = React.forwardRef((props, ref) => {
 });
 Pressable.displayName = "Pressable";
 
+const ScrollView = React.forwardRef((props, ref) =>
+  React.createElement("ScrollView", { ...props, ref }, props.children)
+);
+ScrollView.displayName = "ScrollView";
+
+const FlatList = React.forwardRef((props, ref) => {
+  const items = Array.isArray(props.data)
+    ? props.data.map((item, index) =>
+        props.renderItem ? props.renderItem({ item, index }) : null
+      )
+    : null;
+  return React.createElement("FlatList", { ...props, ref }, items);
+});
+FlatList.displayName = "FlatList";
+
 const ActivityIndicator = (props) => React.createElement("ActivityIndicator", props);
 ActivityIndicator.displayName = "ActivityIndicator";
 
 const StyleSheet = {
   create: (styles) => styles,
   flatten: (style) =>
-    Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean)) : style || {}
+    Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean)) : style || {},
+  absoluteFillObject: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0
+  }
 };
 
 const Platform = {
@@ -35,11 +57,26 @@ const Platform = {
   select: (obj) => obj.android ?? obj.default
 };
 
+const Dimensions = {
+  get: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 })
+};
+
+const PixelRatio = {
+  get: () => 3,
+  getFontScale: () => 1,
+  getPixelSizeForLayoutSize: (size) => size * 3,
+  roundToNearestPixel: (size) => size
+};
+
 module.exports = {
   View,
   Text,
   Pressable,
+  ScrollView,
+  FlatList,
   ActivityIndicator,
   StyleSheet,
-  Platform
+  Platform,
+  Dimensions,
+  PixelRatio
 };
