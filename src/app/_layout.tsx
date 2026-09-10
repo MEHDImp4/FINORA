@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { useAuthStore } from "../stores/authStore";
+import { QueryProvider } from "../providers/QueryProvider";
 
 export default function RootLayout() {
   const status = useAuthStore((state) => state.status);
@@ -16,24 +17,26 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <View style={styles.container}>
-        <StatusBar style="light" backgroundColor="#0A0A0C" />
-        {status === "idle" || status === "restoring" ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#E50914" />
-          </View>
-        ) : (
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: "#0A0A0C" },
-              animation: "fade_from_bottom"
-            }}
-          >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          </Stack>
-        )}
-      </View>
+      <QueryProvider>
+        <View style={styles.container}>
+          <StatusBar style="light" backgroundColor="#0A0A0C" />
+          {status === "idle" || status === "restoring" ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#E50914" />
+            </View>
+          ) : (
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: "#0A0A0C" },
+                animation: "fade_from_bottom"
+              }}
+            >
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            </Stack>
+          )}
+        </View>
+      </QueryProvider>
     </SafeAreaProvider>
   );
 }
