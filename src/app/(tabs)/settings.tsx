@@ -1,21 +1,216 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView
+} from "react-native";
+import { FinoraScreen } from "../../design-system/components/FinoraScreen";
+import { FinoraButton } from "../../design-system/components/FinoraButton";
+import { useAuthStore } from "../../stores/authStore";
+import {
+  diagnosticsService,
+  ServerDiagnosticsResult
+} from "../../core/jellyfin/diagnosticsService";
 
 export default function SettingsScreen() {
+  const session = useAuthStore((state) => state.session);
+  const logout = useAuthStore((state) => state.logout);
+  const [isRunning, setIsRunning] = useState(false);
+  const [diagResult, setDiagResult] = useState<ServerDiagnosticsResult | null>(null);
+
+  const handleRunDiagnostics = async () => {
+    const url = session?.serverUrl || "https://demo.jellyfin.org";
+    setIsRunning(true);
+    try {
+      const res = await diagnosticsService.runDiagnostics(url, session?.token);
+      setDiagResult(res);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Settings</Text>
-        <Text style={styles.subtitle}>Server, playback, and app preferences</Text>
-      </View>
-    </SafeAreaView>
+    <FinoraScreen>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.headerTitle}>Settings</Text>
+
+        {/* Active Account Section */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>Active Session</Text>
+          {session ? (
+            <View style={styles.sessionInfo}>
+              <Text style={styles.infoLabel}>
+                User: <Text style={styles.infoValue}>{session.userName}</Text>
+              </Text>
+              <Text style={styles.infoLabel}>
+                Server URL: <Text style={styles.infoValue}>{session.serverUrl}</Text>
+              </Text>
+              <Text style={styles.infoLabel}>
+                Server ID: <Text style={styles.infoValue}>{session.serverId}</Text>
+              </Text>
+              <View style={styles.actionRow}>
+                <FinoraButton
+                  label="Log Out"
+                  variant="secondary"
+                  size="sm"
+                  onPress={logout}
+                />
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>Not connected to any Jellyfin server.</Text>
+          )}
+        </View>
+
+        {/* Server Diagnostics Section */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>Server Diagnostics (DIAG-01)</Text>
+          <Text style={styles.cardDescription}>
+            Inspect connection latency, TLS/HTTPS security status, and Jellyfin API health.
+          </Text>
+
+          <View style={styles.actionRow}>
+            <FinoraButton
+              label="Run Diagnostics"
+              variant="primary"
+              size="md"
+              loading={isRunning}
+              onPress={handleRunDiagnostics}
+            />
+          </View>
+
+          {diagResult && (
+            <View style={styles.resultsContainer}>
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>Target URL:</Text>
+                <Text style={styles.metricValue}>{diagResult.serverUrl}</Text>
+              </View>
+
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>Security / TLS:</Text>
+                <Text
+                  style={[
+                    styles.metricValue,
+                    { color: diagResult.isHttps ? "#4BB543" : "#FFB800" }
+                  ]}
+                >
+                  {diagResult.isHttps ? "Secure (HTTPS)" : "Unencrypted (HTTP Warning)"}
+                </Text>
+              </View>
+
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>Round-Trip Latency:</Text>
+                <Text style={styles.metricValue}>{diagResult.pingMs} ms</Text>
+              </View>
+
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>Server Name:</Text>
+                <Text style={styles.metricValue}>{diagResult.serverName}</Text>
+              </View>
+
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>Version:</Text>
+                <Text style={styles.metricValue}>{diagResult.version}</Text>
+              </View>
+
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>API Status:</Text>
+                <Text
+                  style={[
+                    styles.metricValue,
+                    { color: diagResult.apiHealthy ? "#4BB543" : "#E50914" }
+                  ]}
+                >
+                  {diagResult.apiHealthy ? "Healthy" : "Degraded / Unreachable"}
+                </Text>
+              </View>
+
+              <Text style={styles.statusMessage}>{diagResult.statusMessage}</Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </FinoraScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0A0A0C" },
-  content: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
-  title: { fontSize: 24, fontWeight: "700", color: "#FFFFFF" },
-  subtitle: { fontSize: 14, color: "#8A8A9E", marginTop: 8 }
+  container: {
+    padding: 20,
+    paddingBottom: 40
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    marginBottom: 20
+  },
+  card: {
+    backgroundColor: "#14141A",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#262633",
+    padding: 18,
+    marginBottom: 20
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 8
+  },
+  cardDescription: {
+    fontSize: 14,
+    color: "#8A8A9E",
+    marginBottom: 16,
+    lineHeight: 20
+  },
+  sessionInfo: {
+    marginTop: 8
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: "#8A8A9E",
+    marginBottom: 4
+  },
+  infoValue: {
+    color: "#FFFFFF",
+    fontWeight: "600"
+  },
+  emptyText: {
+    fontSize: 14,
+    color: "#8A8A9E",
+    fontStyle: "italic"
+  },
+  actionRow: {
+    marginTop: 14,
+    flexDirection: "row"
+  },
+  resultsContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#262633"
+  },
+  metricRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8
+  },
+  metricLabel: {
+    fontSize: 14,
+    color: "#8A8A9E"
+  },
+  metricValue: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    fontWeight: "600"
+  },
+  statusMessage: {
+    marginTop: 8,
+    fontSize: 13,
+    color: "#8A8A9E",
+    fontStyle: "italic"
+  }
 });

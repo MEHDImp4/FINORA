@@ -19,11 +19,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Authentication & Multi-Server (AUTH)
 
-- [ ] **AUTH-01**: Add Jellyfin server with URL validation, strict TLS/HTTPS validation, and explicit warning for unencrypted local HTTP.
-- [ ] **AUTH-02**: Authenticate user via @jellyfin/sdk with proper client identification (FINORA, device info, persistent installation ID).
-- [ ] **AUTH-03**: Securely persist access tokens in hardware keystore, discard password immediately post-auth, and auto-restore session on startup.
-- [ ] **AUTH-04**: Support multi-server configurations and user switching without cross-contaminating cache or credentials.
-- [ ] **AUTH-05**: Implement clean logout, session revocation, and cache clearing.
+- [x] **AUTH-01**: Add Jellyfin server with URL validation, strict TLS/HTTPS validation, and explicit warning for unencrypted local HTTP.
+- [x] **AUTH-02**: Authenticate user via @jellyfin/sdk with proper client identification (FINORA, device info, persistent installation ID).
+- [x] **AUTH-03**: Securely persist access tokens in hardware keystore, discard password immediately post-auth, and auto-restore session on startup.
+- [x] **AUTH-04**: Support multi-server configurations and user switching without cross-contaminating cache or credentials.
+- [x] **AUTH-05**: Implement clean logout, session revocation, and cache clearing.
 
 ### Jellyfin Data & Repositories (DATA)
 
@@ -78,7 +78,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Diagnostics & Settings (DIAG)
 
-- [ ] **DIAG-01**: Implement Settings screen with Server Diagnostics (connectivity, API status, HTTPS, latency, playback health).
+- [x] **DIAG-01**: Implement Settings screen with Server Diagnostics (connectivity, API status, HTTPS, latency, playback health).
 
 ---
 
@@ -128,12 +128,12 @@ Which phases cover which requirements.
 | FOUND-03 | Phase 1: Foundation | Complete |
 | FOUND-04 | Phase 1: Foundation | Complete |
 | FOUND-05 | Phase 1: Foundation | Complete |
-| AUTH-01 | Phase 2: Jellyfin Connection | Pending |
-| AUTH-02 | Phase 2: Jellyfin Connection | Pending |
-| AUTH-03 | Phase 2: Jellyfin Connection | Pending |
-| AUTH-04 | Phase 2: Jellyfin Connection | Pending |
-| AUTH-05 | Phase 2: Jellyfin Connection | Pending |
-| DIAG-01 | Phase 2: Jellyfin Connection | Pending |
+| AUTH-01 | Phase 2: Jellyfin Connection | Complete |
+| AUTH-02 | Phase 2: Jellyfin Connection | Complete |
+| AUTH-03 | Phase 2: Jellyfin Connection | Complete |
+| AUTH-04 | Phase 2: Jellyfin Connection | Complete |
+| AUTH-05 | Phase 2: Jellyfin Connection | Complete |
+| DIAG-01 | Phase 2: Jellyfin Connection | Complete |
 | DATA-01 | Phase 3: Jellyfin Data & Repositories | Pending |
 | DATA-02 | Phase 3: Jellyfin Data & Repositories | Pending |
 | DATA-03 | Phase 3: Jellyfin Data & Repositories | Pending |
@@ -165,7 +165,7 @@ Which phases cover which requirements.
 **Coverage:**
 - v1 requirements: 35 total
 - Mapped to phases: 35
-- Completed: 5
+- Completed: 11
 - Unmapped: 0 ✓
 
 ---

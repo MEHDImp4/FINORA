@@ -7,7 +7,7 @@ FINORA is built incrementally from a rock-solid, production-grade native foundat
 ## Phases
 
 - [x] **Phase 1: Foundation** - Expo New Architecture, TypeScript strict, Expo Router v4, design tokens, networking, secure storage, and polyfills
-- [ ] **Phase 2: Jellyfin Connection** - Server discovery, URL & TLS validation, authentication, keystore session persistence, multi-server switcher, and server diagnostics
+- [x] **Phase 2: Jellyfin Connection** - Server discovery, URL & TLS validation, authentication, keystore session persistence, multi-server switcher, and server diagnostics
 - [ ] **Phase 3: Jellyfin Data & Repositories** - Decoupled repository layer, TanStack Query caching, display-matched image optimization, and progress synchronization
 - [ ] **Phase 4: Cinematic Home** - Dynamic Hero banner, virtualized horizontal carousels, isolated render trees, and 60/90/120 Hz scroll performance
 - [ ] **Phase 5: Media Details** - Movie & Series detail screens, season picker, episode cards, and card-to-details micro-interactions
@@ -49,9 +49,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: Build Jellyfin client initialization with polyfills, client identification, and server connection/URL validation.
-- [ ] 02-02: Implement authentication flow, password purging, SecureStore token storage, and session auto-restoration.
-- [ ] 02-03: Implement multi-server account switching, logout teardown, and Server Diagnostics view.
+- [x] 02-01: Build Jellyfin client initialization with polyfills, client identification, and server connection/URL validation.
+- [x] 02-02: Implement authentication flow, password purging, SecureStore token storage, and session auto-restoration.
+- [x] 02-03: Implement multi-server account switching, logout teardown, and Server Diagnostics view.
 
 ### Phase 3: Jellyfin Data & Repositories
 **Goal**: Build a decoupled repository architecture wrapping `@jellyfin/sdk`, integrate TanStack Query for caching, implement display-matched image optimization with `expo-image`, and synchronize user watch progress and favorites.
@@ -182,7 +182,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-09-10 |
-| 2. Jellyfin Connection | 0/3 | Not started | - |
+| 2. Jellyfin Connection | 3/3 | Complete | 2026-09-10 |
 | 3. Jellyfin Data & Repositories | 0/3 | Not started | - |
 | 4. Cinematic Home | 0/2 | Not started | - |
 | 5. Media Details | 0/2 | Not started | - |

@@ -1,0 +1,154 @@
+import { ServerManager, SAVED_ACCOUNTS_STORAGE_KEY } from "../serverManager";
+import { JellyfinClient } from "../jellyfinClient";
+import { ISecureTokenStorage, IUserPreferencesStorage } from "../../security/storage";
+import { getAuthTokenStorageKey, ACTIVE_SESSION_STORAGE_KEY } from "../authRepository";
+
+jest.mock("../jellyfinClient");
+
+describe("ServerManager", () => {
+  let manager: ServerManager;
+  let mockClient: jest.Mocked<JellyfinClient>;
+  let mockSecureStorage: jest.Mocked<ISecureTokenStorage>;
+  let mockPrefStorage: jest.Mocked<IUserPreferencesStorage>;
+
+  beforeEach(() => {
+    mockClient = new JellyfinClient() as jest.Mocked<JellyfinClient>;
+    mockClient.setServerUrl = jest.fn();
+    mockClient.setAuthToken = jest.fn();
+
+    mockSecureStorage = {
+      getToken: jest.fn(),
+      setToken: jest.fn(),
+      deleteToken: jest.fn()
+    };
+
+    mockPrefStorage = {
+      getItem: jest.fn(),
+      setItem: jest.fn(),
+      removeItem: jest.fn(),
+      clear: jest.fn()
+    };
+
+    manager = new ServerManager(mockClient, mockSecureStorage, mockPrefStorage);
+  });
+
+  describe("saveAccount and getSavedAccounts", () => {
+    it("persists accounts list to preferences", async () => {
+      mockPrefStorage.getItem.mockResolvedValue([]);
+
+      await manager.saveAccount({
+        serverId: "server-A",
+        serverName: "Home Server",
+        serverUrl: "https://jellyfin-a.local",
+        userId: "user-1",
+        userName: "Alice",
+        lastUsedAt: 100
+      });
+
+      expect(mockPrefStorage.setItem).toHaveBeenCalledWith(
+        SAVED_ACCOUNTS_STORAGE_KEY,
+        expect.arrayContaining([
+          expect.objectContaining({
+            serverId: "server-A",
+            userId: "user-1",
+            userName: "Alice"
+          })
+        ])
+      );
+    });
+  });
+
+  describe("switchAccount", () => {
+    it("switches client target and applies token without cross-contamination", async () => {
+      mockPrefStorage.getItem.mockImplementation(async (key) => {
+        if (key === SAVED_ACCOUNTS_STORAGE_KEY) {
+          return [
+            {
+              serverId: "server-A",
+              serverName: "Home Server",
+              serverUrl: "https://jellyfin-a.local",
+              userId: "user-1",
+              userName: "Alice",
+              lastUsedAt: 100
+            },
+            {
+              serverId: "server-B",
+              serverName: "Remote Server",
+              serverUrl: "https://jellyfin-b.remote",
+              userId: "user-2",
+              userName: "Bob",
+              lastUsedAt: 200
+            }
+          ];
+        }
+        return null;
+      });
+
+      const tokenKeyB = getAuthTokenStorageKey("server-B", "user-2");
+      mockSecureStorage.getToken.mockImplementation(async (key) => {
+        if (key === tokenKeyB) return "token-for-bob-server-b";
+        return null;
+      });
+
+      const session = await manager.switchAccount("server-B", "user-2");
+
+      expect(session.userId).toBe("user-2");
+      expect(session.serverId).toBe("server-B");
+      expect(session.token).toBe("token-for-bob-server-b");
+
+      // Verify client updated to server B
+      expect(mockClient.setServerUrl).toHaveBeenCalledWith("https://jellyfin-b.remote");
+      expect(mockClient.setAuthToken).toHaveBeenCalledWith("token-for-bob-server-b");
+
+      // Active session updated
+      expect(mockPrefStorage.setItem).toHaveBeenCalledWith(
+        ACTIVE_SESSION_STORAGE_KEY,
+        expect.objectContaining({
+          userId: "user-2",
+          serverId: "server-B",
+          serverUrl: "https://jellyfin-b.remote"
+        })
+      );
+    });
+
+    it("throws error if account is not found", async () => {
+      mockPrefStorage.getItem.mockResolvedValue([]);
+
+      await expect(manager.switchAccount("server-unknown", "user-unknown")).rejects.toThrow(
+        "Account not found"
+      );
+    });
+  });
+
+  describe("removeAccount", () => {
+    it("deletes secure token and removes from preferences", async () => {
+      mockPrefStorage.getItem.mockImplementation(async (key) => {
+        if (key === SAVED_ACCOUNTS_STORAGE_KEY) {
+          return [
+            {
+              serverId: "server-A",
+              serverName: "Home Server",
+              serverUrl: "https://jellyfin-a.local",
+              userId: "user-1",
+              userName: "Alice",
+              lastUsedAt: 100
+            }
+          ];
+        }
+        if (key === ACTIVE_SESSION_STORAGE_KEY) {
+          return { serverId: "server-A", userId: "user-1" };
+        }
+        return null;
+      });
+
+      const tokenKeyA = getAuthTokenStorageKey("server-A", "user-1");
+
+      await manager.removeAccount("server-A", "user-1");
+
+      expect(mockSecureStorage.deleteToken).toHaveBeenCalledWith(tokenKeyA);
+      expect(mockPrefStorage.setItem).toHaveBeenCalledWith(SAVED_ACCOUNTS_STORAGE_KEY, []);
+      expect(mockPrefStorage.removeItem).toHaveBeenCalledWith(ACTIVE_SESSION_STORAGE_KEY);
+      expect(mockClient.setAuthToken).toHaveBeenCalledWith(null);
+    });
+  });
+});
