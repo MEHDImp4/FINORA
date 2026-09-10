@@ -110,7 +110,14 @@ describe("MediaRepository", () => {
 
     const item = await repository.getItem("user-123", "item-99", mockHttpClient);
 
-    expect(mockHttpClient.request).toHaveBeenCalledWith("/Users/user-123/Items/item-99");
+    expect(mockHttpClient.request).toHaveBeenCalledWith(
+      "/Users/user-123/Items/item-99",
+      expect.objectContaining({
+        params: expect.objectContaining({
+          Fields: expect.stringContaining("People")
+        })
+      })
+    );
     expect(item.id).toBe("item-99");
     expect(item.name).toBe("Specific Film");
   });

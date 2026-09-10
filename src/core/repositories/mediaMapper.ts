@@ -70,6 +70,35 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
   const primaryImageTag = dto.ImageTags?.Primary;
   const logoImageTag = dto.ImageTags?.Logo;
 
+  let tagline: string | undefined = undefined;
+  if (Array.isArray(dto.Taglines) && dto.Taglines.length > 0) {
+    tagline = dto.Taglines[0];
+  } else if (typeof dto.Tagline === "string") {
+    tagline = dto.Tagline;
+  }
+
+  const people = Array.isArray(dto.People)
+    ? dto.People.map((p: any) => ({
+        id: String(p.Id || ""),
+        name: String(p.Name || "Unknown"),
+        role: p.Role || undefined,
+        type: p.Type || undefined,
+        primaryImageTag: p.PrimaryImageTag || undefined
+      }))
+    : undefined;
+
+  const mediaStreams = Array.isArray(dto.MediaStreams)
+    ? dto.MediaStreams.map((s: any) => ({
+        type: s.Type as "Video" | "Audio" | "Subtitle",
+        codec: s.Codec || undefined,
+        displayTitle: s.DisplayTitle || undefined,
+        width: typeof s.Width === "number" ? s.Width : undefined,
+        height: typeof s.Height === "number" ? s.Height : undefined,
+        channels: typeof s.Channels === "number" ? s.Channels : undefined,
+        isDefault: Boolean(s.IsDefault)
+      }))
+    : undefined;
+
   return {
     id: String(dto.Id || ""),
     name: String(dto.Name || "Untitled"),
@@ -79,6 +108,8 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
     runtimeMinutes,
     communityRating:
       typeof dto.CommunityRating === "number" ? Math.round(dto.CommunityRating * 10) / 10 : undefined,
+    officialRating: dto.OfficialRating || undefined,
+    tagline,
     genres: Array.isArray(dto.Genres) ? dto.Genres : [],
     backdropImageTag,
     primaryImageTag,
@@ -93,7 +124,9 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
     seriesName: dto.SeriesName || undefined,
     seasonId: dto.SeasonId || undefined,
     seasonIndex: typeof dto.ParentIndexNumber === "number" ? dto.ParentIndexNumber : undefined,
-    episodeIndex: typeof dto.IndexNumber === "number" ? dto.IndexNumber : undefined
+    episodeIndex: typeof dto.IndexNumber === "number" ? dto.IndexNumber : undefined,
+    people,
+    mediaStreams
   };
 }
 

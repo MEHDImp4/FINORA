@@ -7,6 +7,24 @@ export type MediaType =
   | "Folder"
   | "Unknown";
 
+export interface Person {
+  id: string;
+  name: string;
+  role?: string;
+  type?: string;
+  primaryImageTag?: string;
+}
+
+export interface MediaStreamInfo {
+  type: "Video" | "Audio" | "Subtitle";
+  codec?: string;
+  displayTitle?: string;
+  width?: number;
+  height?: number;
+  channels?: number;
+  isDefault?: boolean;
+}
+
 export interface MediaItem {
   id: string;
   name: string;
@@ -15,6 +33,8 @@ export interface MediaItem {
   year?: number;
   runtimeMinutes?: number;
   communityRating?: number;
+  officialRating?: string;
+  tagline?: string;
   genres: string[];
   backdropImageTag?: string;
   primaryImageTag?: string;
@@ -30,6 +50,8 @@ export interface MediaItem {
   seasonId?: string;
   seasonIndex?: number;
   episodeIndex?: number;
+  people?: Person[];
+  mediaStreams?: MediaStreamInfo[];
 }
 
 export interface MediaLibrary {

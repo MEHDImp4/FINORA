@@ -81,6 +81,62 @@ describe("mediaMapper", () => {
       expect(result.playedPercentage).toBe(100);
     });
 
+    it("maps people, media streams, official rating, and tagline correctly", () => {
+      const dto = {
+        Id: "movie-full",
+        Name: "Interstellar",
+        Type: "Movie",
+        OfficialRating: "PG-13",
+        Taglines: ["Mankind was born on Earth. It was never meant to die here."],
+        People: [
+          {
+            Id: "person-1",
+            Name: "Matthew McConaughey",
+            Role: "Cooper",
+            Type: "Actor",
+            PrimaryImageTag: "tag-matthew"
+          },
+          {
+            Id: "person-2",
+            Name: "Christopher Nolan",
+            Role: "Director",
+            Type: "Director"
+          }
+        ],
+        MediaStreams: [
+          {
+            Type: "Video",
+            Codec: "hevc",
+            DisplayTitle: "4K HEVC",
+            Width: 3840,
+            Height: 2160,
+            IsDefault: true
+          },
+          {
+            Type: "Audio",
+            Codec: "dts",
+            DisplayTitle: "DTS-HD MA 5.1",
+            Channels: 6,
+            IsDefault: true
+          }
+        ]
+      };
+
+      const result = mapJellyfinItemToMediaItem(dto);
+
+      expect(result.officialRating).toBe("PG-13");
+      expect(result.tagline).toBe("Mankind was born on Earth. It was never meant to die here.");
+      expect(result.people).toHaveLength(2);
+      expect(result.people?.[0].name).toBe("Matthew McConaughey");
+      expect(result.people?.[0].role).toBe("Cooper");
+      expect(result.people?.[0].primaryImageTag).toBe("tag-matthew");
+      expect(result.people?.[1].name).toBe("Christopher Nolan");
+      expect(result.mediaStreams).toHaveLength(2);
+      expect(result.mediaStreams?.[0].codec).toBe("hevc");
+      expect(result.mediaStreams?.[0].width).toBe(3840);
+      expect(result.mediaStreams?.[1].channels).toBe(6);
+    });
+
     it("handles minimal item with missing fields without crashing", () => {
       const dto = { Id: "min-1" };
       const result = mapJellyfinItemToMediaItem(dto);
@@ -93,6 +149,8 @@ describe("mediaMapper", () => {
       expect(result.playedPercentage).toBe(0);
       expect(result.isPlayed).toBe(false);
       expect(result.isFavorite).toBe(false);
+      expect(result.people).toBeUndefined();
+      expect(result.mediaStreams).toBeUndefined();
     });
   });
 

@@ -74,3 +74,17 @@ export function getLogoUrl(
     tag
   });
 }
+
+export function getPersonImageUrl(
+  baseUrl: string,
+  personId: string,
+  tag?: string,
+  targetWidth: number = 200
+): string {
+  return buildImageUrl(baseUrl, personId, "Primary", {
+    width: targetWidth,
+    quality: 80,
+    tag
+  });
+}
+
