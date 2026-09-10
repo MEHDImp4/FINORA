@@ -27,10 +27,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Jellyfin Data & Repositories (DATA)
 
-- [ ] **DATA-01**: Build FINORA repository abstraction layer (AuthRepository, MediaRepository, PlaybackRepository, SessionRepository, UserRepository).
-- [ ] **DATA-02**: Fetch and cache user libraries, items, collections, and metadata via TanStack Query.
-- [ ] **DATA-03**: Construct display-optimized image URLs with expo-image (memory/disk cache, blurhash placeholders, downsampled resolutions).
-- [ ] **DATA-04**: Synchronize user watch progress, resume timestamps, and favorites bidirectionally with Jellyfin.
+- [x] **DATA-01**: Build FINORA repository abstraction layer (AuthRepository, MediaRepository, PlaybackRepository, SessionRepository, UserRepository).
+- [x] **DATA-02**: Fetch and cache user libraries, items, collections, and metadata via TanStack Query.
+- [x] **DATA-03**: Construct display-optimized image URLs with expo-image (memory/disk cache, blurhash placeholders, downsampled resolutions).
+- [x] **DATA-04**: Synchronize user watch progress, resume timestamps, and favorites bidirectionally with Jellyfin.
 
 ### Home & Browsing (HOME)
 
@@ -134,10 +134,10 @@ Which phases cover which requirements.
 | AUTH-04 | Phase 2: Jellyfin Connection | Complete |
 | AUTH-05 | Phase 2: Jellyfin Connection | Complete |
 | DIAG-01 | Phase 2: Jellyfin Connection | Complete |
-| DATA-01 | Phase 3: Jellyfin Data & Repositories | Pending |
-| DATA-02 | Phase 3: Jellyfin Data & Repositories | Pending |
-| DATA-03 | Phase 3: Jellyfin Data & Repositories | Pending |
-| DATA-04 | Phase 3: Jellyfin Data & Repositories | Pending |
+| DATA-01 | Phase 3: Jellyfin Data & Repositories | Complete |
+| DATA-02 | Phase 3: Jellyfin Data & Repositories | Complete |
+| DATA-03 | Phase 3: Jellyfin Data & Repositories | Complete |
+| DATA-04 | Phase 3: Jellyfin Data & Repositories | Complete |
 | HOME-01 | Phase 4: Cinematic Home | Pending |
 | HOME-02 | Phase 4: Cinematic Home | Pending |
 | HOME-03 | Phase 4: Cinematic Home | Pending |
@@ -165,7 +165,7 @@ Which phases cover which requirements.
 **Coverage:**
 - v1 requirements: 35 total
 - Mapped to phases: 35
-- Completed: 11
+- Completed: 15
 - Unmapped: 0 ✓
 
 ---
