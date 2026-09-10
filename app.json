@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "FINORA",
+    "slug": "finora",
+    "scheme": "finora",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "jsEngine": "hermes",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0C"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.finora.app"
+    },
+    "android": {
+      "package": "com.finora.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0A0C"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
