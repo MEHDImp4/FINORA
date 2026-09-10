@@ -1,0 +1,63 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": null,
+  "phases": [
+    {
+      "number": "1",
+      "name": "Foundation",
+      "status": "pending"
+    },
+    {
+      "number": "2",
+      "name": "Jellyfin Connection",
+      "status": "pending"
+    },
+    {
+      "number": "3",
+      "name": "Jellyfin Data & Repositories",
+      "status": "pending"
+    },
+    {
+      "number": "4",
+      "name": "Cinematic Home",
+      "status": "pending"
+    },
+    {
+      "number": "5",
+      "name": "Media Details",
+      "status": "pending"
+    },
+    {
+      "number": "6",
+      "name": "Player Foundation",
+      "status": "pending"
+    },
+    {
+      "number": "7",
+      "name": "Premium Player Experience",
+      "status": "pending"
+    },
+    {
+      "number": "8",
+      "name": "Search & Library",
+      "status": "pending"
+    },
+    {
+      "number": "9",
+      "name": "UX Polish & Accessibility",
+      "status": "pending"
+    },
+    {
+      "number": "10",
+      "name": "Offline Subsystem",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step",
+    "reason": "Phase 1 of 10 · 0% · executing"
+  },
+  "updated_at": "2026-09-10T17:44:24.905Z"
+}
