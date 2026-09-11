@@ -1,0 +1,83 @@
+import React from "react";
+import ReactTestRenderer, { act } from "react-test-renderer";
+import { DownloadsScreen, formatBytes } from "../components/DownloadsScreen";
+import { offlineStorageService } from "../offlineStorage";
+import { downloadManager } from "../downloadManager";
+import { OfflineMediaRecord } from "../types";
+
+// Mock router
+const mockPush = jest.fn();
+jest.mock("expo-router", () => ({
+  useRouter: () => ({
+    push: mockPush
+  })
+}));
+
+describe("DownloadsScreen & OfflineSyncManager", () => {
+  const mockRecord: OfflineMediaRecord = {
+    itemId: "movie-offline-1",
+    title: "Blade Runner",
+    type: "Movie",
+    year: 1982,
+    localPath: "finora_downloads/bladerunner.mp4",
+    fileSizeBytes: 1048576000, // ~1000 MB
+    totalTicks: 7000000000,
+    playbackPositionTicks: 0,
+    savedAt: Date.now()
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(offlineStorageService, "getAllOfflineMedia").mockResolvedValue([mockRecord]);
+    jest.spyOn(offlineStorageService, "deleteOfflineMedia").mockResolvedValue();
+    jest.spyOn(downloadManager, "subscribe").mockImplementation((listener) => {
+      listener([]);
+      return () => {};
+    });
+  });
+
+  it("formatBytes formats bytes to MB and GB appropriately", () => {
+    expect(formatBytes(0)).toBe("0 MB");
+    expect(formatBytes(500 * 1024 * 1024)).toBe("500 MB");
+    expect(formatBytes(2.5 * 1024 * 1024 * 1024)).toBe("2.5 GB");
+  });
+
+  it("renders downloaded items and allows offline playback", async () => {
+    const mockOnPlay = jest.fn();
+    let tree: any;
+
+    await act(async () => {
+      tree = ReactTestRenderer.create(<DownloadsScreen onPlayItem={mockOnPlay} />);
+    });
+
+    const playButton = tree.root.findByProps({
+      accessibilityLabel: "Play offline Blade Runner"
+    });
+    expect(playButton).toBeTruthy();
+
+    act(() => {
+      playButton.props.onPress();
+    });
+
+    expect(mockOnPlay).toHaveBeenCalledWith(mockRecord);
+  });
+
+  it("deletes a downloaded item upon button press", async () => {
+    let tree: any;
+
+    await act(async () => {
+      tree = ReactTestRenderer.create(<DownloadsScreen />);
+    });
+
+    const deleteButton = tree.root.findByProps({
+      accessibilityLabel: "Delete Blade Runner"
+    });
+    expect(deleteButton).toBeTruthy();
+
+    await act(async () => {
+      await deleteButton.props.onPress();
+    });
+
+    expect(offlineStorageService.deleteOfflineMedia).toHaveBeenCalledWith("movie-offline-1");
+  });
+});
