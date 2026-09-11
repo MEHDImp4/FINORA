@@ -14,7 +14,7 @@ FINORA is built incrementally from a rock-solid, production-grade native foundat
 - [x] **Phase 6: Player Foundation** - FinoraPlayerEngine abstraction, expo-video integration, PlaybackPlanner (Direct Play first), and session progress reporting
 - [x] **Phase 7: Premium Player Experience** - Auto-fading controls, swipe/tap gestures, audio/subtitle tracks, trickplay thumbnails, skip intro/credits, and stats for nerds
 - [x] **Phase 8: Search & Library** - Debounced global search, category filtering, library browser, sorting, and collections
-- [ ] **Phase 9: UX Polish & Accessibility** - Screen transitions, haptic feedback, accessibility labels, reduced-motion fallbacks, and unified state handling
+- [x] **Phase 9: UX Polish & Accessibility** - Screen transitions, haptic feedback, accessibility labels, reduced-motion fallbacks, and unified state handling
 - [ ] **Phase 10: Offline Subsystem** - Download manager, private app storage, SQLite metadata index, offline player playback, and reconnection sync
 
 ## Phase Details
@@ -156,8 +156,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 09-01: Implement reusable screen state components (shimmer skeletons, empty state, offline notice, error banner with retry).
-- [ ] 09-02: Add haptic feedback, accessibility labels, and reduced-motion animation accessibility fallbacks.
+- [x] 09-01: Implement reusable screen state components (shimmer skeletons, empty state, offline notice, error banner with retry).
+- [x] 09-02: Add haptic feedback, accessibility labels, and reduced-motion animation accessibility fallbacks.
 
 ### Phase 10: Offline Subsystem
 **Goal**: Enable complete offline video playback by downloading media items to private app sandbox storage, tracking metadata in an `expo-sqlite` database, and synchronizing watch progress once reconnected.
