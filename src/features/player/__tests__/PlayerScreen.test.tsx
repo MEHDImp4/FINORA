@@ -45,6 +45,7 @@ describe("PlayerScreen", () => {
           token="test-token"
           onBack={jest.fn()}
           playbackRepository={mockRepo}
+          overlayAutoHideMs={0}
         />
       );
     });
@@ -52,7 +53,7 @@ describe("PlayerScreen", () => {
     const videoView = root.root.findByProps({ testID: "expo-video-view" });
     expect(videoView).toBeTruthy();
 
-    const backButton = root.root.findByProps({ testID: "player-back-button" });
+    const backButton = root.root.findByProps({ testID: "overlay-back-button" });
     expect(backButton).toBeTruthy();
 
     act(() => {
@@ -72,11 +73,12 @@ describe("PlayerScreen", () => {
           token="test-token"
           onBack={onBackMock}
           playbackRepository={mockRepo}
+          overlayAutoHideMs={0}
         />
       );
     });
 
-    const backButton = root.root.findByProps({ testID: "player-back-button" });
+    const backButton = root.root.findByProps({ testID: "overlay-back-button" });
     act(() => {
       backButton.props.onPress();
     });

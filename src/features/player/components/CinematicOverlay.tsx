@@ -51,7 +51,7 @@ export function CinematicOverlay({
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (isPlaying && visible) {
+    if (isPlaying && visible && autoHideMs > 0) {
       timerRef.current = setTimeout(() => {
         onToggleVisible();
       }, autoHideMs);
