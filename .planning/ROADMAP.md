@@ -127,9 +127,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01: Build cinematic auto-fading player overlay, scrub timeline bar, and bottom sheets for audio/subtitle/quality selection.
-- [ ] 07-02: Implement player gestures (double-tap seek, vertical swipes, 2x speed) and Trickplay preview scrubbing.
-- [ ] 07-03: Implement Skip Intro / Skip Credits buttons and Stats for Nerds technical diagnostic overlay.
+- [x] 07-01: Build cinematic auto-fading player overlay, scrub timeline bar, and bottom sheets for audio/subtitle/quality selection.
+- [x] 07-02: Implement player gestures (double-tap seek, vertical swipes, 2x speed) and Trickplay preview scrubbing.
+- [x] 07-03: Implement Skip Intro / Skip Credits buttons and Stats for Nerds technical diagnostic overlay.
 
 ### Phase 8: Search & Library
 **Goal**: Enable fast media discovery through global debounced search with category filtering and a comprehensive library browsing experience with sorting and collection support.

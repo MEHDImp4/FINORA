@@ -53,12 +53,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Premium Player & Controls (PPL)
 
-- [ ] **PPL-01**: Implement minimalist cinematic overlay controls with auto-fade on inactivity and scrub timeline.
-- [ ] **PPL-02**: Support audio track selection and subtitle selection (external/embedded) via sleek bottom sheets.
-- [ ] **PPL-03**: Implement player touch gestures (double-tap seek +/-10s, vertical brightness/volume swipes, long-press 2x speed) with toggle options.
-- [ ] **PPL-04**: Implement Trickplay preview scrubbing thumbnails when available from Jellyfin.
-- [ ] **PPL-05**: Implement Skip Intro and Skip Credits actions when chapter/plugin timestamps are present.
-- [ ] **PPL-06**: Implement Stats for Nerds overlay showing codecs, container, resolution, bitrate, HDR mode, and dropped frames (token redacted).
+- [x] **PPL-01**: Implement minimalist cinematic overlay controls with auto-fade on inactivity and scrub timeline.
+- [x] **PPL-02**: Support audio track selection and subtitle selection (external/embedded) via sleek bottom sheets.
+- [x] **PPL-03**: Implement player touch gestures (double-tap seek +/-10s, vertical brightness/volume swipes, long-press 2x speed) with toggle options.
+- [x] **PPL-04**: Implement Trickplay preview scrubbing thumbnails when available from Jellyfin.
+- [x] **PPL-05**: Implement Skip Intro and Skip Credits actions when chapter/plugin timestamps are present.
+- [x] **PPL-06**: Implement Stats for Nerds overlay showing codecs, container, resolution, bitrate, HDR mode, and dropped frames (token redacted).
 
 ### Search & Library (SRCH)
 
