@@ -3,7 +3,8 @@ module.exports = {
   testEnvironment: "node",
   testMatch: ["**/__tests__/**/*.test.[jt]s?(x)"],
   moduleNameMapper: {
-    "^@/(.*)$": "<rootDir>/src/$1"
+    "^@/(.*)$": "<rootDir>/src/$1",
+    "^expo-video$": "<rootDir>/__mocks__/expo-video.js"
   },
   transform: {
     "^.+\\.tsx?$": [
