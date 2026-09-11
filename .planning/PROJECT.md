@@ -14,44 +14,44 @@ Quality over feature count, performance over visual gimmicks, and rock-solid pla
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] **FOUND-01**: Initialize Expo React Native project with New Architecture, Hermes, TypeScript strict, Expo Router, and base folder structure (Phase 1)
+- [x] **FOUND-02**: Implement FINORA Design System foundation (dark cinematic palette, typography, layout tokens, FinoraScreen, buttons, icons, feedback) (Phase 1)
+- [x] **FOUND-03**: Centralize networking with resilient HTTP client, timeout, retry, backoff, sanitized logging, and error hierarchy (Phase 1)
+- [x] **FOUND-04**: Implement secure storage layer with expo-secure-store for sensitive tokens and AsyncStorage for user preferences (Phase 1)
+- [x] **AUTH-01**: Connect to Jellyfin server, validate HTTPS/TLS or warning for unencrypted local HTTP, and test connectivity (Phase 2)
+- [x] **AUTH-02**: Authenticate user against Jellyfin via @jellyfin/sdk with proper client identification (FINORA, device info, persistent installation ID) (Phase 2)
+- [x] **AUTH-03**: Securely store auth token, discard password immediately post-auth, restore session on app start, and support multi-server session switching (Phase 2)
+- [x] **AUTH-04**: Implement logout and clean session invalidation (Phase 2)
+- [x] **DATA-01**: Create FINORA Jellyfin client abstraction layer (Repositories: Auth, Library, Media, Playback, Session, User) (Phase 3)
+- [x] **DATA-02**: Fetch user media libraries, collections, genres, and metadata with TanStack Query caching (Phase 3)
+- [x] **DATA-03**: Construct optimized image URLs (expo-image) with display-matched resolutions, memory/disk cache, and smart prefetching (Phase 3)
+- [x] **DATA-04**: Synchronize user watch progress, resume points, and favorites with Jellyfin server (Phase 3)
+- [x] **HOME-01**: Build cinematic Home screen with dynamic Hero banner (backdrop, logo/fallback, metadata, quick play, watchlist toggle) (Phase 4)
+- [x] **HOME-02**: Implement virtualized, high-performance horizontal carousels (Continue Watching, Next Up, Recently Added, Movies, Series) (Phase 4)
+- [x] **HOME-03**: Maintain 60/90/120 Hz scroll performance with isolated render trees preventing carousel re-renders on Hero changes (Phase 4)
+- [x] **DET-01**: Build Movie Details screen with cinematic backdrop, logo, synopsis, metadata badges, cast/crew, and technical specs (Phase 5)
+- [x] **DET-02**: Build Series Details screen with season switcher, episode cards, thumbnails, progress, and quick next-episode play (Phase 5)
+- [x] **DET-03**: Add seamless press feedback, micro-interactions, and visual continuity from poster/card to details screen (Phase 5)
+- [x] **PLAY-01**: Build FinoraPlayerEngine abstraction over expo-video (with clean boundary for future native module extensions) (Phase 6)
+- [x] **PLAY-02**: Implement PlaybackPlanner to negotiate playback mode (Direct Play > Direct Stream > Transcoding) using DeviceProfile capabilities (Phase 6)
+- [x] **PLAY-03**: Implement Playback reporting to Jellyfin (Start, Progress with throttled reporting, Stop final event) (Phase 6)
+- [x] **PLAY-04**: Handle playback lifecycle (backgrounding, lock screen, orientation changes without restarting playback, PiP) (Phase 6)
+- [x] **PLAY-05**: Implement cinematic player overlay with auto-fade controls, scrub timeline, trickplay preview thumbnails, and stats for nerds (Phase 7)
+- [x] **PLAY-06**: Support audio track selection, subtitle tracks (external/embedded, styling), and quality selection via bottom sheets (Phase 7)
+- [x] **PLAY-07**: Implement player gestures (double tap seek +/-10s, vertical swipe brightness/volume, long press 2x boost) with toggle options (Phase 7)
+- [x] **PLAY-08**: Support chapter navigation and Skip Intro / Skip Credits when timestamps are available (Phase 7)
+- [x] **SRCH-01**: Build global Jellyfin search with debounce, request cancellation, category filtering (movies, series, episodes, people), and local search history (Phase 8)
+- [x] **SRCH-02**: Build Library browse screen with sorting, filtering, and collection viewing (Phase 8)
+- [x] **UX-01**: Implement consistent screen states: Loading skeletons, Content, Empty, Offline, and Error states with retry (Phase 9)
+- [x] **UX-02**: Add subtle haptic feedback for key interactions, accessibility labels, and reduced-motion support (Phase 9)
+- [x] **OFFL-01**: Implement offline download manager using expo-file-system and private app storage (Phase 10)
+- [x] **OFFL-02**: Persist offline metadata, download queue, and pending watch progress sync with expo-sqlite (Phase 10)
+- [x] **OFFL-03**: Implement offline playback from local storage with progress recording queued for reconnection sync (Phase 10)
+- [x] **DIAG-01**: Implement Settings screen with Server Diagnostics (connectivity, API status, HTTPS, latency, playback health) (Phase 2)
 
 ### Active
 
-- [ ] **FOUND-01**: Initialize Expo React Native project with New Architecture, Hermes, TypeScript strict, Expo Router, and base folder structure
-- [ ] **FOUND-02**: Implement FINORA Design System foundation (dark cinematic palette, typography, layout tokens, FinoraScreen, buttons, icons, feedback)
-- [ ] **FOUND-03**: Centralize networking with resilient HTTP client, timeout, retry, backoff, sanitized logging, and error hierarchy
-- [ ] **FOUND-04**: Implement secure storage layer with expo-secure-store for sensitive tokens and AsyncStorage for user preferences
-- [ ] **AUTH-01**: Connect to Jellyfin server, validate HTTPS/TLS or warning for unencrypted local HTTP, and test connectivity
-- [ ] **AUTH-02**: Authenticate user against Jellyfin via @jellyfin/sdk with proper client identification (FINORA, device info, persistent installation ID)
-- [ ] **AUTH-03**: Securely store auth token, discard password immediately post-auth, restore session on app start, and support multi-server session switching
-- [ ] **AUTH-04**: Implement logout and clean session invalidation
-- [ ] **DATA-01**: Create FINORA Jellyfin client abstraction layer (Repositories: Auth, Library, Media, Playback, Session, User)
-- [ ] **DATA-02**: Fetch user media libraries, collections, genres, and metadata with TanStack Query caching
-- [ ] **DATA-03**: Construct optimized image URLs (expo-image) with display-matched resolutions, memory/disk cache, and smart prefetching
-- [ ] **DATA-04**: Synchronize user watch progress, resume points, and favorites with Jellyfin server
-- [ ] **HOME-01**: Build cinematic Home screen with dynamic Hero banner (backdrop, logo/fallback, metadata, quick play, watchlist toggle)
-- [ ] **HOME-02**: Implement virtualized, high-performance horizontal carousels (Continue Watching, Next Up, Recently Added, Movies, Series)
-- [ ] **HOME-03**: Maintain 60/90/120 Hz scroll performance with isolated render trees preventing carousel re-renders on Hero changes
-- [ ] **DET-01**: Build Movie Details screen with cinematic backdrop, logo, synopsis, metadata badges, cast/crew, and technical specs
-- [ ] **DET-02**: Build Series Details screen with season switcher, episode cards, thumbnails, progress, and quick next-episode play
-- [ ] **DET-03**: Add seamless press feedback, micro-interactions, and visual continuity from poster/card to details screen
-- [ ] **PLAY-01**: Build FinoraPlayerEngine abstraction over expo-video (with clean boundary for future native module extensions)
-- [ ] **PLAY-02**: Implement PlaybackPlanner to negotiate playback mode (Direct Play > Direct Stream > Transcoding) using DeviceProfile capabilities
-- [ ] **PLAY-03**: Implement Playback reporting to Jellyfin (Start, Progress with throttled reporting, Stop final event)
-- [ ] **PLAY-04**: Handle playback lifecycle (backgrounding, lock screen, orientation changes without restarting playback, PiP)
-- [ ] **PLAY-05**: Implement cinematic player overlay with auto-fade controls, scrub timeline, trickplay preview thumbnails, and stats for nerds
-- [ ] **PLAY-06**: Support audio track selection, subtitle tracks (external/embedded, styling), and quality selection via bottom sheets
-- [ ] **PLAY-07**: Implement player gestures (double tap seek +/-10s, vertical swipe brightness/volume, long press 2x boost) with toggle options
-- [ ] **PLAY-08**: Support chapter navigation and Skip Intro / Skip Credits when timestamps are available
-- [ ] **SRCH-01**: Build global Jellyfin search with debounce, request cancellation, category filtering (movies, series, episodes, people), and local search history
-- [ ] **SRCH-02**: Build Library browse screen with sorting, filtering, and collection viewing
-- [ ] **UX-01**: Implement consistent screen states: Loading skeletons, Content, Empty, Offline, and Error states with retry
-- [ ] **UX-02**: Add subtle haptic feedback for key interactions, accessibility labels, and reduced-motion support
-- [ ] **OFFL-01**: Implement offline download manager using expo-file-system and private app storage
-- [ ] **OFFL-02**: Persist offline metadata, download queue, and pending watch progress sync with expo-sqlite
-- [ ] **OFFL-03**: Implement offline playback from local storage with progress recording queued for reconnection sync
-- [ ] **DIAG-01**: Implement Settings screen with Server Diagnostics (connectivity, API status, HTTPS, latency, playback health)
+(All v1 requirements validated in milestone 1.0)
 
 ### Out of Scope
 
@@ -92,11 +92,11 @@ Quality over feature count, performance over visual gimmicks, and rock-solid pla
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Expo + New Architecture + Hermes | Modern tooling, optimal performance, CNG native extensibility without losing Expo benefits | — Pending |
-| expo-video wrapped in FinoraPlayerEngine | High performance native player foundation with clean separation for future native codec/subtitles extensions | — Pending |
-| @jellyfin/sdk with FINORA Repository Layer | Official TypeScript support isolated behind app repositories for upgrade safety | — Pending |
-| TanStack Query + Zustand separation | Network state cached intelligently without polluting global client stores | — Pending |
-| expo-secure-store for credentials | Passwords never persisted, auth tokens encrypted at rest via hardware-backed keystore | — Pending |
+| Expo + New Architecture + Hermes | Modern tooling, optimal performance, CNG native extensibility without losing Expo benefits | Accepted / Validated |
+| expo-video wrapped in FinoraPlayerEngine | High performance native player foundation with clean separation for future native codec/subtitles extensions | Accepted / Validated |
+| @jellyfin/sdk with FINORA Repository Layer | Official TypeScript support isolated behind app repositories for upgrade safety | Accepted / Validated |
+| TanStack Query + Zustand separation | Network state cached intelligently without polluting global client stores | Accepted / Validated |
+| expo-secure-store for credentials | Passwords never persisted, auth tokens encrypted at rest via hardware-backed keystore | Accepted / Validated |
 
 ## Evolution
 
