@@ -232,6 +232,29 @@ export class MediaRepository {
     const items = response?.Items || [];
     return items.map(mapJellyfinItemToMediaItem);
   }
+
+  public async getGenres(
+    userId: string,
+    parentId?: string,
+    customClient?: HttpClient
+  ): Promise<string[]> {
+    if (!userId) {
+      throw new FinoraError("User ID is required to fetch genres", "INVALID_PARAMS");
+    }
+
+    const http = this.getHttp(customClient);
+    const params: Record<string, string | undefined> = {
+      UserId: userId,
+      ParentId: parentId
+    };
+
+    const response = await http.request<{ Items?: Array<{ Name?: string }> }>(`/Genres`, {
+      params
+    });
+
+    const items = response?.Items || [];
+    return items.map((g) => g.Name || "").filter(Boolean);
+  }
 }
 
 export const mediaRepository = new MediaRepository();

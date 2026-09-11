@@ -16,7 +16,9 @@ export const mediaKeys = {
   seasons: (seriesId: string, userId: string) =>
     [...mediaKeys.all, "seasons", seriesId, userId] as const,
   episodes: (seriesId: string, seasonId: string, userId: string) =>
-    [...mediaKeys.all, "episodes", seriesId, seasonId, userId] as const
+    [...mediaKeys.all, "episodes", seriesId, seasonId, userId] as const,
+  genres: (userId: string, parentId?: string) =>
+    [...mediaKeys.all, "genres", userId, parentId] as const
 };
 
 export function useLibraries(userId?: string) {
@@ -76,5 +78,14 @@ export function useEpisodes(seriesId?: string, seasonId?: string, userId?: strin
     queryKey: mediaKeys.episodes(seriesId || "", seasonId || "", userId || ""),
     queryFn: () => mediaRepository.getEpisodes(userId!, seriesId!, seasonId),
     enabled: Boolean(seriesId && userId)
+  });
+}
+
+export function useGenres(userId?: string, parentId?: string) {
+  return useQuery<string[]>({
+    queryKey: mediaKeys.genres(userId || "", parentId),
+    queryFn: () => mediaRepository.getGenres(userId!, parentId),
+    enabled: Boolean(userId),
+    staleTime: 5 * 60 * 1000
   });
 }
