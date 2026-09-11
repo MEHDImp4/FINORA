@@ -113,6 +113,50 @@ const Keyboard = {
   addListener: () => ({ remove: () => {} })
 };
 
+const AccessibilityInfo = {
+  isReduceMotionEnabled: jest.fn(() => Promise.resolve(false)),
+  addEventListener: () => ({ remove: () => {} })
+};
+
+class AnimatedValue {
+  constructor(val) {
+    this._value = val;
+  }
+  setValue(val) {
+    this._value = val;
+  }
+  interpolate(config) {
+    return this;
+  }
+}
+
+const Animated = {
+  Value: AnimatedValue,
+  timing: (val, config) => ({
+    start: (callback) => {
+      if (config && config.toValue !== undefined) {
+        val.setValue(config.toValue);
+      }
+      if (callback) callback({ finished: true });
+    },
+    stop: () => {}
+  }),
+  sequence: (animations) => ({
+    start: (callback) => {
+      animations.forEach((a) => a.start());
+      if (callback) callback({ finished: true });
+    },
+    stop: () => {}
+  }),
+  loop: (animation) => ({
+    start: (callback) => {
+      animation.start();
+    },
+    stop: () => {}
+  }),
+  View: View
+};
+
 module.exports = {
   View,
   Text,
@@ -130,5 +174,7 @@ module.exports = {
   StatusBar,
   AppState,
   PanResponder,
-  Modal
+  Modal,
+  AccessibilityInfo,
+  Animated
 };
