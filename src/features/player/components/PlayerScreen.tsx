@@ -23,6 +23,7 @@ export interface PlayerScreenProps {
   item: MediaItem;
   serverUrl: string;
   token?: string;
+  localPath?: string;
   onBack: () => void;
   playbackRepository?: any;
   overlayAutoHideMs?: number;
@@ -32,6 +33,7 @@ export function PlayerScreen({
   item,
   serverUrl,
   token = "",
+  localPath,
   onBack,
   playbackRepository: customPlaybackRepo,
   overlayAutoHideMs = 4000
@@ -40,8 +42,6 @@ export function PlayerScreen({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [tracksModalVisible, setTracksModalVisible] = useState(false);
   const [statsModalVisible, setStatsModalVisible] = useState(false);
-
-  // Selected tracks
   const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | undefined>(undefined);
   const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState<number | null>(null);
   const [selectedQuality, setSelectedQuality] = useState<string>("auto");
@@ -56,9 +56,10 @@ export function PlayerScreen({
     return createPlaybackPlan({
       item,
       serverUrl,
-      token
+      token,
+      localPath
     });
-  }, [item, serverUrl, token]);
+  }, [item, serverUrl, token, localPath]);
 
   // Initial resume position in seconds
   const initialPositionSeconds = useMemo(() => {
@@ -164,6 +165,11 @@ export function PlayerScreen({
         onBack={handleBack}
         onOpenTracks={() => setTracksModalVisible(true)}
         onOpenStats={() => setStatsModalVisible(true)}
+        onScrubbingChange={setIsScrubbing}
+        onScrubMove={(seconds, percent) => {
+          setScrubPositionSeconds(seconds);
+          setScrubPositionPercent(percent);
+        }}
         autoHideMs={overlayAutoHideMs}
       />
 

@@ -15,7 +15,7 @@ FINORA is built incrementally from a rock-solid, production-grade native foundat
 - [x] **Phase 7: Premium Player Experience** - Auto-fading controls, swipe/tap gestures, audio/subtitle tracks, trickplay thumbnails, skip intro/credits, and stats for nerds
 - [x] **Phase 8: Search & Library** - Debounced global search, category filtering, library browser, sorting, and collections
 - [x] **Phase 9: UX Polish & Accessibility** - Screen transitions, haptic feedback, accessibility labels, reduced-motion fallbacks, and unified state handling
-- [ ] **Phase 10: Offline Subsystem** - Download manager, private app storage, SQLite metadata index, offline player playback, and reconnection sync
+- [x] **Phase 10: Offline Subsystem** - Download manager, private app storage, SQLite metadata index, offline player playback, and reconnection sync
 
 ## Phase Details
 

@@ -62,19 +62,19 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Search & Library (SRCH)
 
-- [ ] **SRCH-01**: Build global Jellyfin search with debounce, request cancellation, category filtering (movies, series, episodes, people), and local search history.
-- [ ] **SRCH-02**: Build Library browse screen with sorting, filtering, and collection viewing.
+- [x] **SRCH-01**: Build global Jellyfin search with debounce, request cancellation, category filtering (movies, series, episodes, people), and local search history.
+- [x] **SRCH-02**: Build Library browse screen with sorting, filtering, and collection viewing.
 
 ### UX Polish & States (UX)
 
-- [ ] **UX-01**: Implement unified screen state architecture: Loading skeletons, Content, Empty, Offline, and Error states with retry.
-- [ ] **UX-02**: Add subtle haptic feedback for key actions, full accessibility labels, and reduced-motion animation fallbacks.
+- [x] **UX-01**: Implement unified screen state architecture: Loading skeletons, Content, Empty, Offline, and Error states with retry.
+- [x] **UX-02**: Add subtle haptic feedback for key actions, full accessibility labels, and reduced-motion animation fallbacks.
 
 ### Offline Subsystem (OFFL)
 
-- [ ] **OFFL-01**: Implement offline download manager using expo-file-system and private app storage.
-- [ ] **OFFL-02**: Persist offline metadata, download queue, and pending watch progress sync with expo-sqlite.
-- [ ] **OFFL-03**: Implement offline playback from local storage with progress recording queued for reconnection sync.
+- [x] **OFFL-01**: Implement offline download manager using expo-file-system and private app storage.
+- [x] **OFFL-02**: Persist offline metadata, download queue, and pending watch progress sync with expo-sqlite.
+- [x] **OFFL-03**: Implement offline playback from local storage with progress recording queued for reconnection sync.
 
 ### Diagnostics & Settings (DIAG)
 
@@ -144,30 +144,30 @@ Which phases cover which requirements.
 | DET-01 | Phase 5: Media Details | Complete |
 | DET-02 | Phase 5: Media Details | Complete |
 | DET-03 | Phase 5: Media Details | Complete |
-| PLAY-01 | Phase 6: Player Foundation | Pending |
-| PLAY-02 | Phase 6: Player Foundation | Pending |
-| PLAY-03 | Phase 6: Player Foundation | Pending |
-| PLAY-04 | Phase 6: Player Foundation | Pending |
-| PPL-01 | Phase 7: Premium Player Experience | Pending |
-| PPL-02 | Phase 7: Premium Player Experience | Pending |
-| PPL-03 | Phase 7: Premium Player Experience | Pending |
-| PPL-04 | Phase 7: Premium Player Experience | Pending |
-| PPL-05 | Phase 7: Premium Player Experience | Pending |
-| PPL-06 | Phase 7: Premium Player Experience | Pending |
-| SRCH-01 | Phase 8: Search & Library | Pending |
-| SRCH-02 | Phase 8: Search & Library | Pending |
-| UX-01 | Phase 9: UX Polish & Accessibility | Pending |
-| UX-02 | Phase 9: UX Polish & Accessibility | Pending |
-| OFFL-01 | Phase 10: Offline Subsystem | Pending |
-| OFFL-02 | Phase 10: Offline Subsystem | Pending |
-| OFFL-03 | Phase 10: Offline Subsystem | Pending |
+| PLAY-01 | Phase 6: Player Foundation | Complete |
+| PLAY-02 | Phase 6: Player Foundation | Complete |
+| PLAY-03 | Phase 6: Player Foundation | Complete |
+| PLAY-04 | Phase 6: Player Foundation | Complete |
+| PPL-01 | Phase 7: Premium Player Experience | Complete |
+| PPL-02 | Phase 7: Premium Player Experience | Complete |
+| PPL-03 | Phase 7: Premium Player Experience | Complete |
+| PPL-04 | Phase 7: Premium Player Experience | Complete |
+| PPL-05 | Phase 7: Premium Player Experience | Complete |
+| PPL-06 | Phase 7: Premium Player Experience | Complete |
+| SRCH-01 | Phase 8: Search & Library | Complete |
+| SRCH-02 | Phase 8: Search & Library | Complete |
+| UX-01 | Phase 9: UX Polish & Accessibility | Complete |
+| UX-02 | Phase 9: UX Polish & Accessibility | Complete |
+| OFFL-01 | Phase 10: Offline Subsystem | Complete |
+| OFFL-02 | Phase 10: Offline Subsystem | Complete |
+| OFFL-03 | Phase 10: Offline Subsystem | Complete |
 
 **Coverage:**
 - v1 requirements: 35 total
 - Mapped to phases: 35
-- Completed: 21
+- Completed: 35
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-10*  
-*Last updated: 2026-09-10 after Phase 1 completion*
+*Last updated: 2026-09-11 after Phase 10 completion*

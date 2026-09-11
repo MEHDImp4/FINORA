@@ -4,6 +4,9 @@ status: completed
 plans_executed:
   - 08-01
   - 08-02
+requirements_completed:
+  - SRCH-01
+  - SRCH-02
 verification:
   typecheck: passed
   tests_passed: 140

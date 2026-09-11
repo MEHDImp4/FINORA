@@ -5,6 +5,10 @@ plans_executed:
   - 10-01
   - 10-02
   - 10-03
+requirements_completed:
+  - OFFL-01
+  - OFFL-02
+  - OFFL-03
 verification:
   typecheck: passed
   tests_passed: 161

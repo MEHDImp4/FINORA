@@ -57,7 +57,7 @@ export default function HomeScreen() {
     null;
 
   const handlePlay = (item: MediaItem) => {
-    // Playback trigger will connect to FinoraPlayerEngine in Phase 6
+    router.push({ pathname: "/player/[id]", params: { id: item.id } });
   };
 
   const handleItemPress = (item: MediaItem) => {

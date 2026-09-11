@@ -24,6 +24,8 @@ export interface CinematicOverlayProps {
   onBack: () => void;
   onOpenTracks: () => void;
   onOpenStats?: () => void;
+  onScrubbingChange?: (isScrubbing: boolean) => void;
+  onScrubMove?: (seconds: number, percent: number) => void;
   autoHideMs?: number;
 }
 
@@ -42,6 +44,8 @@ export function CinematicOverlay({
   onBack,
   onOpenTracks,
   onOpenStats,
+  onScrubbingChange,
+  onScrubMove,
   autoHideMs = 4000
 }: CinematicOverlayProps) {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -213,7 +217,9 @@ export function CinematicOverlay({
             } else {
               resetTimer();
             }
+            onScrubbingChange?.(isScrubbing);
           }}
+          onScrubMove={onScrubMove}
         />
       </View>
     </Pressable>

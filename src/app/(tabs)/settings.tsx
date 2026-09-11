@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
 import { FinoraScreen } from "../../design-system/components/FinoraScreen";
 import { FinoraButton } from "../../design-system/components/FinoraButton";
 import { useAuthStore } from "../../stores/authStore";
+import { useServerStore } from "../../stores/serverStore";
 import {
   diagnosticsService,
   ServerDiagnosticsResult
@@ -16,8 +17,17 @@ import {
 export default function SettingsScreen() {
   const session = useAuthStore((state) => state.session);
   const logout = useAuthStore((state) => state.logout);
+  const savedAccounts = useServerStore((state) => state.savedAccounts);
+  const loadSavedAccounts = useServerStore((state) => state.loadSavedAccounts);
+  const switchAccount = useServerStore((state) => state.switchAccount);
+  const removeAccount = useServerStore((state) => state.removeAccount);
+
   const [isRunning, setIsRunning] = useState(false);
   const [diagResult, setDiagResult] = useState<ServerDiagnosticsResult | null>(null);
+
+  useEffect(() => {
+    loadSavedAccounts();
+  }, [loadSavedAccounts]);
 
   const handleRunDiagnostics = async () => {
     const url = session?.serverUrl || "https://demo.jellyfin.org";
@@ -60,6 +70,52 @@ export default function SettingsScreen() {
             </View>
           ) : (
             <Text style={styles.emptyText}>Not connected to any Jellyfin server.</Text>
+          )}
+        </View>
+
+        {/* Saved Accounts / Multi-Server Switching (AUTH-04) */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>Saved Accounts (AUTH-04)</Text>
+          <Text style={styles.cardDescription}>
+            Switch between configured Jellyfin servers and user profiles without re-entering credentials.
+          </Text>
+          {savedAccounts.length > 0 ? (
+            savedAccounts.map((account) => {
+              const isActive =
+                session?.serverId === account.serverId && session?.userId === account.userId;
+              return (
+                <View
+                  key={`${account.serverId}-${account.userId}`}
+                  style={styles.accountRow}
+                  testID={`saved-account-${account.userId}`}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.infoValue}>
+                      {account.userName} {isActive ? "(Active)" : ""}
+                    </Text>
+                    <Text style={styles.infoLabel}>{account.serverUrl}</Text>
+                  </View>
+                  {!isActive ? (
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <FinoraButton
+                        label="Switch"
+                        variant="primary"
+                        size="sm"
+                        onPress={() => switchAccount(account.serverId, account.userId)}
+                      />
+                      <FinoraButton
+                        label="Remove"
+                        variant="secondary"
+                        size="sm"
+                        onPress={() => removeAccount(account.serverId, account.userId)}
+                      />
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })
+          ) : (
+            <Text style={styles.emptyText}>No other accounts saved.</Text>
           )}
         </View>
 
@@ -212,5 +268,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#8A8A9E",
     fontStyle: "italic"
+  },
+  accountRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1E1E26"
   }
 });

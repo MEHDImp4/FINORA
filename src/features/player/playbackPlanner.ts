@@ -20,6 +20,7 @@ export interface PlaybackPlanOptions {
   token?: string;
   deviceProfile?: DeviceProfile;
   container?: string;
+  localPath?: string;
 }
 
 export function getSanitizedPlaybackUrl(url: string): string {
@@ -32,8 +33,17 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     serverUrl,
     token = "",
     deviceProfile = getDefaultDeviceProfile(),
-    container
+    container,
+    localPath
   } = options;
+
+  if (localPath) {
+    return {
+      mode: "direct-play",
+      url: localPath,
+      reason: "Offline local file playback"
+    };
+  }
 
   const cleanServerUrl = serverUrl.replace(/\/+$/, "");
 

@@ -4,6 +4,9 @@ status: completed
 plans_executed:
   - 09-01
   - 09-02
+requirements_completed:
+  - UX-01
+  - UX-02
 verification:
   typecheck: passed
   tests_passed: 150

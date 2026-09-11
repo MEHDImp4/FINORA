@@ -6,14 +6,22 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { useAuthStore } from "../stores/authStore";
 import { QueryProvider } from "../providers/QueryProvider";
+import { offlineSyncManager } from "../features/offline/offlineSyncManager";
 
 export default function RootLayout() {
   const status = useAuthStore((state) => state.status);
+  const session = useAuthStore((state) => state.session);
   const restoreSession = useAuthStore((state) => state.restoreSession);
 
   useEffect(() => {
     restoreSession();
   }, [restoreSession]);
+
+  useEffect(() => {
+    if (status === "authenticated" && session?.userId) {
+      offlineSyncManager.syncPendingProgress(session.userId).catch(() => {});
+    }
+  }, [status, session?.userId]);
 
   return (
     <SafeAreaProvider>
