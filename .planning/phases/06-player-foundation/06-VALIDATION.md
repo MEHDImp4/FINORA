@@ -38,12 +38,12 @@ created: 2026-09-11
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 06-01-01 | 01 | 1 | PLAY-01 | — | expo-video installed and Jest mock in place | config/mock | `npm test -- FinoraPlayerEngine.test.ts` | ❌ W0 | ⬜ pending |
-| 06-01-02 | 01 | 1 | PLAY-01 | — | FinoraPlayerEngine state machine, controls, and useFinoraPlayer hook | unit | `npx jest --testPathPattern=FinoraPlayerEngine.test.ts` | ❌ W0 | ⬜ pending |
-| 06-02-01 | 02 | 2 | PLAY-02 | — | DeviceProfile capabilities and PlaybackPlanner negotiation logic | unit | `npx jest --testPathPattern=playbackPlanner.test.ts` | ❌ W0 | ⬜ pending |
-| 06-02-02 | 02 | 2 | PLAY-02 | THREAT-01 | Token sanitized in all stream URLs and logs | unit/security | `npx jest --testPathPattern=playbackPlanner.test.ts` | ❌ W0 | ⬜ pending |
-| 06-03-01 | 03 | 3 | PLAY-03 | — | PlaybackRepository reports start, throttled progress, and stopped to Jellyfin | unit | `npx jest --testPathPattern=playbackRepository.test.ts` | ❌ W0 | ⬜ pending |
-| 06-03-02 | 03 | 3 | PLAY-03, PLAY-04 | — | PlayerScreen and lifecycle/orientation resilience preserve state across transitions | unit/render | `npx jest --testPathPattern=PlayerScreen.test.tsx` | ❌ W0 | ⬜ pending |
+| 06-01-01 | 01 | 1 | PLAY-01 | — | expo-video installed and Jest mock in place | config/mock | `npm test -- FinoraPlayerEngine.test.ts` | ✅ | ✅ green |
+| 06-01-02 | 01 | 1 | PLAY-01 | — | FinoraPlayerEngine state machine, controls, and useFinoraPlayer hook | unit | `npx jest --testPathPattern=FinoraPlayerEngine.test.ts` | ✅ | ✅ green |
+| 06-02-01 | 02 | 2 | PLAY-02 | — | DeviceProfile capabilities and PlaybackPlanner negotiation logic | unit | `npx jest --testPathPattern=playbackPlanner.test.ts` | ✅ | ✅ green |
+| 06-02-02 | 02 | 2 | PLAY-02 | THREAT-01 | Token sanitized in all stream URLs and logs | unit/security | `npx jest --testPathPattern=playbackPlanner.test.ts` | ✅ | ✅ green |
+| 06-03-01 | 03 | 3 | PLAY-03 | — | PlaybackRepository reports start, throttled progress, and stopped to Jellyfin | unit | `npx jest --testPathPattern=playbackRepository.test.ts` | ✅ | ✅ green |
+| 06-03-02 | 03 | 3 | PLAY-03, PLAY-04 | — | PlayerScreen and lifecycle/orientation resilience preserve state across transitions | unit/render | `npx jest --testPathPattern=PlayerScreen.test.tsx` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -51,9 +51,9 @@ created: 2026-09-11
 
 ## Wave 0 Requirements
 
-- [ ] Install `expo-video` package compatible with Expo SDK 52
-- [ ] Create `__mocks__/expo-video.js` with mock `useVideoPlayer` and `VideoView`
-- [ ] Test stubs:
+- [x] Install `expo-video` package compatible with Expo SDK 52
+- [x] Create `__mocks__/expo-video.js` with mock `useVideoPlayer` and `VideoView`
+- [x] Test stubs:
   - `src/features/player/__tests__/FinoraPlayerEngine.test.ts`
   - `src/features/player/__tests__/playbackPlanner.test.ts`
   - `src/core/repositories/__tests__/playbackRepository.test.ts`

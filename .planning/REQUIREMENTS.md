@@ -46,10 +46,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Playback Foundation (PLAY)
 
-- [ ] **PLAY-01**: Build FinoraPlayerEngine abstraction over expo-video isolating player logic from UI components.
-- [ ] **PLAY-02**: Implement PlaybackPlanner to negotiate stream mode (Direct Play > Direct Stream > Transcoding) based on DeviceProfile.
-- [ ] **PLAY-03**: Report playback progress to Jellyfin (Start, throttled periodic Progress, Stop final event).
-- [ ] **PLAY-04**: Maintain playback state across device orientation changes, backgrounding, and lock screen events without restarting stream.
+- [x] **PLAY-01**: Build FinoraPlayerEngine abstraction over expo-video isolating player logic from UI components.
+- [x] **PLAY-02**: Implement PlaybackPlanner to negotiate stream mode (Direct Play > Direct Stream > Transcoding) based on DeviceProfile.
+- [x] **PLAY-03**: Report playback progress to Jellyfin (Start, throttled periodic Progress, Stop final event).
+- [x] **PLAY-04**: Maintain playback state across device orientation changes, backgrounding, and lock screen events without restarting stream.
 
 ### Premium Player & Controls (PPL)
 

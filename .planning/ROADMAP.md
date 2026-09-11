@@ -109,9 +109,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 06-01: Create FinoraPlayerEngine abstraction wrapping expo-video with player state machine.
-- [ ] 06-02: Implement PlaybackPlanner, DeviceProfile hardware capability detector, and stream URL resolver.
-- [ ] 06-03: Implement Jellyfin playback session reporting (Start, Progress, Stop) and orientation/lifecycle resilience.
+- [x] 06-01: Create FinoraPlayerEngine abstraction wrapping expo-video with player state machine.
+- [x] 06-02: Implement PlaybackPlanner, DeviceProfile hardware capability detector, and stream URL resolver.
+- [x] 06-03: Implement Jellyfin playback session reporting (Start, Progress, Stop) and orientation/lifecycle resilience.
 
 ### Phase 7: Premium Player Experience
 **Goal**: Elevate playback to a premium streaming experience with auto-fading cinematic controls, gesture navigation, track selection bottom sheets, trickplay thumbnails, skip intro/credits, and stats for nerds.
