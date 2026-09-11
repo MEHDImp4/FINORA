@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
+import { hapticService } from "../../../core/feedback/hapticService";
 
 export interface TimelineScrubberProps {
   currentTimeSeconds: number;
@@ -94,6 +95,7 @@ export function TimelineScrubber({
         const { seconds, percent } = calculateSecondsFromLocation(evt.nativeEvent.locationX);
         setScrubPosition(seconds);
         onScrubMove?.(seconds, percent);
+        hapticService.selection();
       },
       onPanResponderMove: (evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
         const { seconds, percent } = calculateSecondsFromLocation(evt.nativeEvent.locationX);
@@ -106,6 +108,7 @@ export function TimelineScrubber({
         onScrubbingChange?.(false);
 
         const { seconds } = calculateSecondsFromLocation(evt.nativeEvent.locationX);
+        hapticService.impactLight();
         onSeek(seconds);
       },
       onPanResponderTerminate: () => {
@@ -117,7 +120,18 @@ export function TimelineScrubber({
   ).current;
 
   return (
-    <View style={styles.container} testID="timeline-scrubber">
+    <View
+      style={styles.container}
+      testID="timeline-scrubber"
+      accessibilityRole="adjustable"
+      accessibilityLabel="Playback progress scrubber"
+      accessibilityValue={{
+        min: 0,
+        max: Math.round(durationSeconds),
+        now: Math.round(effectiveSeconds),
+        text: `${Math.round(effectiveSeconds)} of ${Math.round(durationSeconds)} seconds`
+      }}
+    >
       {/* Time Labels */}
       <View style={styles.labelsRow}>
         <FinoraText variant="caption" style={styles.timeLabel} testID="current-time-label">

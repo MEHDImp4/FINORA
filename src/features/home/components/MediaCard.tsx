@@ -5,6 +5,7 @@ import { MediaItem } from "../../../types/media";
 import { getPosterUrl, getBackdropUrl } from "../../../core/repositories/imageUrlBuilder";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
+import { hapticService } from "../../../core/feedback/hapticService";
 
 export type CardVariant = "poster" | "thumbnail";
 
@@ -38,6 +39,14 @@ export const MediaCard = React.memo(
       : getPosterUrl(serverUrl, item.id, item.primaryImageTag, width);
 
     const hasProgress = item.playedPercentage > 0 && !item.isPlayed;
+    const progressLabel = hasProgress ? `, ${Math.round(item.playedPercentage)}% watched` : "";
+
+    const handlePress = () => {
+      hapticService.impactLight();
+      if (onPress) {
+        onPress(item);
+      }
+    };
 
     return (
       <Pressable
@@ -46,9 +55,10 @@ export const MediaCard = React.memo(
           { width },
           pressed && styles.pressed
         ]}
-        onPress={() => onPress && onPress(item)}
+        onPress={handlePress}
         accessibilityRole="button"
-        accessibilityLabel={`${item.name}${item.year ? `, ${item.year}` : ""}`}
+        accessibilityLabel={`${item.name}${item.year ? `, ${item.year}` : ""}${progressLabel}`}
+        accessibilityHint="Double tap to open media details"
       >
         {/* Media Poster / Thumbnail Image */}
         <View style={[styles.imageContainer, { width, height }]}>

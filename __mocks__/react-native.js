@@ -176,5 +176,9 @@ module.exports = {
   PanResponder,
   Modal,
   AccessibilityInfo,
-  Animated
+  Animated,
+  Vibration: {
+    vibrate: jest.fn(),
+    cancel: jest.fn()
+  }
 };
