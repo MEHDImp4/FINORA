@@ -11,9 +11,9 @@ FINORA is built incrementally from a rock-solid, production-grade native foundat
 - [x] **Phase 3: Jellyfin Data & Repositories** - Decoupled repository layer, TanStack Query caching, display-matched image optimization, and progress synchronization
 - [x] **Phase 4: Cinematic Home** - Dynamic Hero banner, virtualized horizontal carousels, isolated render trees, and 60/90/120 Hz scroll performance
 - [x] **Phase 5: Media Details** - Movie & Series detail screens, season picker, episode cards, and card-to-details micro-interactions
-- [ ] **Phase 6: Player Foundation** - FinoraPlayerEngine abstraction, expo-video integration, PlaybackPlanner (Direct Play first), and session progress reporting
-- [ ] **Phase 7: Premium Player Experience** - Auto-fading controls, swipe/tap gestures, audio/subtitle tracks, trickplay thumbnails, skip intro/credits, and stats for nerds
-- [ ] **Phase 8: Search & Library** - Debounced global search, category filtering, library browser, sorting, and collections
+- [x] **Phase 6: Player Foundation** - FinoraPlayerEngine abstraction, expo-video integration, PlaybackPlanner (Direct Play first), and session progress reporting
+- [x] **Phase 7: Premium Player Experience** - Auto-fading controls, swipe/tap gestures, audio/subtitle tracks, trickplay thumbnails, skip intro/credits, and stats for nerds
+- [x] **Phase 8: Search & Library** - Debounced global search, category filtering, library browser, sorting, and collections
 - [ ] **Phase 9: UX Polish & Accessibility** - Screen transitions, haptic feedback, accessibility labels, reduced-motion fallbacks, and unified state handling
 - [ ] **Phase 10: Offline Subsystem** - Download manager, private app storage, SQLite metadata index, offline player playback, and reconnection sync
 
@@ -142,8 +142,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 08-01: Build global search screen with debounced input, request cancellation, category chips, and search history.
-- [ ] 08-02: Build Library browse screen with grid virtualization, filters, sorting options, and collection views.
+- [x] 08-01: Build global search screen with debounced input, request cancellation, category chips, and search history.
+- [x] 08-02: Build Library browse screen with grid virtualization, filters, sorting options, and collection views.
 
 ### Phase 9: UX Polish & Accessibility
 **Goal**: Deliver a tier-one user experience with fluid screen transitions, subtle haptics, full accessibility screen reader support, and unified screen states (loading skeletons, content, empty, offline, error).
