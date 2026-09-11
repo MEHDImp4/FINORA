@@ -23,9 +23,10 @@ export default function DetailsScreen() {
   const markPlayed = useMarkPlayed(userId);
 
   const handlePlay = (mediaItem: MediaItem) => {
-    // In Phase 6 this routes to FinoraPlayerEngine player screen
-    // For now we log and can navigate
-    console.debug(`[FINORA] Play item: ${mediaItem.id} (${mediaItem.name})`);
+    router.push({
+      pathname: "/player/[id]",
+      params: { id: mediaItem.id }
+    });
   };
 
   const handleToggleFavorite = (mediaItem: MediaItem) => {

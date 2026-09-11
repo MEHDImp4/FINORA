@@ -73,6 +73,18 @@ const PixelRatio = {
   roundToNearestPixel: (size) => size
 };
 
+const StatusBar = () => null;
+StatusBar.currentHeight = 44;
+StatusBar.setHidden = () => {};
+StatusBar.setBarStyle = () => {};
+
+const AppState = {
+  currentState: "active",
+  addEventListener: () => ({
+    remove: () => {}
+  })
+};
+
 module.exports = {
   View,
   Text,
@@ -84,5 +96,7 @@ module.exports = {
   StyleSheet,
   Platform,
   Dimensions,
-  PixelRatio
+  PixelRatio,
+  StatusBar,
+  AppState
 };

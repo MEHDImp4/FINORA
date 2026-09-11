@@ -1,0 +1,90 @@
+import React from "react";
+import renderer, { act } from "react-test-renderer";
+import { PlayerScreen } from "../components/PlayerScreen";
+import { MediaItem } from "../../../types/media";
+
+// Mock dependencies
+jest.mock("expo-router", () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    back: jest.fn()
+  })
+}));
+
+describe("PlayerScreen", () => {
+  const mockItem: MediaItem = {
+    id: "item-movie-1",
+    name: "Blade Runner 2049",
+    type: "Movie",
+    genres: ["Sci-Fi"],
+    playbackPositionTicks: 120000000, // 12 seconds
+    totalTicks: 600000000,
+    playedPercentage: 20,
+    isPlayed: false,
+    isFavorite: false,
+    mediaStreams: [
+      { type: "Video", codec: "h264" },
+      { type: "Audio", codec: "aac" }
+    ]
+  };
+
+  const createMockRepo = () => ({
+    reportPlaybackStart: jest.fn().mockResolvedValue(undefined),
+    reportPlaybackProgress: jest.fn().mockResolvedValue(undefined),
+    reportPlaybackStopped: jest.fn().mockResolvedValue(undefined)
+  });
+
+  it("renders video view surface and title header", () => {
+    const mockRepo = createMockRepo();
+    let root: any;
+    act(() => {
+      root = renderer.create(
+        <PlayerScreen
+          item={mockItem}
+          serverUrl="https://demo.jellyfin.org"
+          token="test-token"
+          onBack={jest.fn()}
+          playbackRepository={mockRepo}
+        />
+      );
+    });
+
+    const videoView = root.root.findByProps({ testID: "expo-video-view" });
+    expect(videoView).toBeTruthy();
+
+    const backButton = root.root.findByProps({ testID: "player-back-button" });
+    expect(backButton).toBeTruthy();
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  it("triggers onBack when back button is pressed", () => {
+    const onBackMock = jest.fn();
+    const mockRepo = createMockRepo();
+    let root: any;
+    act(() => {
+      root = renderer.create(
+        <PlayerScreen
+          item={mockItem}
+          serverUrl="https://demo.jellyfin.org"
+          token="test-token"
+          onBack={onBackMock}
+          playbackRepository={mockRepo}
+        />
+      );
+    });
+
+    const backButton = root.root.findByProps({ testID: "player-back-button" });
+    act(() => {
+      backButton.props.onPress();
+    });
+
+    expect(onBackMock).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      root.unmount();
+    });
+  });
+});
