@@ -17,12 +17,21 @@ export interface Person {
 
 export interface MediaStreamInfo {
   type: "Video" | "Audio" | "Subtitle";
+  index?: number;
   codec?: string;
   displayTitle?: string;
+  language?: string;
+  isExternal?: boolean;
   width?: number;
   height?: number;
   channels?: number;
   isDefault?: boolean;
+}
+
+export interface ChapterMarker {
+  name: string;
+  startPositionTicks: number;
+  markerType?: "IntroStart" | "IntroEnd" | "CreditsStart" | "Chapter";
 }
 
 export interface MediaItem {
@@ -52,6 +61,7 @@ export interface MediaItem {
   episodeIndex?: number;
   people?: Person[];
   mediaStreams?: MediaStreamInfo[];
+  chapters?: ChapterMarker[];
 }
 
 export interface MediaLibrary {

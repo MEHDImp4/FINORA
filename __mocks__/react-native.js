@@ -85,6 +85,24 @@ const AppState = {
   })
 };
 
+const PanResponder = {
+  create: (config) => ({
+    panHandlers: {
+      onStartShouldSetResponder: config.onStartShouldSetPanResponder || (() => true),
+      onMoveShouldSetResponder: config.onMoveShouldSetPanResponder || (() => true),
+      onResponderGrant: config.onPanResponderGrant || (() => {}),
+      onResponderMove: config.onPanResponderMove || (() => {}),
+      onResponderRelease: config.onPanResponderRelease || (() => {}),
+      onResponderTerminate: config.onPanResponderTerminate || (() => {})
+    }
+  })
+};
+
+const Modal = React.forwardRef((props, ref) =>
+  props.visible ? React.createElement("Modal", { ...props, ref }, props.children) : null
+);
+Modal.displayName = "Modal";
+
 module.exports = {
   View,
   Text,
@@ -98,5 +116,7 @@ module.exports = {
   Dimensions,
   PixelRatio,
   StatusBar,
-  AppState
+  AppState,
+  PanResponder,
+  Modal
 };

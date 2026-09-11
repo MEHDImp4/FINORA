@@ -90,12 +90,23 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
   const mediaStreams = Array.isArray(dto.MediaStreams)
     ? dto.MediaStreams.map((s: any) => ({
         type: s.Type as "Video" | "Audio" | "Subtitle",
+        index: typeof s.Index === "number" ? s.Index : undefined,
         codec: s.Codec || undefined,
         displayTitle: s.DisplayTitle || undefined,
+        language: s.Language || undefined,
+        isExternal: Boolean(s.IsExternal),
         width: typeof s.Width === "number" ? s.Width : undefined,
         height: typeof s.Height === "number" ? s.Height : undefined,
         channels: typeof s.Channels === "number" ? s.Channels : undefined,
         isDefault: Boolean(s.IsDefault)
+      }))
+    : undefined;
+
+  const chapters = Array.isArray(dto.Chapters)
+    ? dto.Chapters.map((c: any) => ({
+        name: String(c.Name || ""),
+        startPositionTicks: typeof c.StartPositionTicks === "number" ? c.StartPositionTicks : 0,
+        markerType: c.MarkerType || undefined
       }))
     : undefined;
 
@@ -126,7 +137,8 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
     seasonIndex: typeof dto.ParentIndexNumber === "number" ? dto.ParentIndexNumber : undefined,
     episodeIndex: typeof dto.IndexNumber === "number" ? dto.IndexNumber : undefined,
     people,
-    mediaStreams
+    mediaStreams,
+    chapters
   };
 }
 
