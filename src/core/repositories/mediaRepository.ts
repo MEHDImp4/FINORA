@@ -195,6 +195,43 @@ export class MediaRepository {
     const items = response?.Items || [];
     return items.map(mapJellyfinItemToMediaItem);
   }
+
+  public async searchMedia(
+    userId: string,
+    searchTerm: string,
+    itemTypes?: string[],
+    customClient?: HttpClient
+  ): Promise<MediaItem[]> {
+    if (!userId) {
+      throw new FinoraError("User ID is required to search media", "INVALID_PARAMS");
+    }
+
+    const trimmed = searchTerm ? searchTerm.trim() : "";
+    if (!trimmed) {
+      return [];
+    }
+
+    const http = this.getHttp(customClient);
+    const params: Record<string, string | number | boolean | undefined> = {
+      SearchTerm: trimmed,
+      Recursive: true,
+      Limit: 50,
+      Fields:
+        "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber",
+      EnableImageTypes: "Primary,Backdrop,Thumb"
+    };
+
+    if (itemTypes && itemTypes.length > 0) {
+      params.IncludeItemTypes = itemTypes.join(",");
+    }
+
+    const response = await http.request<{ Items?: any[] }>(`/Users/${userId}/Items`, {
+      params
+    });
+
+    const items = response?.Items || [];
+    return items.map(mapJellyfinItemToMediaItem);
+  }
 }
 
 export const mediaRepository = new MediaRepository();

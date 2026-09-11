@@ -103,9 +103,21 @@ const Modal = React.forwardRef((props, ref) =>
 );
 Modal.displayName = "Modal";
 
+const TextInput = React.forwardRef((props, ref) =>
+  React.createElement("TextInput", { ...props, ref }, props.children)
+);
+TextInput.displayName = "TextInput";
+
+const Keyboard = {
+  dismiss: jest.fn(),
+  addListener: () => ({ remove: () => {} })
+};
+
 module.exports = {
   View,
   Text,
+  TextInput,
+  Keyboard,
   Pressable,
   ScrollView,
   RefreshControl,
