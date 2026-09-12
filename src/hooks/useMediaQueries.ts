@@ -18,7 +18,9 @@ export const mediaKeys = {
   episodes: (seriesId: string, seasonId: string, userId: string) =>
     [...mediaKeys.all, "episodes", seriesId, seasonId, userId] as const,
   genres: (userId: string, parentId?: string) =>
-    [...mediaKeys.all, "genres", userId, parentId] as const
+    [...mediaKeys.all, "genres", userId, parentId] as const,
+  watchlist: (userId: string, options?: GetItemsOptions) =>
+    [...mediaKeys.all, "watchlist", userId, options] as const
 };
 
 export function useLibraries(userId?: string) {
@@ -89,3 +91,23 @@ export function useGenres(userId?: string, parentId?: string) {
     staleTime: 5 * 60 * 1000
   });
 }
+
+export function useWatchlistItems(
+  userId?: string,
+  options?: GetItemsOptions
+) {
+  return useQuery<MediaItem[]>({
+    queryKey: mediaKeys.watchlist(userId || "", options),
+    queryFn: () =>
+      mediaRepository.getItems(userId!, {
+        ...options,
+        filters: ["IsFavorite"],
+        includeItemTypes: options?.includeItemTypes || ["Movie", "Series"],
+        sortBy: options?.sortBy || "DateCreated,SortName",
+        sortOrder: options?.sortOrder || "Descending",
+        recursive: true
+      }),
+    enabled: Boolean(userId)
+  });
+}
+

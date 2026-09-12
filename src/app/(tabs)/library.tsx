@@ -1,11 +1,12 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { View, ScrollView, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import {
   useLibraries,
   useLibraryItems,
+  useWatchlistItems,
   useGenres
 } from "../../hooks/useMediaQueries";
 import { useAuthStore } from "../../stores/authStore";
@@ -20,14 +21,26 @@ import { MediaItem } from "../../types/media";
 import { FinoraText } from "../../design-system/components/FinoraText";
 import { colors, spacing } from "../../design-system/tokens";
 
+const WATCHLIST_ID = "watchlist";
+
 export default function LibraryScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const session = useAuthStore((s) => s.session);
   const currentUserId = session?.userId;
   const serverUrl = session?.serverUrl || "";
 
   // Active library state
-  const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(null);
+  const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(
+    params.tab === "watchlist" ? WATCHLIST_ID : null
+  );
+
+  useEffect(() => {
+    if (params.tab === "watchlist") {
+      setSelectedLibraryId(WATCHLIST_ID);
+      setSelectedGenre(null);
+    }
+  }, [params.tab]);
 
   // Sorting state
   const [currentSort, setCurrentSort] = useState<SortOption>(
@@ -38,18 +51,21 @@ export default function LibraryScreen() {
   // Genre filter state
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
 
+  const isWatchlist = selectedLibraryId === WATCHLIST_ID;
+
   // Fetch libraries
   const { data: libraries = [], isLoading: isLibrariesLoading } = useLibraries(
     currentUserId
   );
 
-  // Default to first library if none selected
+  // Default to first library if none selected and not on watchlist
   const activeLibrary = useMemo(() => {
+    if (isWatchlist) return undefined;
     if (selectedLibraryId) {
       return libraries.find((lib) => lib.id === selectedLibraryId);
     }
     return libraries.length > 0 ? libraries[0] : undefined;
-  }, [selectedLibraryId, libraries]);
+  }, [selectedLibraryId, libraries, isWatchlist]);
 
   const activeLibraryId = activeLibrary?.id;
 
@@ -72,12 +88,15 @@ export default function LibraryScreen() {
   }, [activeLibrary]);
 
   // Fetch genres for active library
-  const { data: genres = [] } = useGenres(currentUserId, activeLibraryId);
+  const { data: genres = [] } = useGenres(
+    currentUserId,
+    isWatchlist ? undefined : activeLibraryId
+  );
 
   // Fetch library items
-  const { data: items = [], isLoading: isItemsLoading } = useLibraryItems(
+  const { data: libraryItems = [], isLoading: isItemsLoading } = useLibraryItems(
     currentUserId,
-    activeLibraryId,
+    isWatchlist ? undefined : activeLibraryId,
     {
       sortBy: currentSort.sortBy,
       sortOrder: currentSort.sortOrder,
@@ -85,6 +104,21 @@ export default function LibraryScreen() {
       includeItemTypes
     }
   );
+
+  // Fetch watchlist items
+  const { data: watchlistItems = [], isLoading: isWatchlistLoading } = useWatchlistItems(
+    currentUserId,
+    isWatchlist
+      ? {
+          sortBy: currentSort.sortBy,
+          sortOrder: currentSort.sortOrder,
+          genres: selectedGenre ? [selectedGenre] : undefined
+        }
+      : undefined
+  );
+
+  const items = isWatchlist ? watchlistItems : libraryItems;
+  const isLoading = isWatchlist ? isWatchlistLoading : (isItemsLoading || isLibrariesLoading);
 
   const handleLibrarySelect = useCallback((libraryId: string) => {
     setSelectedLibraryId(libraryId);
@@ -101,47 +135,74 @@ export default function LibraryScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       {/* Top Libraries Selector */}
-      {libraries.length > 1 && (
-        <View style={styles.tabsWrapper}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tabsContainer}
+      <View style={styles.tabsWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabsContainer}
+        >
+          {/* Watchlist Tab */}
+          <Pressable
+            key="watchlist"
+            style={[
+              styles.libraryTab,
+              isWatchlist && styles.libraryTabSelected
+            ]}
+            onPress={() => handleLibrarySelect(WATCHLIST_ID)}
+            accessibilityRole="button"
+            accessibilityLabel="Select Watchlist"
+            accessibilityState={{ selected: isWatchlist }}
           >
-            {libraries.map((lib) => {
-              const isSelected = lib.id === activeLibraryId;
-              return (
-                <Pressable
-                  key={lib.id}
+            <Ionicons
+              name="bookmark"
+              size={13}
+              color={isWatchlist ? "#E50914" : colors.textSecondary}
+              style={styles.tabIcon}
+            />
+            <FinoraText
+              variant="body"
+              style={[
+                styles.libraryTabText,
+                isWatchlist && styles.libraryTabTextSelected
+              ]}
+            >
+              Watchlist
+            </FinoraText>
+          </Pressable>
+
+          {libraries.map((lib) => {
+            const isSelected = !isWatchlist && lib.id === activeLibraryId;
+            return (
+              <Pressable
+                key={lib.id}
+                style={[
+                  styles.libraryTab,
+                  isSelected && styles.libraryTabSelected
+                ]}
+                onPress={() => handleLibrarySelect(lib.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Select library ${lib.name}`}
+                accessibilityState={{ selected: isSelected }}
+              >
+                <FinoraText
+                  variant="body"
                   style={[
-                    styles.libraryTab,
-                    isSelected && styles.libraryTabSelected
+                    styles.libraryTabText,
+                    isSelected && styles.libraryTabTextSelected
                   ]}
-                  onPress={() => handleLibrarySelect(lib.id)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Select library ${lib.name}`}
-                  accessibilityState={{ selected: isSelected }}
                 >
-                  <FinoraText
-                    variant="body"
-                    style={[
-                      styles.libraryTabText,
-                      isSelected && styles.libraryTabTextSelected
-                    ]}
-                  >
-                    {lib.name}
-                  </FinoraText>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
+                  {lib.name}
+                </FinoraText>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       {/* Action bar: Sort trigger & Active genre info */}
       <View style={styles.actionBar}>
         <FinoraText variant="caption" style={styles.resultsCount}>
-          {items.length} {items.length === 1 ? "item" : "items"}
+          {items.length} {isWatchlist ? (items.length <= 1 ? "item in watchlist" : "items in watchlist") : (items.length === 1 ? "item" : "items")}
         </FinoraText>
 
         <Pressable
@@ -158,18 +219,25 @@ export default function LibraryScreen() {
       </View>
 
       {/* Genre filter horizontal list */}
-      <LibraryFilterBar
-        genres={genres}
-        selectedGenre={selectedGenre}
-        onSelectGenre={setSelectedGenre}
-      />
+      {!isWatchlist && (
+        <LibraryFilterBar
+          genres={genres}
+          selectedGenre={selectedGenre}
+          onSelectGenre={setSelectedGenre}
+        />
+      )}
 
       {/* 3-Column Virtualized Media Grid */}
       <LibraryGridView
         items={items}
         serverUrl={serverUrl}
-        isLoading={isItemsLoading || isLibrariesLoading}
+        isLoading={isLoading}
         onItemPress={handleItemPress}
+        emptyMessage={
+          isWatchlist
+            ? "Your watchlist is empty. Add movies and series to find them here."
+            : "No media found in this library"
+        }
       />
 
       {/* Sort bottom sheet */}
@@ -197,9 +265,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   libraryTab: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 8
+  },
+  tabIcon: {
+    marginRight: 5
   },
   libraryTabSelected: {
     backgroundColor: "#1F1F2F"

@@ -3,7 +3,7 @@ import ReactTestRenderer from "react-test-renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import HomeScreen from "../../../app/(tabs)/index";
 import { useAuthStore } from "../../../stores/authStore";
-import { useResumeItems, useRecentlyAdded, useLibraries } from "../../../hooks/useMediaQueries";
+import { useResumeItems, useRecentlyAdded, useLibraries, useWatchlistItems } from "../../../hooks/useMediaQueries";
 import { useToggleFavorite } from "../../../hooks/useUserDataMutations";
 
 jest.mock("expo-router", () => ({
@@ -70,6 +70,21 @@ describe("HomeScreen", () => {
 
     (useLibraries as jest.Mock).mockReturnValue({
       data: [{ id: "lib-1", name: "Movies", collectionType: "movies" }],
+      isLoading: false,
+      refetch: jest.fn()
+    });
+
+    (useWatchlistItems as jest.Mock).mockReturnValue({
+      data: [
+        {
+          id: "watchlist-1",
+          name: "Interstellar",
+          type: "Movie",
+          isFavorite: true,
+          playedPercentage: 0,
+          isPlayed: false
+        }
+      ],
       isLoading: false,
       refetch: jest.fn()
     });

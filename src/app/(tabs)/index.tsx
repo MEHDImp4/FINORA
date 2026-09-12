@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl, Pressable } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { Ionicons } from "@expo/vector-icons";
 import { FinoraScreen } from "../../design-system/components/FinoraScreen";
 import { HeroBanner } from "../../features/home/components/HeroBanner";
 import { MediaCarousel } from "../../features/home/components/MediaCarousel";
@@ -11,6 +12,7 @@ import {
   useResumeItems,
   useRecentlyAdded,
   useLibraries,
+  useWatchlistItems,
   mediaKeys
 } from "../../hooks/useMediaQueries";
 import { useToggleFavorite } from "../../hooks/useUserDataMutations";
@@ -66,6 +68,10 @@ export default function HomeScreen() {
   const {
     data: libraries
   } = useLibraries(userId);
+
+  const {
+    data: watchlistItems = []
+  } = useWatchlistItems(userId);
 
   const toggleFavorite = useToggleFavorite(userId || "");
 
@@ -193,29 +199,39 @@ export default function HomeScreen() {
         />
 
         {/* Quick Library Shortcuts */}
-        {libraries && libraries.length > 0 ? (
-          <View style={styles.categoriesBar}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesContent}
+        <View style={styles.categoriesBar}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesContent}
+          >
+            <Pressable
+              style={[styles.categoryPill, styles.watchlistPill]}
+              onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: "watchlist" } })}
+              accessibilityRole="button"
+              accessibilityLabel="Browse Watchlist"
             >
-              {libraries.map((lib) => (
-                <Pressable
-                  key={lib.id}
-                  style={styles.categoryPill}
-                  onPress={() => router.push("/(tabs)/library")}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Browse ${lib.name}`}
-                >
-                  <FinoraText variant="caption" color="textSecondary" weight="600">
-                    {lib.name}
-                  </FinoraText>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        ) : null}
+              <Ionicons name="bookmark" size={12} color="#E50914" style={styles.watchlistPillIcon} />
+              <FinoraText variant="caption" color="textPrimary" weight="700">
+                Watchlist
+              </FinoraText>
+            </Pressable>
+
+            {libraries?.map((lib) => (
+              <Pressable
+                key={lib.id}
+                style={styles.categoryPill}
+                onPress={() => router.push("/(tabs)/library")}
+                accessibilityRole="button"
+                accessibilityLabel={`Browse ${lib.name}`}
+              >
+                <FinoraText variant="caption" color="textSecondary" weight="600">
+                  {lib.name}
+                </FinoraText>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
 
         {/* Continue Watching Section (Thumbnails with progress bars) */}
         {resumeItems && resumeItems.length > 0 ? (
@@ -224,6 +240,17 @@ export default function HomeScreen() {
             items={resumeItems}
             serverUrl={serverUrl}
             variant="thumbnail"
+            onItemPress={handleItemPress}
+          />
+        ) : null}
+
+        {/* Watchlist Section (My List Posters) */}
+        {watchlistItems && watchlistItems.length > 0 ? (
+          <MediaCarousel
+            title="Watchlist"
+            items={watchlistItems}
+            serverUrl={serverUrl}
+            variant="poster"
             onItemPress={handleItemPress}
           />
         ) : null}
@@ -275,6 +302,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "rgba(255, 255, 255, 0.08)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)"
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  watchlistPill: {
+    backgroundColor: "rgba(229, 9, 20, 0.15)",
+    borderColor: "rgba(229, 9, 20, 0.45)"
+  },
+  watchlistPillIcon: {
+    marginRight: 5
   }
 });

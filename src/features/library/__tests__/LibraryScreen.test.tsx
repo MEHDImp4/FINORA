@@ -9,7 +9,8 @@ jest.mock("expo-router", () => ({
     push: mockPush,
     replace: jest.fn(),
     back: jest.fn()
-  })
+  }),
+  useLocalSearchParams: () => ({})
 }));
 
 // Mock authStore
@@ -47,7 +48,8 @@ const mockItems = [
 jest.mock("../../../hooks/useMediaQueries", () => ({
   useLibraries: () => ({ data: mockLibraries, isLoading: false }),
   useGenres: () => ({ data: mockGenres, isLoading: false }),
-  useLibraryItems: () => ({ data: mockItems, isLoading: false })
+  useLibraryItems: () => ({ data: mockItems, isLoading: false }),
+  useWatchlistItems: () => ({ data: [], isLoading: false })
 }));
 
 describe("LibraryScreen", () => {
@@ -105,5 +107,21 @@ describe("LibraryScreen", () => {
     act(() => {
       closeBtn.props.onPress();
     });
+  });
+
+  it("renders watchlist tab and allows selecting it", async () => {
+    let tree: any;
+    await act(async () => {
+      tree = ReactTestRenderer.create(<LibraryScreen />);
+    });
+
+    const watchlistTab = tree.root.findByProps({ accessibilityLabel: "Select Watchlist" });
+    expect(watchlistTab).toBeTruthy();
+
+    act(() => {
+      watchlistTab.props.onPress();
+    });
+
+    expect(watchlistTab.props.accessibilityState.selected).toBe(true);
   });
 });
