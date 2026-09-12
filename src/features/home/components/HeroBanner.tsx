@@ -3,7 +3,7 @@ import { View, StyleSheet, Dimensions, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { MediaItem } from "../../../types/media";
-import { getBackdropUrl, getLogoUrl } from "../../../core/repositories/imageUrlBuilder";
+import { getBackdropUrl, getPosterUrl, getLogoUrl } from "../../../core/repositories/imageUrlBuilder";
 import { FinoraButton } from "../../../design-system/components/FinoraButton";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
@@ -36,7 +36,11 @@ export const HeroBanner = React.memo(function HeroBanner({
     );
   }
 
-  const backdropUri = getBackdropUrl(serverUrl, item.id, item.backdropImageTag, SCREEN_WIDTH);
+  const backdropUri = item.backdropImageTag
+    ? getBackdropUrl(serverUrl, item.id, item.backdropImageTag, SCREEN_WIDTH)
+    : item.primaryImageTag
+    ? getPosterUrl(serverUrl, item.id, item.primaryImageTag, SCREEN_WIDTH)
+    : "";
   const logoUri = item.logoImageTag
     ? getLogoUrl(serverUrl, item.id, item.logoImageTag, 400)
     : undefined;

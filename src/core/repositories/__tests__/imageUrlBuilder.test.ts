@@ -46,4 +46,11 @@ describe("imageUrlBuilder", () => {
     expect(url).toContain("/Items/item-12345/Images/Logo");
     expect(url).toContain("fillWidth=400");
   });
+
+  it("appends apiKey when specified in options", () => {
+    const url = buildImageUrl(baseUrl, itemId, "Primary", {
+      apiKey: "secret-token-xyz"
+    });
+    expect(url).toContain("api_key=secret-token-xyz");
+  });
 });

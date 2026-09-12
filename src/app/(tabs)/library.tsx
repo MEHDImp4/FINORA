@@ -44,11 +44,32 @@ export default function LibraryScreen() {
   );
 
   // Default to first library if none selected
-  const activeLibraryId = useMemo(() => {
-    if (selectedLibraryId) return selectedLibraryId;
-    if (libraries.length > 0) return libraries[0].id;
-    return undefined;
+  const activeLibrary = useMemo(() => {
+    if (selectedLibraryId) {
+      return libraries.find((lib) => lib.id === selectedLibraryId);
+    }
+    return libraries.length > 0 ? libraries[0] : undefined;
   }, [selectedLibraryId, libraries]);
+
+  const activeLibraryId = activeLibrary?.id;
+
+  // Determine item types based on library collection type (prevents showing all episodes instead of series)
+  const includeItemTypes = useMemo(() => {
+    if (!activeLibrary) return undefined;
+    const type = activeLibrary.collectionType?.toLowerCase() || "";
+    const name = activeLibrary.name?.toLowerCase() || "";
+
+    if (type === "tvshows" || name.includes("show") || name.includes("série") || name.includes("serie")) {
+      return ["Series"];
+    }
+    if (type === "movies" || name.includes("movie") || name.includes("film")) {
+      return ["Movie"];
+    }
+    if (type === "boxsets" || name.includes("collection")) {
+      return ["BoxSet"];
+    }
+    return ["Movie", "Series"];
+  }, [activeLibrary]);
 
   // Fetch genres for active library
   const { data: genres = [] } = useGenres(currentUserId, activeLibraryId);
@@ -60,7 +81,8 @@ export default function LibraryScreen() {
     {
       sortBy: currentSort.sortBy,
       sortOrder: currentSort.sortOrder,
-      genres: selectedGenre ? [selectedGenre] : undefined
+      genres: selectedGenre ? [selectedGenre] : undefined,
+      includeItemTypes
     }
   );
 

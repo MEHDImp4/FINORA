@@ -148,17 +148,24 @@ export class AuthRepository {
         return null;
       }
 
-      this.client.setServerUrl(descriptor.serverUrl);
+      if (typeof this.client.initialize === "function") {
+        await this.client.initialize(descriptor.serverUrl);
+      } else {
+        this.client.setServerUrl(descriptor.serverUrl);
+      }
       this.client.setAuthToken(token);
       const clientHttp = httpClient || this.client.getHttpClient();
 
       // Verify token validity against /System/Info or /Users/{userId}
       try {
-        await clientHttp.request(`${descriptor.serverUrl}/System/Info`);
+        await clientHttp.request(`/System/Info`);
       } catch (error) {
-        // Token invalid or expired
-        await this.logout(descriptor.serverId, descriptor.userId);
-        return null;
+        if (error instanceof AuthenticationError) {
+          // Token invalid or expired on server (401/403)
+          await this.logout(descriptor.serverId, descriptor.userId);
+          return null;
+        }
+        // Transient network error or offline - preserve session
       }
 
       return {

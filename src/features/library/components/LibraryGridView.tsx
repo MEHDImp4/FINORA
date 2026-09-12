@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { View, FlatList, ActivityIndicator, StyleSheet } from "react-native";
+import { View, FlatList, ActivityIndicator, StyleSheet, Dimensions } from "react-native";
 import { MediaCard } from "../../home/components/MediaCard";
 import { MediaItem } from "../../../types/media";
 import { FinoraText } from "../../../design-system/components/FinoraText";
@@ -13,6 +13,9 @@ interface LibraryGridViewProps {
   emptyMessage?: string;
 }
 
+const HORIZONTAL_PADDING = spacing.md; // 16
+const GRID_GAP = spacing.sm; // 8
+
 export const LibraryGridView = React.memo(function LibraryGridView({
   items,
   serverUrl,
@@ -20,18 +23,24 @@ export const LibraryGridView = React.memo(function LibraryGridView({
   onItemPress,
   emptyMessage = "No media found in this library"
 }: LibraryGridViewProps) {
+  const screenWidth = Dimensions.get("window").width || 375;
+  const cardWidth = Math.max(90, Math.floor((screenWidth - (HORIZONTAL_PADDING * 2) - (GRID_GAP * 2)) / 3));
+  const cardHeight = Math.round(cardWidth * 1.5);
+
   const renderItem = useCallback(
     ({ item }: { item: MediaItem }) => (
-      <View style={styles.gridItem}>
+      <View style={{ width: cardWidth, marginBottom: GRID_GAP * 1.5 }}>
         <MediaCard
           item={item}
           serverUrl={serverUrl}
           variant="poster"
+          cardWidth={cardWidth}
+          cardHeight={cardHeight}
           onPress={onItemPress}
         />
       </View>
     ),
-    [serverUrl, onItemPress]
+    [serverUrl, cardWidth, cardHeight, onItemPress]
   );
 
   const keyExtractor = useCallback((item: MediaItem) => item.id, []);
@@ -53,7 +62,8 @@ export const LibraryGridView = React.memo(function LibraryGridView({
       keyExtractor={keyExtractor}
       renderItem={renderItem}
       numColumns={3}
-      contentContainerStyle={styles.container}
+      columnWrapperStyle={{ gap: GRID_GAP }}
+      contentContainerStyle={[styles.container, { paddingHorizontal: HORIZONTAL_PADDING }]}
       initialNumToRender={12}
       maxToRenderPerBatch={12}
       windowSize={5}
@@ -76,14 +86,8 @@ export const LibraryGridView = React.memo(function LibraryGridView({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: spacing.sm,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl
-  },
-  gridItem: {
-    flex: 1 / 3,
-    alignItems: "center",
-    marginBottom: spacing.md
   },
   centerContainer: {
     flex: 1,

@@ -1,3 +1,5 @@
+import { jellyfinClient } from "../jellyfin/jellyfinClient";
+
 export type ImageType = "Primary" | "Backdrop" | "Logo" | "Thumb";
 
 export interface ImageUrlOptions {
@@ -5,6 +7,7 @@ export interface ImageUrlOptions {
   height?: number;
   quality?: number;
   tag?: string;
+  apiKey?: string;
 }
 
 export function buildImageUrl(
@@ -31,6 +34,11 @@ export function buildImageUrl(
   }
   if (options.tag) {
     url.searchParams.append("tag", options.tag);
+  }
+
+  const token = options.apiKey || jellyfinClient.getAuthToken();
+  if (token) {
+    url.searchParams.append("api_key", token);
   }
 
   return url.toString();

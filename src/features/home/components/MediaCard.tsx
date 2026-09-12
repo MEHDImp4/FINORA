@@ -1,6 +1,7 @@
-import React from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import React, { useState } from "react";
+import { View, StyleSheet, Pressable, StyleProp, ViewStyle } from "react-native";
 import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import { MediaItem } from "../../../types/media";
 import { getPosterUrl, getBackdropUrl } from "../../../core/repositories/imageUrlBuilder";
 import { FinoraText } from "../../../design-system/components/FinoraText";
@@ -13,6 +14,9 @@ interface MediaCardProps {
   item: MediaItem;
   serverUrl: string;
   variant?: CardVariant;
+  cardWidth?: number;
+  cardHeight?: number;
+  style?: StyleProp<ViewStyle>;
   onPress?: (item: MediaItem) => void;
 }
 
@@ -27,11 +31,15 @@ export const MediaCard = React.memo(
     item,
     serverUrl,
     variant = "poster",
+    cardWidth,
+    cardHeight,
+    style,
     onPress
   }: MediaCardProps) {
+    const [imageError, setImageError] = useState(false);
     const isThumbnail = variant === "thumbnail";
-    const width = isThumbnail ? THUMBNAIL_WIDTH : POSTER_WIDTH;
-    const height = isThumbnail ? THUMBNAIL_HEIGHT : POSTER_HEIGHT;
+    const width = cardWidth ?? (isThumbnail ? THUMBNAIL_WIDTH : POSTER_WIDTH);
+    const height = cardHeight ?? (isThumbnail ? THUMBNAIL_HEIGHT : POSTER_HEIGHT);
 
     // Determine target image URL: Thumbnails prefer backdrop or primary, posters prefer primary
     const imageUrl = isThumbnail
@@ -53,6 +61,8 @@ export const MediaCard = React.memo(
         style={({ pressed }) => [
           styles.container,
           { width },
+          cardWidth !== undefined && { marginRight: 0 },
+          style,
           pressed && styles.pressed
         ]}
         onPress={handlePress}
@@ -62,13 +72,32 @@ export const MediaCard = React.memo(
       >
         {/* Media Poster / Thumbnail Image */}
         <View style={[styles.imageContainer, { width, height }]}>
-          <Image
-            source={{ uri: imageUrl }}
-            placeholder={item.blurhash ? { blurhash: item.blurhash } : undefined}
-            style={styles.image}
-            contentFit="cover"
-            transition={200}
-          />
+          {imageUrl && !imageError ? (
+            <Image
+              source={{ uri: imageUrl }}
+              placeholder={item.blurhash ? { blurhash: item.blurhash } : undefined}
+              style={styles.image}
+              contentFit="cover"
+              transition={200}
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <View style={styles.fallbackContainer}>
+              <Ionicons
+                name={item.type === "Series" ? "tv-outline" : "film-outline"}
+                size={Math.min(width, height) * 0.28}
+                color={colors.textMuted}
+              />
+              <FinoraText
+                variant="caption"
+                color="textMuted"
+                numberOfLines={2}
+                style={styles.fallbackText}
+              >
+                {item.name}
+              </FinoraText>
+            </View>
+          )}
 
           {/* Progress Bar for In-Progress Media */}
           {hasProgress ? (
@@ -118,7 +147,9 @@ export const MediaCard = React.memo(
     prev.item.isPlayed === next.item.isPlayed &&
     prev.item.isFavorite === next.item.isFavorite &&
     prev.serverUrl === next.serverUrl &&
-    prev.variant === next.variant
+    prev.variant === next.variant &&
+    prev.cardWidth === next.cardWidth &&
+    prev.cardHeight === next.cardHeight
 );
 
 const styles = StyleSheet.create({
@@ -139,6 +170,19 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%"
+  },
+  fallbackContainer: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#16161c",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.xs
+  },
+  fallbackText: {
+    fontSize: 10,
+    textAlign: "center",
+    marginTop: 4
   },
   progressBarTrack: {
     position: "absolute",

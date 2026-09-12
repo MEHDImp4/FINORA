@@ -24,6 +24,7 @@ describe("AuthRepository", () => {
 
     mockClient = new JellyfinClient() as jest.Mocked<JellyfinClient>;
     mockClient.getHttpClient = jest.fn(() => mockHttpClient);
+    mockClient.initialize = jest.fn().mockResolvedValue(undefined);
     mockClient.setServerUrl = jest.fn();
     mockClient.setAuthToken = jest.fn();
     mockClient.getServerUrl = jest.fn(() => "https://jellyfin.example.com");
@@ -148,6 +149,24 @@ describe("AuthRepository", () => {
 
       const session = await repository.restoreSession(mockHttpClient);
       expect(session).toBeNull();
+    });
+
+    it("preserves session on transient network error during verification", async () => {
+      mockPrefStorage.getItem.mockResolvedValue({
+        userId: "user-456",
+        userName: "FinoraUser",
+        serverId: "server-001",
+        serverUrl: "https://jellyfin.example.com"
+      });
+
+      mockSecureStorage.getToken.mockResolvedValue("stored-token-abc");
+      mockHttpClient.request.mockRejectedValue(new Error("Network timeout"));
+
+      const session = await repository.restoreSession(mockHttpClient);
+
+      expect(session).not.toBeNull();
+      expect(session?.token).toBe("stored-token-abc");
+      expect(mockSecureStorage.deleteToken).not.toHaveBeenCalled();
     });
   });
 
