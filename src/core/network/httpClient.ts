@@ -129,7 +129,19 @@ export class HttpClient {
             throw new ServerUnavailableError(`Server unavailable (${status})`, url);
           }
 
-          throw new NetworkError(`HTTP request failed with status ${status}`, {
+          let detailMessage = `HTTP request failed with status ${status}`;
+          if (typeof errorBody === "string" && errorBody.trim().length > 0) {
+            detailMessage = `${detailMessage}: ${errorBody.trim()}`;
+          } else if (
+            typeof errorBody === "object" &&
+            errorBody !== null &&
+            "message" in errorBody &&
+            typeof (errorBody as { message: unknown }).message === "string"
+          ) {
+            detailMessage = `${detailMessage}: ${(errorBody as { message: string }).message}`;
+          }
+
+          throw new NetworkError(detailMessage, {
             statusCode: status,
             endpoint: url
           });

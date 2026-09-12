@@ -63,7 +63,8 @@ export class AuthRepository {
     httpClient?: HttpClient
   ): Promise<AuthSession> {
     const targetUrl = serverUrl.replace(/\/+$/, "");
-    this.client.setServerUrl(targetUrl);
+    await this.client.initialize(targetUrl);
+    this.client.setAuthToken(null);
     const clientHttp = httpClient || this.client.getHttpClient();
 
     // Prepare payload and ensure password variable can be cleared

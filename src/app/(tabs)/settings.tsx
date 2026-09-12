@@ -55,15 +55,28 @@ export default function SettingsScreen() {
     setLoginSuccess(null);
 
     try {
+      const normalizedUrl = serverInput.trim().replace(/\/+$/, "").replace(/\/web(\/.*)?$/i, "");
       const success = await login(
         {
           username: usernameInput.trim(),
           password: passwordInput
         },
-        serverInput.trim()
+        normalizedUrl
       );
 
       if (success) {
+        const currentSession = useAuthStore.getState().session;
+        if (currentSession) {
+          const { serverManager } = await import("../../core/jellyfin/serverManager");
+          await serverManager.saveAccount({
+            serverId: currentSession.serverId,
+            serverName: "Jellyfin Server",
+            serverUrl: currentSession.serverUrl,
+            userId: currentSession.userId,
+            userName: currentSession.userName,
+            lastUsedAt: Date.now()
+          });
+        }
         setLoginSuccess("Connected successfully!");
         setPasswordInput("");
         await loadSavedAccounts();
