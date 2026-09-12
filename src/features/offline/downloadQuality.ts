@@ -12,13 +12,10 @@ export interface DownloadQualityProfile {
 
 export const DOWNLOAD_QUALITIES: DownloadQualityProfile[] = [
   {
-    id: "720p",
-    title: "720p HD",
-    description: "Qualité optimale pour smartphone, taille et temps réduits",
-    badge: "Recommandé",
-    maxHeight: 720,
-    maxWidth: 1280,
-    videoBitRate: 3500000
+    id: "original",
+    title: "Qualité d'origine",
+    description: "Fichier brut complet du serveur sans transcodage, lecture fluide garantie",
+    badge: "Recommandé"
   },
   {
     id: "1080p",
@@ -29,18 +26,20 @@ export const DOWNLOAD_QUALITIES: DownloadQualityProfile[] = [
     videoBitRate: 7500000
   },
   {
+    id: "720p",
+    title: "720p HD",
+    description: "Qualité optimale pour smartphone, taille et temps réduits",
+    maxHeight: 720,
+    maxWidth: 1280,
+    videoBitRate: 3500000
+  },
+  {
     id: "480p",
     title: "480p SD",
     description: "Économiseur d'espace et téléchargement ultra rapide",
     maxHeight: 480,
     maxWidth: 854,
     videoBitRate: 1500000
-  },
-  {
-    id: "original",
-    title: "Qualité d'origine",
-    description: "Fichier brut du serveur sans transcodage (taille maximale)",
-    badge: "Source"
   }
 ];
 
@@ -64,7 +63,7 @@ export function buildDownloadUrl(
   serverUrl: string,
   itemId: string,
   token: string,
-  quality: DownloadQuality = "720p"
+  quality: DownloadQuality = "original"
 ): string {
   const cleanUrl = serverUrl.replace(/\/+$/, "");
 

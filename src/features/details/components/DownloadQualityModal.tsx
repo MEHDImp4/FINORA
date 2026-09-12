@@ -24,7 +24,7 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
   item,
   onConfirmDownload
 }) => {
-  const [selectedQuality, setSelectedQuality] = useState<DownloadQuality>("720p");
+  const [selectedQuality, setSelectedQuality] = useState<DownloadQuality>("original");
 
   const handleConfirm = () => {
     hapticService.impactMedium();

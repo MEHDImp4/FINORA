@@ -79,7 +79,7 @@ export default function DetailsScreen() {
 
   const handleDownloadMovie = async (
     mediaItem: MediaItem,
-    quality: DownloadQuality = "720p"
+    quality: DownloadQuality = "original"
   ) => {
     hapticService.impactMedium();
     const downloadUrl = buildDownloadUrl(serverUrl, mediaItem.id, token, quality);
@@ -109,7 +109,7 @@ export default function DetailsScreen() {
 
   const handleDownloadSeriesEpisodes = async (
     episodes: MediaItem[],
-    quality: DownloadQuality = "720p"
+    quality: DownloadQuality = "original"
   ) => {
     hapticService.impactMedium();
     const headers = getDownloadHeaders(token);

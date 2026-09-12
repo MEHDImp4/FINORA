@@ -39,7 +39,7 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
   onConfirmDownload
 }) => {
   const [mode, setMode] = useState<SelectionMode>("seasons");
-  const [selectedQuality, setSelectedQuality] = useState<DownloadQuality>("720p");
+  const [selectedQuality, setSelectedQuality] = useState<DownloadQuality>("original");
   const [selectedSeasonIds, setSelectedSeasonIds] = useState<Set<string>>(new Set());
   const [episodeCountLimit, setEpisodeCountLimit] = useState<number>(3);
   const [allEpisodes, setAllEpisodes] = useState<MediaItem[]>([]);

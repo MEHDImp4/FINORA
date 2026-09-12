@@ -47,7 +47,7 @@ describe("DownloadQualityModal", () => {
       confirmBtn.props.onPress();
     });
 
-    expect(onConfirmMock).toHaveBeenCalledWith("720p");
+    expect(onConfirmMock).toHaveBeenCalledWith("original");
     expect(onCloseMock).toHaveBeenCalledTimes(1);
   });
 });

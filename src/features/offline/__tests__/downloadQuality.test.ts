@@ -39,10 +39,15 @@ describe("Download Quality & Transcoding URL Builder", () => {
     expect(url).toContain("videoBitRate=1500000");
   });
 
-  it("contains 4 quality profiles with 720p recommended", () => {
+  it("contains 4 quality profiles with original recommended", () => {
     expect(DOWNLOAD_QUALITIES).toHaveLength(4);
-    const recommended = DOWNLOAD_QUALITIES.find((q) => q.id === "720p");
+    const recommended = DOWNLOAD_QUALITIES.find((q) => q.id === "original");
     expect(recommended?.badge).toBe("Recommandé");
+  });
+
+  it("defaults to original quality when no quality is specified", () => {
+    const url = buildDownloadUrl(serverUrl, itemId, token);
+    expect(url).toBe("https://jellyfin.example.com/Items/movie-123/Download?api_key=secret-token-xyz");
   });
 
   it("builds correct authentication headers for Jellyfin downloads", () => {
