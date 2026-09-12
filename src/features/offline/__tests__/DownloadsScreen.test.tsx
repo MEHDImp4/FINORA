@@ -1,6 +1,11 @@
 import React from "react";
 import ReactTestRenderer, { act } from "react-test-renderer";
-import { DownloadsScreen, formatBytes } from "../components/DownloadsScreen";
+import {
+  DownloadsScreen,
+  formatBytes,
+  formatSpeed,
+  formatTimeRemaining
+} from "../components/DownloadsScreen";
 import { offlineStorageService } from "../offlineStorage";
 import { downloadManager } from "../downloadManager";
 import { OfflineMediaRecord } from "../types";
@@ -40,6 +45,19 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     expect(formatBytes(0)).toBe("0 MB");
     expect(formatBytes(500 * 1024 * 1024)).toBe("500 MB");
     expect(formatBytes(2.5 * 1024 * 1024 * 1024)).toBe("2.5 GB");
+  });
+
+  it("formatSpeed formats transfer speed to KB/s and MB/s", () => {
+    expect(formatSpeed(0)).toBe("");
+    expect(formatSpeed(500 * 1024)).toBe("500 KB/s");
+    expect(formatSpeed(3.5 * 1024 * 1024)).toBe("3.5 MB/s");
+  });
+
+  it("formatTimeRemaining formats ETA seconds into readable strings", () => {
+    expect(formatTimeRemaining(0)).toBe("");
+    expect(formatTimeRemaining(45)).toBe("~45s");
+    expect(formatTimeRemaining(120)).toBe("~2 min");
+    expect(formatTimeRemaining(3660)).toBe("~1h 1m");
   });
 
   it("renders downloaded items and allows offline playback", async () => {

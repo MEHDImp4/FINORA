@@ -7,17 +7,21 @@ import { getMediaThumbnailUrls } from "../../../core/repositories/imageUrlBuilde
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
 
+import { hapticService } from "../../../core/feedback/hapticService";
+
 export interface EpisodeCardProps {
   episode: MediaItem;
   serverUrl: string;
   onPlay: (episode: MediaItem) => void;
+  onLongPress?: (episode: MediaItem) => void;
+  onDownload?: (episode: MediaItem) => void;
 }
 
 const THUMBNAIL_WIDTH = 130;
 const THUMBNAIL_HEIGHT = 73;
 
 export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
-  ({ episode, serverUrl, onPlay }) => {
+  ({ episode, serverUrl, onPlay, onLongPress, onDownload }) => {
     const candidateUrls = useMemo(
       () => getMediaThumbnailUrls(serverUrl, episode, 300),
       [serverUrl, episode]
@@ -44,10 +48,19 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
     const episodePrefix =
       typeof episode.episodeIndex === "number" ? `E${episode.episodeIndex} · ` : "";
 
+    const handleLongPress = () => {
+      if (onLongPress) {
+        hapticService.impactMedium();
+        onLongPress(episode);
+      }
+    };
+
     return (
       <Pressable
         testID={`episode-card-${episode.id}`}
         onPress={() => onPlay(episode)}
+        onLongPress={handleLongPress}
+        delayLongPress={350}
         accessibilityRole="button"
         accessibilityLabel={`Play episode ${episode.name}`}
         style={({ pressed }) => [
@@ -120,6 +133,24 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
             </FinoraText>
           ) : null}
         </View>
+
+        {/* Download Action Button */}
+        {onDownload ? (
+          <Pressable
+            testID={`download-button-${episode.id}`}
+            style={styles.downloadButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              hapticService.impactMedium();
+              onDownload(episode);
+            }}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Télécharger ${episode.name}`}
+          >
+            <Ionicons name="arrow-down-circle-outline" size={24} color={colors.textSecondary} />
+          </Pressable>
+        ) : null}
       </Pressable>
     );
   },
@@ -208,5 +239,10 @@ const styles = StyleSheet.create({
   overviewText: {
     fontSize: 12,
     lineHeight: 16
+  },
+  downloadButton: {
+    padding: spacing.xs,
+    justifyContent: "center",
+    alignItems: "center"
   }
 });

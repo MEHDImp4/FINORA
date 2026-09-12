@@ -145,4 +145,44 @@ describe("EpisodeCard", () => {
     image = instance.findByProps({ contentFit: "cover" });
     expect(image.props.source.uri).toContain("tag-series-backdrop");
   });
+
+  it("triggers onLongPress and onDownload for single episode download", () => {
+    const onPlay = jest.fn();
+    const onLongPress = jest.fn();
+    const onDownload = jest.fn();
+
+    let root: renderer.ReactTestRenderer;
+    act(() => {
+      root = renderer.create(
+        <EpisodeCard
+          episode={mockEpisode}
+          serverUrl="https://jellyfin.example.com"
+          onPlay={onPlay}
+          onLongPress={onLongPress}
+          onDownload={onDownload}
+        />
+      );
+    });
+
+    const card = root!.root.findByProps({
+      accessibilityLabel: "Play episode Winter Is Coming"
+    });
+
+    // Test long press
+    act(() => {
+      card.props.onLongPress();
+    });
+    expect(onLongPress).toHaveBeenCalledWith(mockEpisode);
+
+    // Test download button press
+    const downloadBtn = root!.root.findByProps({
+      testID: "download-button-ep-1"
+    });
+    expect(downloadBtn).toBeTruthy();
+
+    act(() => {
+      downloadBtn.props.onPress({ stopPropagation: jest.fn() });
+    });
+    expect(onDownload).toHaveBeenCalledWith(mockEpisode);
+  });
 });

@@ -107,4 +107,37 @@ describe("DownloadManager", () => {
     expect(manager.getDownload("movie-retry")?.status).toBe("downloading");
     expect(manager.getDownload("movie-retry")?.error).toBeUndefined();
   });
+
+  it("limits concurrent downloads to 3 and queues excess items", async () => {
+    // Start 5 downloads
+    for (let i = 1; i <= 5; i++) {
+      await manager.startDownload({
+        itemId: `ep-${i}`,
+        title: `Episode ${i}`,
+        type: "Episode",
+        downloadUrl: `https://jellyfin.example.com/Videos/ep-${i}/stream.mp4`,
+        localPath: `finora_downloads/ep-${i}.mp4`
+      });
+    }
+
+    // Check first 3 are downloading, next 2 are queued
+    expect(manager.getDownload("ep-1")?.status).toBe("downloading");
+    expect(manager.getDownload("ep-2")?.status).toBe("downloading");
+    expect(manager.getDownload("ep-3")?.status).toBe("downloading");
+    expect(manager.getDownload("ep-4")?.status).toBe("queued");
+    expect(manager.getDownload("ep-5")?.status).toBe("queued");
+    expect(manager.getQueueLength()).toBe(2);
+
+    // Complete ep-1 -> ep-4 should automatically start downloading
+    await manager.completeDownload("ep-1", 500000000);
+    expect(manager.getDownload("ep-1")?.status).toBe("completed");
+    expect(manager.getDownload("ep-4")?.status).toBe("downloading");
+    expect(manager.getQueueLength()).toBe(1);
+
+    // Cancel ep-2 -> ep-5 should automatically start downloading
+    await manager.cancelDownload("ep-2");
+    expect(manager.getDownload("ep-2")).toBeUndefined();
+    expect(manager.getDownload("ep-5")?.status).toBe("downloading");
+    expect(manager.getQueueLength()).toBe(0);
+  });
 });

@@ -25,6 +25,7 @@ import { SeasonPicker } from "./SeasonPicker";
 import { EpisodeCard } from "./EpisodeCard";
 import { CastList } from "./CastList";
 import { DownloadSeriesModal } from "./DownloadSeriesModal";
+import { DownloadQualityModal } from "./DownloadQualityModal";
 import { DownloadQuality } from "../../offline/downloadQuality";
 import { hapticService } from "../../../core/feedback/hapticService";
 
@@ -55,6 +56,8 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
     const [selectedSeasonId, setSelectedSeasonId] = useState<string>("");
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+    const [selectedEpisodeForDownload, setSelectedEpisodeForDownload] =
+      useState<MediaItem | null>(null);
 
     const { data: seasons = [], isLoading: isLoadingSeasons } = useSeasons(
       series.id,
@@ -281,6 +284,14 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
                 episode={ep}
                 serverUrl={serverUrl}
                 onPlay={onPlayEpisode}
+                onLongPress={(episode) => {
+                  hapticService.impactMedium();
+                  setSelectedEpisodeForDownload(episode);
+                }}
+                onDownload={(episode) => {
+                  hapticService.impactMedium();
+                  setSelectedEpisodeForDownload(episode);
+                }}
               />
             ))
           ) : (
@@ -307,6 +318,20 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
             }
           }}
         />
+
+        {selectedEpisodeForDownload && (
+          <DownloadQualityModal
+            visible={!!selectedEpisodeForDownload}
+            onClose={() => setSelectedEpisodeForDownload(null)}
+            item={selectedEpisodeForDownload}
+            onConfirmDownload={(quality) => {
+              if (onDownloadEpisodes && selectedEpisodeForDownload) {
+                onDownloadEpisodes([selectedEpisodeForDownload], quality);
+              }
+              setSelectedEpisodeForDownload(null);
+            }}
+          />
+        )}
       </ScrollView>
     );
   }

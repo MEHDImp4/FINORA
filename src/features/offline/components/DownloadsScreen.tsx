@@ -19,6 +19,30 @@ export function formatBytes(bytes: number): string {
   return `${Math.round(mb)} MB`;
 }
 
+export function formatSpeed(bytesPerSec?: number): string {
+  if (!bytesPerSec || bytesPerSec <= 0) return "";
+  const mb = bytesPerSec / (1024 * 1024);
+  if (mb >= 1) {
+    return `${mb.toFixed(1)} MB/s`;
+  }
+  const kb = bytesPerSec / 1024;
+  return `${Math.round(kb)} KB/s`;
+}
+
+export function formatTimeRemaining(seconds?: number): string {
+  if (!seconds || seconds <= 0) return "";
+  if (seconds >= 3600) {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    return `~${hours}h ${mins}m`;
+  }
+  if (seconds >= 60) {
+    const mins = Math.ceil(seconds / 60);
+    return `~${mins} min`;
+  }
+  return `~${seconds}s`;
+}
+
 interface DownloadsScreenProps {
   onPlayItem?: (record: OfflineMediaRecord) => void;
 }
@@ -172,9 +196,22 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
 
   const pendingOrFailedDownloads = useMemo(() => {
     return activeDownloads.filter(
-      (d) => d.status === "downloading" || d.status === "failed" || d.status === "paused"
+      (d) =>
+        d.status === "downloading" ||
+        d.status === "queued" ||
+        d.status === "failed" ||
+        d.status === "paused"
     );
   }, [activeDownloads]);
+
+  const activeCount = useMemo(
+    () => activeDownloads.filter((d) => d.status === "downloading").length,
+    [activeDownloads]
+  );
+  const queuedCount = useMemo(
+    () => activeDownloads.filter((d) => d.status === "queued").length,
+    [activeDownloads]
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -213,14 +250,15 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
         </View>
       )}
 
-      {/* Active & Failed Downloads Section */}
+      {/* Active, Queued & Failed Downloads Section */}
       {pendingOrFailedDownloads.length > 0 && (
         <View style={styles.activeSection}>
           <FinoraText variant="caption" style={styles.sectionTitle}>
-            Téléchargements en cours & alertes
+            {`Téléchargements (${activeCount}/3 actifs${queuedCount > 0 ? ` • ${queuedCount} en attente` : ""})`}
           </FinoraText>
           {pendingOrFailedDownloads.map((download) => {
             const isFailed = download.status === "failed";
+            const isQueued = download.status === "queued";
             const progressPercent = Math.round(download.progress * 100);
 
             return (
@@ -262,6 +300,13 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
                       {download.error || "Échec du téléchargement"}
                     </FinoraText>
                   </View>
+                ) : isQueued ? (
+                  <View style={styles.queuedNotice}>
+                    <Ionicons name="hourglass-outline" size={13} color="#4A90E2" style={{ marginRight: 4 }} />
+                    <FinoraText variant="caption" style={styles.queuedText}>
+                      En file d'attente (démarrera automatiquement)
+                    </FinoraText>
+                  </View>
                 ) : (
                   <>
                     <View style={styles.progressBar}>
@@ -286,6 +331,8 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
                           : download.bytesDownloaded > 0
                           ? `${formatBytes(download.bytesDownloaded)} reçus`
                           : "Connexion au serveur..."}
+                        {download.speedBytesPerSecond ? ` • ${formatSpeed(download.speedBytesPerSecond)}` : ""}
+                        {download.estimatedSecondsRemaining ? ` • ${formatTimeRemaining(download.estimatedSecondsRemaining)}` : ""}
                       </FinoraText>
                       <FinoraText variant="caption" style={styles.progressPercent}>
                         {download.totalBytes > 0 ? `${progressPercent}%` : "En cours"}
@@ -558,5 +605,19 @@ const styles = StyleSheet.create({
     color: "#E50914",
     fontSize: 11,
     fontWeight: "600"
+  },
+  queuedNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(74, 144, 226, 0.12)",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 4,
+    marginTop: 2
+  },
+  queuedText: {
+    color: "#4A90E2",
+    fontSize: 11,
+    fontWeight: "500"
   }
 });

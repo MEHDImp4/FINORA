@@ -17,6 +17,8 @@ export interface DownloadItem {
   progress: number; // 0.0 to 1.0
   bytesDownloaded: number;
   totalBytes: number;
+  speedBytesPerSecond?: number;
+  estimatedSecondsRemaining?: number;
   error?: string;
   startedAt: number;
   completedAt?: number;
