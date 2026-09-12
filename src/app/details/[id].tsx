@@ -15,6 +15,10 @@ import { hapticService } from "../../core/feedback/hapticService";
 import { downloadManager } from "../../features/offline/downloadManager";
 import { offlineStorageService } from "../../features/offline/offlineStorage";
 import { OfflineMediaRecord, DownloadItem } from "../../features/offline/types";
+import {
+  DownloadQuality,
+  buildDownloadUrl
+} from "../../features/offline/downloadQuality";
 
 export default function DetailsScreen() {
   const insets = useSafeAreaInsets();
@@ -66,24 +70,23 @@ export default function DetailsScreen() {
     });
   };
 
-  const handleDownloadMovie = async (mediaItem: MediaItem) => {
+  const handleDownloadMovie = async (
+    mediaItem: MediaItem,
+    quality: DownloadQuality = "720p"
+  ) => {
     hapticService.impactMedium();
-    const downloadUrl = `${serverUrl}/Items/${mediaItem.id}/Download?api_key=${token}`;
+    const downloadUrl = buildDownloadUrl(serverUrl, mediaItem.id, token, quality);
     const localPath = `finora_downloads/movie_${mediaItem.id}.mp4`;
 
-    await downloadManager.startDownload({
-      itemId: mediaItem.id,
-      title: mediaItem.name,
-      type: "Movie",
-      year: mediaItem.year,
-      downloadUrl,
-      localPath
-    });
-
-    // Complete download registration into local offline storage
-    await downloadManager.completeDownload(
-      mediaItem.id,
-      2500000000, // estimated 2.5 GB
+    await downloadManager.startDownload(
+      {
+        itemId: mediaItem.id,
+        title: `${mediaItem.name} (${quality.toUpperCase()})`,
+        type: "Movie",
+        year: mediaItem.year,
+        downloadUrl,
+        localPath
+      },
       {
         totalTicks: mediaItem.totalTicks || 72000000000,
         playbackPositionTicks: mediaItem.playbackPositionTicks || 0,
@@ -92,33 +95,31 @@ export default function DetailsScreen() {
       }
     );
 
-    const record = await offlineStorageService.getOfflineMedia(mediaItem.id);
-    setOfflineRecord(record);
     hapticService.notificationSuccess();
   };
 
-  const handleDownloadSeriesEpisodes = async (episodes: MediaItem[]) => {
+  const handleDownloadSeriesEpisodes = async (
+    episodes: MediaItem[],
+    quality: DownloadQuality = "720p"
+  ) => {
     hapticService.impactMedium();
     for (const ep of episodes) {
-      const downloadUrl = `${serverUrl}/Items/${ep.id}/Download?api_key=${token}`;
+      const downloadUrl = buildDownloadUrl(serverUrl, ep.id, token, quality);
       const localPath = `finora_downloads/ep_${ep.id}.mp4`;
 
-      await downloadManager.startDownload({
-        itemId: ep.id,
-        title: `${item?.name || "Série"} - ${ep.name}`,
-        type: "Episode",
-        year: ep.year || item?.year,
-        downloadUrl,
-        localPath,
-        seriesId: item?.id,
-        seriesName: item?.name,
-        seasonIndex: ep.seasonIndex,
-        episodeIndex: ep.episodeIndex
-      });
-
-      await downloadManager.completeDownload(
-        ep.id,
-        800000000, // estimated 800 MB per episode
+      await downloadManager.startDownload(
+        {
+          itemId: ep.id,
+          title: `${item?.name || "Série"} - ${ep.name} (${quality.toUpperCase()})`,
+          type: "Episode",
+          year: ep.year || item?.year,
+          downloadUrl,
+          localPath,
+          seriesId: item?.id,
+          seriesName: item?.name,
+          seasonIndex: ep.seasonIndex,
+          episodeIndex: ep.episodeIndex
+        },
         {
           totalTicks: ep.totalTicks || 25000000000,
           playbackPositionTicks: ep.playbackPositionTicks || 0,

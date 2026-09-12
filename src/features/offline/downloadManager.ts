@@ -1,5 +1,6 @@
 import { DownloadItem, DownloadStatus, OfflineMediaRecord } from "./types";
 import { offlineStorageService } from "./offlineStorage";
+import * as FileSystem from "expo-file-system/legacy";
 
 export type DownloadListener = (downloads: DownloadItem[]) => void;
 
@@ -10,6 +11,7 @@ export type DownloadListener = (downloads: DownloadItem[]) => void;
 export class DownloadManager {
   private downloads: Map<string, DownloadItem> = new Map();
   private listeners: Set<DownloadListener> = new Set();
+  private activeTasks: Map<string, any> = new Map();
 
   public subscribe(listener: DownloadListener): () => void {
     this.listeners.add(listener);
@@ -42,15 +44,28 @@ export class DownloadManager {
     item: Omit<
       DownloadItem,
       "status" | "progress" | "bytesDownloaded" | "totalBytes" | "startedAt"
-    >
+    >,
+    metadata?: Partial<OfflineMediaRecord>
   ): Promise<DownloadItem> {
     const existing = this.downloads.get(item.itemId);
     if (existing && existing.status === "downloading") {
       return existing;
     }
 
+    let localPath = item.localPath;
+    if (FileSystem.documentDirectory) {
+      const mediaDir = `${FileSystem.documentDirectory}finora_downloads/`;
+      try {
+        await FileSystem.makeDirectoryAsync(mediaDir, { intermediates: true });
+        localPath = `${mediaDir}${item.itemId}.mp4`;
+      } catch {
+        // Fallback to provided path
+      }
+    }
+
     const downloadItem: DownloadItem = {
       ...item,
+      localPath,
       status: "downloading",
       progress: 0,
       bytesDownloaded: 0,
@@ -60,6 +75,51 @@ export class DownloadManager {
 
     this.downloads.set(item.itemId, downloadItem);
     this.notify();
+
+    // Start real network download with expo-file-system if available
+    if (typeof FileSystem.createDownloadResumable === "function" && localPath.startsWith("file://")) {
+      try {
+        const downloadResumable = FileSystem.createDownloadResumable(
+          item.downloadUrl,
+          localPath,
+          {},
+          (progressData) => {
+            this.updateProgress(
+              item.itemId,
+              progressData.totalBytesWritten,
+              progressData.totalBytesExpectedToWrite
+            );
+          }
+        );
+
+        this.activeTasks.set(item.itemId, downloadResumable);
+
+        // Execute download in background
+        downloadResumable
+          .downloadAsync()
+          .then(async (result) => {
+            this.activeTasks.delete(item.itemId);
+            if (result && result.uri) {
+              const fileInfo = await FileSystem.getInfoAsync(result.uri).catch(() => null);
+              const finalSize =
+                fileInfo && "size" in fileInfo
+                  ? (fileInfo as any).size
+                  : downloadItem.bytesDownloaded || 1000000;
+              await this.completeDownload(item.itemId, finalSize, {
+                ...metadata,
+                localPath: result.uri
+              });
+            }
+          })
+          .catch((err) => {
+            this.activeTasks.delete(item.itemId);
+            this.markFailed(item.itemId, err?.message || "Échec du téléchargement");
+          });
+      } catch (err: any) {
+        this.markFailed(item.itemId, err?.message || "Erreur d'initialisation du téléchargement");
+      }
+    }
+
     return downloadItem;
   }
 
@@ -87,6 +147,15 @@ export class DownloadManager {
     const item = this.downloads.get(itemId);
     if (!item || item.status !== "downloading") return;
 
+    const task = this.activeTasks.get(itemId);
+    if (task && typeof task.pauseAsync === "function") {
+      try {
+        await task.pauseAsync();
+      } catch {
+        // Safe execution
+      }
+    }
+
     item.status = "paused";
     this.notify();
   }
@@ -95,6 +164,15 @@ export class DownloadManager {
     const item = this.downloads.get(itemId);
     if (!item || item.status !== "paused") return;
 
+    const task = this.activeTasks.get(itemId);
+    if (task && typeof task.resumeAsync === "function") {
+      try {
+        task.resumeAsync().catch(() => {});
+      } catch {
+        // Safe execution
+      }
+    }
+
     item.status = "downloading";
     this.notify();
   }
@@ -102,6 +180,20 @@ export class DownloadManager {
   public async cancelDownload(itemId: string): Promise<void> {
     const item = this.downloads.get(itemId);
     if (!item) return;
+
+    const task = this.activeTasks.get(itemId);
+    if (task && typeof task.cancelAsync === "function") {
+      try {
+        await task.cancelAsync();
+      } catch {
+        // Safe execution
+      }
+      this.activeTasks.delete(itemId);
+    }
+
+    if (item.localPath && typeof FileSystem.deleteAsync === "function") {
+      FileSystem.deleteAsync(item.localPath, { idempotent: true }).catch(() => {});
+    }
 
     item.status = "canceled";
     this.downloads.delete(itemId);

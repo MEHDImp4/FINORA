@@ -155,9 +155,11 @@ describe("DownloadSeriesModal", () => {
 
     expect(onConfirmMock).toHaveBeenCalledTimes(1);
     const downloadedEpisodes: MediaItem[] = onConfirmMock.mock.calls[0][0];
+    const chosenQuality: string = onConfirmMock.mock.calls[0][1];
     expect(downloadedEpisodes).toHaveLength(3);
     expect(downloadedEpisodes.every((ep) => !ep.isPlayed)).toBe(true);
     expect(downloadedEpisodes.map((ep) => ep.id)).toEqual(["ep-1-2", "ep-1-3", "ep-2-1"]);
+    expect(chosenQuality).toBe("720p");
     expect(onCloseMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -20,6 +20,9 @@ import { FinoraButton } from "../../../design-system/components/FinoraButton";
 import { FinoraIconButton } from "../../../design-system/components/FinoraIconButton";
 import { colors, spacing } from "../../../design-system/tokens";
 import { CastList } from "./CastList";
+import { DownloadQualityModal } from "./DownloadQualityModal";
+import { DownloadQuality } from "../../offline/downloadQuality";
+import { hapticService } from "../../../core/feedback/hapticService";
 
 export interface MovieDetailsViewProps {
   item: MediaItem;
@@ -28,7 +31,7 @@ export interface MovieDetailsViewProps {
   onBack: () => void;
   onToggleFavorite?: (item: MediaItem) => void;
   onTogglePlayed?: (item: MediaItem) => void;
-  onDownload?: (item: MediaItem) => void;
+  onDownload?: (item: MediaItem, quality: DownloadQuality) => void;
   isDownloaded?: boolean;
   isDownloading?: boolean;
 }
@@ -50,6 +53,7 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
   }) => {
     const insets = useSafeAreaInsets();
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
+    const [isQualityModalOpen, setIsQualityModalOpen] = useState(false);
 
     const backdropUri = item.backdropImageTag
       ? getBackdropUrl(serverUrl, item.id, item.backdropImageTag, 1080)
@@ -253,7 +257,10 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
                   ? "Téléchargement en cours"
                   : "Télécharger le film"
               }
-              onPress={() => onDownload(item)}
+              onPress={() => {
+                hapticService.impactLight();
+                setIsQualityModalOpen(true);
+              }}
               size={48}
               backgroundColor={
                 isDownloaded
@@ -323,6 +330,17 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
         {item.people && item.people.length > 0 ? (
           <CastList people={item.people} serverUrl={serverUrl} />
         ) : null}
+
+        <DownloadQualityModal
+          visible={isQualityModalOpen}
+          onClose={() => setIsQualityModalOpen(false)}
+          item={item}
+          onConfirmDownload={(quality) => {
+            if (onDownload) {
+              onDownload(item, quality);
+            }
+          }}
+        />
       </ScrollView>
     );
   }

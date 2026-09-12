@@ -14,6 +14,10 @@ import { FinoraText } from "../../../design-system/components/FinoraText";
 import { FinoraButton } from "../../../design-system/components/FinoraButton";
 import { colors, spacing } from "../../../design-system/tokens";
 import { hapticService } from "../../../core/feedback/hapticService";
+import {
+  DownloadQuality,
+  DOWNLOAD_QUALITIES
+} from "../../offline/downloadQuality";
 
 export interface DownloadSeriesModalProps {
   visible: boolean;
@@ -21,7 +25,7 @@ export interface DownloadSeriesModalProps {
   series: MediaItem;
   seasons: MediaItem[];
   userId: string;
-  onConfirmDownload: (episodes: MediaItem[]) => void;
+  onConfirmDownload: (episodes: MediaItem[], quality: DownloadQuality) => void;
 }
 
 type SelectionMode = "seasons" | "count";
@@ -35,6 +39,7 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
   onConfirmDownload
 }) => {
   const [mode, setMode] = useState<SelectionMode>("seasons");
+  const [selectedQuality, setSelectedQuality] = useState<DownloadQuality>("720p");
   const [selectedSeasonIds, setSelectedSeasonIds] = useState<Set<string>>(new Set());
   const [episodeCountLimit, setEpisodeCountLimit] = useState<number>(3);
   const [allEpisodes, setAllEpisodes] = useState<MediaItem[]>([]);
@@ -152,7 +157,7 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
   const handleConfirm = () => {
     if (episodesToDownload.length === 0) return;
     hapticService.impactMedium();
-    onConfirmDownload(episodesToDownload);
+    onConfirmDownload(episodesToDownload, selectedQuality);
     onClose();
   };
 
@@ -362,6 +367,41 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
 
           {/* Footer & Summary */}
           <View style={styles.footer}>
+            {/* Quality Selector */}
+            <View style={styles.qualitySelectorRow}>
+              <FinoraText variant="caption" style={styles.qualityLabelText}>
+                Qualité vidéo :
+              </FinoraText>
+              <View style={styles.qualityChipsContainer}>
+                {DOWNLOAD_QUALITIES.map((q) => {
+                  const isSelected = selectedQuality === q.id;
+                  return (
+                    <Pressable
+                      key={q.id}
+                      style={[
+                        styles.qualityMiniChip,
+                        isSelected && styles.qualityMiniChipSelected
+                      ]}
+                      onPress={() => {
+                        hapticService.selection();
+                        setSelectedQuality(q.id);
+                      }}
+                    >
+                      <FinoraText
+                        variant="caption"
+                        style={[
+                          styles.qualityMiniChipText,
+                          isSelected && styles.qualityMiniChipTextSelected
+                        ]}
+                      >
+                        {q.id === "original" ? "Source" : q.id}
+                      </FinoraText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
             <View style={styles.summaryBadge}>
               <Ionicons
                 name="shield-checkmark-outline"
@@ -576,6 +616,41 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#1F1F2E",
     backgroundColor: "#101018"
+  },
+  qualitySelectorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12
+  },
+  qualityLabelText: {
+    color: colors.textSecondary,
+    fontWeight: "600"
+  },
+  qualityChipsContainer: {
+    flexDirection: "row",
+    gap: 6
+  },
+  qualityMiniChip: {
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    backgroundColor: "#1C1C2A",
+    borderWidth: 1,
+    borderColor: "#2B2B3E"
+  },
+  qualityMiniChipSelected: {
+    borderColor: colors.primary,
+    backgroundColor: "rgba(229, 9, 20, 0.15)"
+  },
+  qualityMiniChipText: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: "600"
+  },
+  qualityMiniChipTextSelected: {
+    color: "#FFFFFF",
+    fontWeight: "700"
   },
   summaryBadge: {
     flexDirection: "row",

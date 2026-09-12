@@ -25,6 +25,7 @@ import { SeasonPicker } from "./SeasonPicker";
 import { EpisodeCard } from "./EpisodeCard";
 import { CastList } from "./CastList";
 import { DownloadSeriesModal } from "./DownloadSeriesModal";
+import { DownloadQuality } from "../../offline/downloadQuality";
 import { hapticService } from "../../../core/feedback/hapticService";
 
 export interface SeriesDetailsViewProps {
@@ -34,7 +35,7 @@ export interface SeriesDetailsViewProps {
   onPlayEpisode: (episode: MediaItem) => void;
   onBack: () => void;
   onToggleFavorite?: (item: MediaItem) => void;
-  onDownloadEpisodes?: (episodes: MediaItem[]) => void;
+  onDownloadEpisodes?: (episodes: MediaItem[], quality: DownloadQuality) => void;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -300,9 +301,9 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
           series={series}
           seasons={seasons}
           userId={userId}
-          onConfirmDownload={(episodes) => {
+          onConfirmDownload={(episodes, quality) => {
             if (onDownloadEpisodes) {
-              onDownloadEpisodes(episodes);
+              onDownloadEpisodes(episodes, quality);
             }
           }}
         />
