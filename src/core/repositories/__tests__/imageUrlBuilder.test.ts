@@ -6,7 +6,8 @@ import {
   getMediaPosterUrl,
   getMediaThumbnailUrl,
   getMediaPosterUrls,
-  getMediaThumbnailUrls
+  getMediaThumbnailUrls,
+  getHeroBannerUrls
 } from "../imageUrlBuilder";
 
 describe("imageUrlBuilder", () => {
@@ -166,4 +167,43 @@ describe("imageUrlBuilder", () => {
       expect(urls.some((u) => u.includes("/Images/Primary"))).toBe(true);
     });
   });
+
+  describe("getHeroBannerUrls", () => {
+    it("returns empty array when baseUrl or item is missing", () => {
+      expect(getHeroBannerUrls("", {} as any)).toEqual([]);
+      expect(getHeroBannerUrls(baseUrl, null as any)).toEqual([]);
+    });
+
+    it("prioritizes backdrop tag with 1280 target width and falls back to primary and fallbacks", () => {
+      const item: any = {
+        id: "hero-1",
+        type: "Movie",
+        backdropImageTag: "hero-bd-123",
+        primaryImageTag: "hero-pri-456"
+      };
+
+      const urls = getHeroBannerUrls(baseUrl, item, 1280);
+      expect(urls.length).toBeGreaterThanOrEqual(2);
+      expect(urls[0]).toContain("/Items/hero-1/Images/Backdrop");
+      expect(urls[0]).toContain("maxWidth=1280");
+      expect(urls[0]).toContain("tag=hero-bd-123");
+
+      // Verify fallback without tag is also present
+      expect(urls.some((u) => u.includes("/Items/hero-1/Images/Backdrop") && !u.includes("tag="))).toBe(true);
+    });
+
+    it("includes parent backdrop and thumb when item is an episode with parent info", () => {
+      const episode: any = {
+        id: "ep-10",
+        type: "Episode",
+        seriesId: "series-50",
+        parentBackdropImageTag: "series-bd-tag",
+        primaryImageTag: "ep-still-tag"
+      };
+
+      const urls = getHeroBannerUrls(baseUrl, episode, 1280);
+      expect(urls.some((u) => u.includes("/Items/series-50/Images/Backdrop") && u.includes("series-bd-tag"))).toBe(true);
+    });
+  });
 });
+

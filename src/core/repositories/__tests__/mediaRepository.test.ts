@@ -217,6 +217,26 @@ describe("MediaRepository", () => {
     expect(recent[0].id).toBe("show-active");
   });
 
+  it("refreshLibrary calls POST /Library/Refresh and throttles within 30 seconds", async () => {
+    mockHttpClient.request.mockResolvedValue({});
+
+    await repository.refreshLibrary(mockHttpClient);
+    expect(mockHttpClient.request).toHaveBeenCalledWith("/Library/Refresh", { method: "POST" });
+
+    // Second call immediately after should be throttled
+    mockHttpClient.request.mockClear();
+    await repository.refreshLibrary(mockHttpClient);
+    expect(mockHttpClient.request).not.toHaveBeenCalled();
+  });
+
+  it("refreshLibrary suppresses errors from Jellyfin without throwing", async () => {
+    // Create new repo instance to reset throttling timestamp
+    const freshRepo = new MediaRepository(mockClient);
+    mockHttpClient.request.mockRejectedValueOnce(new Error("Unauthorized"));
+
+    await expect(freshRepo.refreshLibrary(mockHttpClient)).resolves.not.toThrow();
+  });
+
   it("throws FinoraError on missing userId parameter", async () => {
     await expect(repository.getLibraries("", mockHttpClient)).rejects.toThrow(FinoraError);
   });

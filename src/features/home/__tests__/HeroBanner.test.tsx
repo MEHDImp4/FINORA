@@ -47,6 +47,33 @@ describe("HeroBanner", () => {
     expect(root.findByProps({ children: "Dune: Part Two" })).toBeDefined();
   });
 
+  it("cycles to next candidate URL when image error occurs", () => {
+    const itemWithFallbacks: MediaItem = {
+      ...sampleItem,
+      backdropImageTag: "primary-backdrop-tag"
+    };
+
+    const component = ReactTestRenderer.create(
+      <HeroBanner item={itemWithFallbacks} serverUrl={serverUrl} />
+    );
+
+    const images = component.root.findAllByType("Image" as any);
+    expect(images.length).toBeGreaterThan(0);
+    const backdropImg = images[0];
+    const initialSource = backdropImg.props.source.uri;
+    expect(initialSource).toContain("tag=primary-backdrop-tag");
+
+    // Trigger onError on backdrop image
+    ReactTestRenderer.act(() => {
+      backdropImg.props.onError();
+    });
+
+    const updatedImages = component.root.findAllByType("Image" as any);
+    const updatedBackdrop = updatedImages[0];
+    // Candidate should now have moved forward to the next candidate without the tag
+    expect(updatedBackdrop.props.source.uri).not.toBe(initialSource);
+  });
+
   it("handles empty/null media gracefully", () => {
     const component = ReactTestRenderer.create(
       <HeroBanner item={null} serverUrl={serverUrl} />

@@ -1,5 +1,6 @@
 import React from "react";
 import renderer, { act } from "react-test-renderer";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PlayerScreen } from "../components/PlayerScreen";
 import { MediaItem } from "../../../types/media";
 
@@ -12,6 +13,16 @@ jest.mock("expo-router", () => ({
 }));
 
 describe("PlayerScreen", () => {
+  let queryClient: QueryClient;
+
+  beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false }
+      }
+    });
+  });
+
   const mockItem: MediaItem = {
     id: "item-movie-1",
     name: "Blade Runner 2049",
@@ -39,14 +50,16 @@ describe("PlayerScreen", () => {
     let root: any;
     act(() => {
       root = renderer.create(
-        <PlayerScreen
-          item={mockItem}
-          serverUrl="https://demo.jellyfin.org"
-          token="test-token"
-          onBack={jest.fn()}
-          playbackRepository={mockRepo}
-          overlayAutoHideMs={0}
-        />
+        <QueryClientProvider client={queryClient}>
+          <PlayerScreen
+            item={mockItem}
+            serverUrl="https://demo.jellyfin.org"
+            token="test-token"
+            onBack={jest.fn()}
+            playbackRepository={mockRepo}
+            overlayAutoHideMs={0}
+          />
+        </QueryClientProvider>
       );
     });
 
@@ -67,14 +80,16 @@ describe("PlayerScreen", () => {
     let root: any;
     act(() => {
       root = renderer.create(
-        <PlayerScreen
-          item={mockItem}
-          serverUrl="https://demo.jellyfin.org"
-          token="test-token"
-          onBack={onBackMock}
-          playbackRepository={mockRepo}
-          overlayAutoHideMs={0}
-        />
+        <QueryClientProvider client={queryClient}>
+          <PlayerScreen
+            item={mockItem}
+            serverUrl="https://demo.jellyfin.org"
+            token="test-token"
+            onBack={onBackMock}
+            playbackRepository={mockRepo}
+            overlayAutoHideMs={0}
+          />
+        </QueryClientProvider>
       );
     });
 

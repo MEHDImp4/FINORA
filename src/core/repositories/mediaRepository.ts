@@ -56,15 +56,13 @@ export function isValidMediaDto(dto: any): boolean {
     if (dto.MediaSourceCount !== undefined && dto.MediaSourceCount === 0) {
       return false;
     }
-    if (Array.isArray(dto.MediaSources) && dto.MediaSources.length === 0) {
-      return false;
-    }
   }
   return true;
 }
 
 export class MediaRepository {
   private client: JellyfinClient;
+  private lastLibraryRefreshTime = 0;
 
   constructor(client: JellyfinClient = jellyfinClient) {
     this.client = client;
@@ -72,6 +70,22 @@ export class MediaRepository {
 
   private getHttp(customClient?: HttpClient): HttpClient {
     return customClient || this.client.getHttpClient();
+  }
+
+  public async refreshLibrary(customClient?: HttpClient): Promise<void> {
+    const now = Date.now();
+    // Throttled to at most once per 30s to stay optimal and prevent server load
+    if (now - this.lastLibraryRefreshTime < 30000) {
+      return;
+    }
+    this.lastLibraryRefreshTime = now;
+
+    try {
+      const http = this.getHttp(customClient);
+      await http.request(`/Library/Refresh`, { method: "POST" });
+    } catch {
+      // Ignored for non-admin users or transient network errors
+    }
   }
 
   public async getLibraries(userId: string, customClient?: HttpClient): Promise<MediaLibrary[]> {

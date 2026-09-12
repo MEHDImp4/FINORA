@@ -11,10 +11,13 @@ import { offlineStorageService } from "../../features/offline/offlineStorage";
 import { OfflineMediaRecord } from "../../features/offline/types";
 import { MediaItem } from "../../types/media";
 import { jellyfinClient } from "../../core/jellyfin/jellyfinClient";
+import { useQueryClient } from "@tanstack/react-query";
+import { mediaKeys } from "../../hooks/useMediaQueries";
 
 export default function PlayerRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const session = useAuthStore((state) => state.session);
   const authStatus = useAuthStore((state) => state.status);
   const restoreSession = useAuthStore((state) => state.restoreSession);
@@ -55,6 +58,22 @@ export default function PlayerRoute() {
   }, [id]);
 
   const { data: item, isLoading, isError } = useItemDetails(userId, id);
+
+  useEffect(() => {
+    if (isError || (item && (item.isMissing || item.locationType === "Virtual"))) {
+      try {
+        queryClient.setQueriesData({ queryKey: mediaKeys.all }, (oldData: any) => {
+          if (Array.isArray(oldData)) {
+            return oldData.filter((i: any) => i?.id !== id && i?.seriesId !== id);
+          }
+          return oldData;
+        });
+        queryClient.invalidateQueries({ queryKey: mediaKeys.all });
+      } catch {
+        // Ignored
+      }
+    }
+  }, [isError, item, id, queryClient]);
 
   if (isLoading || checkingOffline || authStatus === "restoring" || authStatus === "authenticating") {
     return (

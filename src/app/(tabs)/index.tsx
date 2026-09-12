@@ -16,6 +16,8 @@ import {
 import { useToggleFavorite } from "../../hooks/useUserDataMutations";
 import { colors, spacing } from "../../design-system/tokens";
 import { MediaItem, MediaLibrary } from "../../types/media";
+import { mediaRepository } from "../../core/repositories/mediaRepository";
+import { jellyfinClient } from "../../core/jellyfin/jellyfinClient";
 
 function HomeLibraryRow({
   library,
@@ -50,47 +52,57 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const session = useAuthStore((state) => state.session);
   const userId = session?.userId;
-  const serverUrl = session?.serverUrl || "";
+  const serverUrl = session?.serverUrl || jellyfinClient.getServerUrl() || "";
 
   // Data queries
   const {
-    data: resumeItems,
-    isLoading: isResumeLoading,
-    refetch: refetchResume
+    data: resumeItems
   } = useResumeItems(userId);
 
   const {
-    data: recentItems,
-    isLoading: isRecentLoading,
-    refetch: refetchRecent
+    data: recentItems
   } = useRecentlyAdded(userId);
 
   const {
-    data: libraries,
-    isLoading: isLibrariesLoading,
-    refetch: refetchLibraries
+    data: libraries
   } = useLibraries(userId);
 
   const toggleFavorite = useToggleFavorite(userId || "");
 
-  const isRefreshing = isResumeLoading || isRecentLoading || isLibrariesLoading;
+  const [isPullRefreshing, setIsPullRefreshing] = React.useState(false);
+  const lastFocusRef = React.useRef(0);
 
   const onRefresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: mediaKeys.all });
+    setIsPullRefreshing(true);
+    try {
+      // 1. Ask Jellyfin to check disk changes / scan (throttled to 1/30s)
+      await mediaRepository.refreshLibrary().catch(() => {});
+      // 2. Refetch active queries and wait for server responses
+      await queryClient.refetchQueries({ queryKey: mediaKeys.all, type: "active" });
+    } finally {
+      setIsPullRefreshing(false);
+    }
   }, [queryClient]);
 
   useFocusEffect(
     useCallback(() => {
-      // Revalidate active queries when navigating back to Home
-      queryClient.invalidateQueries({ queryKey: mediaKeys.all, refetchType: "active" });
+      const now = Date.now();
+      // Throttle focus refetch to at most once every 15 seconds
+      if (now - lastFocusRef.current > 15000) {
+        lastFocusRef.current = now;
+        queryClient.invalidateQueries({ queryKey: mediaKeys.all, refetchType: "active" });
+      }
     }, [queryClient])
   );
 
-  // Derive featured hero item (prefer first recently added with backdrop or first resume item)
+  // Derive featured hero item (prefer first recently added with backdrop or primary image, then resume item)
   const featuredItem =
     recentItems?.find((i) => i.backdropImageTag && !i.isMissing && i.locationType !== "Virtual") ||
+    recentItems?.find((i) => i.primaryImageTag && !i.isMissing && i.locationType !== "Virtual") ||
     resumeItems?.find((i) => i.backdropImageTag && !i.isMissing && i.locationType !== "Virtual") ||
+    resumeItems?.find((i) => i.primaryImageTag && !i.isMissing && i.locationType !== "Virtual") ||
     recentItems?.[0] ||
+    resumeItems?.[0] ||
     null;
 
   const handlePlay = (item: MediaItem) => {
@@ -117,7 +129,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isRefreshing}
+            refreshing={isPullRefreshing}
             onRefresh={onRefresh}
             tintColor={colors.primary}
             colors={[colors.primary]}

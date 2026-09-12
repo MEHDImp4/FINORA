@@ -106,6 +106,80 @@ export function getPersonImageUrl(
 }
 
 /**
+ * Resolves an ordered list of candidate high-definition banner/backdrop URLs for the Hero Banner.
+ */
+export function getHeroBannerUrls(
+  baseUrl: string,
+  item: MediaItem,
+  targetWidth: number = 1280
+): string[] {
+  if (!baseUrl || !item) return [];
+
+  const urls: string[] = [];
+  const parentId = item.parentBackdropItemId || item.seriesId || item.parentId;
+
+  // 1. Item Backdrop with tag
+  if (item.backdropImageTag) {
+    urls.push(getBackdropUrl(baseUrl, item.id, item.backdropImageTag, targetWidth));
+  }
+
+  // 2. Parent Backdrop with tag
+  const parentBackdropTag = item.parentBackdropImageTag || item.backdropImageTag;
+  if (parentId && parentBackdropTag) {
+    urls.push(getBackdropUrl(baseUrl, parentId, parentBackdropTag, targetWidth));
+  }
+
+  // 3. Item Thumb with tag
+  if (item.thumbImageTag) {
+    urls.push(
+      buildImageUrl(baseUrl, item.id, "Thumb", {
+        width: targetWidth,
+        quality: 85,
+        tag: item.thumbImageTag
+      })
+    );
+  }
+
+  // 4. Parent Thumb with tag
+  const parentThumbTag = item.parentThumbImageTag || item.thumbImageTag;
+  const parentThumbId = item.parentThumbItemId || parentId;
+  if (parentThumbId && parentThumbTag) {
+    urls.push(
+      buildImageUrl(baseUrl, parentThumbId, "Thumb", {
+        width: targetWidth,
+        quality: 85,
+        tag: parentThumbTag
+      })
+    );
+  }
+
+  // 5. Item Primary with tag
+  if (item.primaryImageTag) {
+    urls.push(getPosterUrl(baseUrl, item.id, item.primaryImageTag, Math.min(targetWidth, 1080)));
+  }
+
+  // 6. Parent Primary with tag
+  const seriesPosterTag = item.seriesPrimaryImageTag || item.parentPrimaryImageTag;
+  if (parentId && seriesPosterTag) {
+    urls.push(getPosterUrl(baseUrl, parentId, seriesPosterTag, Math.min(targetWidth, 1080)));
+  }
+
+  // 7. Backdrop fallback without tag
+  urls.push(getBackdropUrl(baseUrl, item.id, undefined, targetWidth));
+  if (parentId) {
+    urls.push(getBackdropUrl(baseUrl, parentId, undefined, targetWidth));
+  }
+
+  // 8. Primary fallback without tag
+  urls.push(getPosterUrl(baseUrl, item.id, undefined, Math.min(targetWidth, 1080)));
+  if (parentId) {
+    urls.push(getPosterUrl(baseUrl, parentId, undefined, Math.min(targetWidth, 1080)));
+  }
+
+  return Array.from(new Set(urls.filter(Boolean)));
+}
+
+/**
  * Resolves an ordered list of candidate 2:3 vertical poster URLs for an item.
  * For an Episode, it prefers the Series Poster, falling back to Season Poster,
  * Episode still, and Series Backdrop.

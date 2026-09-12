@@ -1,10 +1,10 @@
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { View, StyleSheet, Dimensions, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { MediaItem } from "../../../types/media";
-import { getBackdropUrl, getPosterUrl, getLogoUrl } from "../../../core/repositories/imageUrlBuilder";
+import { getHeroBannerUrls, getLogoUrl } from "../../../core/repositories/imageUrlBuilder";
 import { FinoraButton } from "../../../design-system/components/FinoraButton";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
@@ -27,6 +27,27 @@ export const HeroBanner = React.memo(function HeroBanner({
   onToggleFavorite,
   onPressDetails
 }: HeroBannerProps) {
+  const candidateUrls = useMemo(
+    () => (item ? getHeroBannerUrls(serverUrl, item, 1280) : []),
+    [serverUrl, item]
+  );
+  const candidateKey = candidateUrls.join("|");
+  const [candidateIndex, setCandidateIndex] = useState(0);
+
+  useEffect(() => {
+    setCandidateIndex(0);
+  }, [candidateKey]);
+
+  const currentUri = candidateUrls[candidateIndex];
+
+  const handleImageError = () => {
+    if (candidateIndex < candidateUrls.length - 1) {
+      setCandidateIndex((prev) => prev + 1);
+    } else {
+      setCandidateIndex(candidateUrls.length);
+    }
+  };
+
   if (!item) {
     return (
       <View style={[styles.container, styles.emptyContainer]}>
@@ -37,18 +58,6 @@ export const HeroBanner = React.memo(function HeroBanner({
     );
   }
 
-  const backdropUri = item.backdropImageTag
-    ? getBackdropUrl(serverUrl, item.id, item.backdropImageTag, SCREEN_WIDTH)
-    : item.parentBackdropItemId || item.seriesId
-    ? getBackdropUrl(
-        serverUrl,
-        (item.parentBackdropItemId || item.seriesId)!,
-        item.parentBackdropImageTag || item.backdropImageTag,
-        SCREEN_WIDTH
-      )
-    : item.primaryImageTag
-    ? getPosterUrl(serverUrl, item.id, item.primaryImageTag, SCREEN_WIDTH)
-    : "";
   const logoUri = item.logoImageTag
     ? getLogoUrl(serverUrl, item.id, item.logoImageTag, 400)
     : item.seriesId
@@ -74,13 +83,20 @@ export const HeroBanner = React.memo(function HeroBanner({
       accessibilityLabel={`Featured: ${displayTitle}`}
     >
       {/* Dynamic Backdrop */}
-      <Image
-        source={{ uri: backdropUri }}
-        placeholder={item.blurhash ? { blurhash: item.blurhash } : undefined}
-        style={styles.backdropImage}
-        contentFit="cover"
-        transition={300}
-      />
+      {currentUri && candidateIndex < candidateUrls.length ? (
+        <Image
+          key={currentUri}
+          source={{ uri: currentUri }}
+          placeholder={item.blurhash ? { blurhash: item.blurhash } : undefined}
+          style={styles.backdropImage}
+          contentFit="cover"
+          transition={300}
+          cachePolicy="memory-disk"
+          onError={handleImageError}
+        />
+      ) : (
+        <View style={[styles.backdropImage, { backgroundColor: colors.surface }]} />
+      )}
 
       {/* Multi-stop Linear Gradient overlay blending into deep OLED black */}
       <LinearGradient

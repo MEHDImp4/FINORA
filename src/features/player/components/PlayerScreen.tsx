@@ -18,10 +18,14 @@ import { TrickplayPreview } from "./TrickplayPreview";
 import { SkipMarkerButton } from "./SkipMarkerButton";
 import { StatsForNerdsModal } from "./StatsForNerdsModal";
 import { FinoraText } from "../../../design-system/components/FinoraText";
+import { FinoraButton } from "../../../design-system/components/FinoraButton";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../../../design-system/tokens";
 import { formatAuthorizationHeader } from "../../../core/jellyfin/clientInfo";
 import { findMatchingAudioTrack, findMatchingSubtitleTrack } from "../trackUtils";
 import { logger } from "../../../core/network/logger";
+import { useQueryClient } from "@tanstack/react-query";
+import { mediaKeys } from "../../../hooks/useMediaQueries";
 
 export interface PlayerScreenProps {
   item: MediaItem;
@@ -46,6 +50,7 @@ export function PlayerScreen({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [tracksModalVisible, setTracksModalVisible] = useState(false);
   const [statsModalVisible, setStatsModalVisible] = useState(false);
+  const queryClient = useQueryClient();
 
   // Compute default audio stream index
   const defaultAudioIndex = useMemo(() => {
@@ -258,6 +263,22 @@ export function PlayerScreen({
 
   const isBufferingOrLoading = snapshot.state === "loading" || snapshot.state === "buffering";
 
+  useEffect(() => {
+    if (snapshot.state === "error") {
+      try {
+        queryClient.setQueriesData({ queryKey: mediaKeys.all }, (oldData: any) => {
+          if (Array.isArray(oldData)) {
+            return oldData.filter((i: any) => i?.id !== item.id && i?.seriesId !== item.id);
+          }
+          return oldData;
+        });
+        queryClient.invalidateQueries({ queryKey: mediaKeys.all });
+      } catch {
+        // Ignored
+      }
+    }
+  }, [snapshot.state, item.id, queryClient]);
+
   return (
     <View style={styles.container} testID="player-screen">
       <StatusBar hidden />
@@ -360,41 +381,21 @@ export function PlayerScreen({
             `[PlayerScreen] onSelectAudio requested for stream index ${idx} (${targetStream?.displayTitle || targetStream?.language || "unknown"}). Available native tracks: ${currentTracks?.length || 0}`
           );
 
-          // Tier 1: Instant native track switch without interrupting or reloading playback
           if (currentTracks && currentTracks.length > 0) {
-            const matchingTrack = findMatchingAudioTrack(currentTracks, audioStreams, idx);
-            if (matchingTrack) {
-              try {
-                player.audioTrack = matchingTrack;
-                logger.info(
-                  `[PlayerScreen] Native audio track switched successfully to id=${matchingTrack.id} (${matchingTrack.label || matchingTrack.language})`
-                );
-                return;
-              } catch (err) {
-                logger.warn("[PlayerScreen] Native audio track switch failed, falling back to server:", err);
-              }
+            const matchedNative = findMatchingAudioTrack(currentTracks, audioStreams, idx);
+            if (matchedNative) {
+              logger.info(`[PlayerScreen] Setting player.audioTrack directly to: ${matchedNative.id || matchedNative.label}`);
+              player.audioTrack = matchedNative;
+              return;
             }
           }
 
-          // Tier 2: Server transcode/remux stream replacement fallback
-          logger.info(
-            `[PlayerScreen] Tier 2 server-side audio switch required for stream index ${idx} (${targetStream?.displayTitle || targetStream?.language || "unknown"})`
-          );
+          logger.info(`[PlayerScreen] Native track not found in container. Switching server-side audio stream to index ${idx}`);
           setServerAudioIndex(idx);
         }}
         onSelectSubtitle={(idx) => {
           setSelectedSubtitleIndex(idx);
           setTracksModalVisible(false);
-
-          if (idx === null) {
-            try {
-              player.subtitleTrack = null;
-            } catch {
-              // Ignored
-            }
-            setServerSubtitleIndex(null);
-            return;
-          }
 
           const subStreams = item.mediaStreams?.filter((s) => s.type === "Subtitle") || [];
           const currentTracks =
@@ -402,18 +403,22 @@ export function PlayerScreen({
               ? player.availableSubtitleTracks
               : availableSubtitleTracks;
 
+          if (idx === null) {
+            player.subtitleTrack = null;
+            setServerSubtitleIndex(null);
+            return;
+          }
+
           if (currentTracks && currentTracks.length > 0) {
-            const matchingTrack = findMatchingSubtitleTrack(currentTracks, subStreams, idx);
-            if (matchingTrack) {
-              try {
-                player.subtitleTrack = matchingTrack;
-                return;
-              } catch {
-                // Fallback to server
-              }
+            const matchedNative = findMatchingSubtitleTrack(currentTracks, subStreams, idx);
+            if (matchedNative) {
+              logger.info(`[PlayerScreen] Setting player.subtitleTrack directly to: ${matchedNative.id || matchedNative.label}`);
+              player.subtitleTrack = matchedNative;
+              return;
             }
           }
 
+          logger.info(`[PlayerScreen] Native subtitle not found in container. Switching server-side subtitle stream to index ${idx}`);
           setServerSubtitleIndex(idx);
         }}
         onSelectQuality={(q) => {
@@ -434,12 +439,26 @@ export function PlayerScreen({
       {/* Error Banner if error occurs */}
       {snapshot.state === "error" && (
         <View style={styles.errorOverlay} testID="player-error">
+          <Ionicons
+            name="alert-circle-outline"
+            size={48}
+            color={colors.primary}
+            style={{ marginBottom: spacing.sm }}
+          />
           <FinoraText variant="title" style={styles.errorText}>
-            Playback Error
+            Lecture impossible
           </FinoraText>
           <FinoraText variant="caption" style={styles.errorSubtext}>
-            {snapshot.errorMessage || "Unable to play stream."}
+            {snapshot.errorMessage?.includes("500") || snapshot.errorMessage?.includes("source")
+              ? "Ce média n'est plus accessible sur le serveur Jellyfin."
+              : snapshot.errorMessage || "Impossible de lire ce flux vidéo."}
           </FinoraText>
+          <FinoraButton
+            label="Retour"
+            variant="secondary"
+            onPress={handleBack}
+            style={{ marginTop: spacing.md }}
+          />
         </View>
       )}
     </View>
