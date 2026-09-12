@@ -45,14 +45,6 @@ export default function DetailsScreen() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <View style={styles.centerContainer} testID="details-loading">
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
   React.useEffect(() => {
     if (item && item.type === "Season" && item.seriesId) {
       router.replace({
@@ -61,6 +53,14 @@ export default function DetailsScreen() {
       });
     }
   }, [item, router]);
+
+  if (isLoading) {
+    return (
+      <View style={styles.centerContainer} testID="details-loading">
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   if (isError || !item || item.locationType === "Virtual" || item.isMissing) {
     return (
