@@ -272,6 +272,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill
   },
   contentContainer: {
+    width: "100%",
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
     alignItems: "center",
@@ -330,16 +331,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.md,
-    width: "100%",
-    paddingHorizontal: spacing.md
+    width: "100%"
   },
   playButton: {
-    flex: 1,
-    maxWidth: 150
+    minWidth: 130,
+    paddingHorizontal: 20
   },
   watchlistButton: {
-    flex: 1,
-    maxWidth: 180,
-    paddingHorizontal: 12
+    minWidth: 155,
+    paddingHorizontal: 20
   }
 });
