@@ -42,13 +42,19 @@ export function getRetentionLabel(record: OfflineMediaRecord): string | null {
 
 export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
   const router = useRouter();
-  const [offlineItems, setOfflineItems] = useState<OfflineMediaRecord[]>([]);
+  const [offlineItems, setOfflineItems] = useState<
+    (OfflineMediaRecord & { fileExists?: boolean; actualBytes?: number })[]
+  >([]);
+  const [totalPhysicalStorage, setTotalPhysicalStorage] = useState<number>(0);
+  const [hasOrphans, setHasOrphans] = useState<boolean>(false);
   const [activeDownloads, setActiveDownloads] = useState<DownloadItem[]>([]);
 
   const loadData = useCallback(async () => {
     await offlineStorageService.cleanupExpiredWatchedMedia(48);
-    const items = await offlineStorageService.getAllOfflineMedia();
-    setOfflineItems(items);
+    const verified = await offlineStorageService.getVerifiedOfflineMedia();
+    setOfflineItems(verified.items);
+    setTotalPhysicalStorage(verified.totalPhysicalBytes);
+    setHasOrphans(verified.hasOrphans);
   }, []);
 
   useEffect(() => {
@@ -57,15 +63,12 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     return unsub;
   }, [loadData]);
 
-  const totalStorageBytes = useMemo(() => {
-    return offlineItems.reduce((acc, curr) => acc + (curr.fileSizeBytes || 0), 0);
-  }, [offlineItems]);
-
   const handlePlay = useCallback(
     (record: OfflineMediaRecord) => {
       hapticService.impactMedium();
+      const { fileExists, actualBytes, ...cleanRecord } = record as any;
       if (onPlayItem) {
-        onPlayItem(record);
+        onPlayItem(cleanRecord);
       } else {
         router.push(`/player/${record.itemId}`);
       }
@@ -82,9 +85,26 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     [loadData]
   );
 
+  const handleCleanOrphans = useCallback(async () => {
+    hapticService.notificationSuccess();
+    await offlineStorageService.cleanupOrphanMedia();
+    await loadData();
+  }, [loadData]);
+
+  const handleRetry = useCallback(async (itemId: string) => {
+    hapticService.impactMedium();
+    await downloadManager.retryDownload(itemId);
+  }, []);
+
+  const handleCancelDownload = useCallback(async (itemId: string) => {
+    hapticService.impactLight();
+    await downloadManager.cancelDownload(itemId);
+  }, []);
+
   const renderItem = useCallback(
-    ({ item }: { item: OfflineMediaRecord }) => {
+    ({ item }: { item: OfflineMediaRecord & { fileExists?: boolean; actualBytes?: number } }) => {
       const retentionLabel = getRetentionLabel(item);
+      const isMissing = item.fileExists === false;
 
       return (
         <View style={styles.recordRow} testID={`offline-item-${item.itemId}`}>
@@ -98,8 +118,16 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
                 {typeof item.seasonIndex === "number" && typeof item.episodeIndex === "number"
                   ? `S${item.seasonIndex}:E${item.episodeIndex} • `
                   : `${item.type} • `}
-                {formatBytes(item.fileSizeBytes)}
+                {formatBytes(item.actualBytes !== undefined ? item.actualBytes : item.fileSizeBytes)}
               </FinoraText>
+              {isMissing ? (
+                <View style={styles.missingBadge}>
+                  <Ionicons name="alert-circle-outline" size={12} color="#E50914" style={{ marginRight: 3 }} />
+                  <FinoraText variant="caption" style={styles.missingText}>
+                    Fichier manquant
+                  </FinoraText>
+                </View>
+              ) : null}
               {retentionLabel ? (
                 <View style={styles.retentionBadge}>
                   <Ionicons name="time-outline" size={12} color="#F5A623" style={{ marginRight: 3 }} />
@@ -111,73 +139,163 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
             </View>
           </View>
 
-        <View style={styles.actionButtons}>
-          <Pressable
-            style={styles.playButton}
-            onPress={() => handlePlay(item)}
-            accessibilityRole="button"
-            accessibilityLabel={`Play offline ${item.title}`}
-          >
-            <Ionicons name="play" size={16} color="#FFFFFF" />
-            <FinoraText variant="caption" style={styles.playText}>
-              Play
-            </FinoraText>
-          </Pressable>
+          <View style={styles.actionButtons}>
+            {!isMissing ? (
+              <Pressable
+                style={styles.playButton}
+                onPress={() => handlePlay(item)}
+                accessibilityRole="button"
+                accessibilityLabel={`Play offline ${item.title}`}
+              >
+                <Ionicons name="play" size={16} color="#FFFFFF" />
+                <FinoraText variant="caption" style={styles.playText}>
+                  Play
+                </FinoraText>
+              </Pressable>
+            ) : null}
 
-          <Pressable
-            style={styles.deleteButton}
-            onPress={() => handleDelete(item)}
-            accessibilityRole="button"
-            accessibilityLabel={`Delete ${item.title}`}
-            hitSlop={8}
-          >
-            <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />
-          </Pressable>
+            <Pressable
+              style={styles.deleteButton}
+              onPress={() => handleDelete(item)}
+              accessibilityRole="button"
+              accessibilityLabel={`Delete ${item.title}`}
+              hitSlop={8}
+            >
+              <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />
+            </Pressable>
+          </View>
         </View>
-      </View>
+      );
+    },
+    [handlePlay, handleDelete]
+  );
+
+  const pendingOrFailedDownloads = useMemo(() => {
+    return activeDownloads.filter(
+      (d) => d.status === "downloading" || d.status === "failed" || d.status === "paused"
     );
-  },
-  [handlePlay, handleDelete]
-);
+  }, [activeDownloads]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-      {/* Header & Storage Indicator */}
+      {/* Header & Real Storage Indicator */}
       <View style={styles.header}>
         <FinoraText variant="title" style={styles.headerTitle}>
           Downloads
         </FinoraText>
         <FinoraText variant="caption" style={styles.storageText}>
-          Total offline storage: {formatBytes(totalStorageBytes)}
+          Total offline storage: {formatBytes(totalPhysicalStorage)}
         </FinoraText>
       </View>
 
-      {/* Active Downloads in Progress */}
-      {activeDownloads.filter((d) => d.status === "downloading").length > 0 && (
+      {/* Orphan Cleanup Banner if Phantom Entries Exist */}
+      {hasOrphans && (
+        <View style={styles.orphanBanner}>
+          <Ionicons name="information-circle-outline" size={20} color="#F5A623" style={{ marginRight: 8 }} />
+          <View style={{ flex: 1 }}>
+            <FinoraText variant="caption" style={styles.orphanTitle}>
+              Données résiduelles détectées
+            </FinoraText>
+            <FinoraText variant="caption" style={styles.orphanSubtitle}>
+              Des fichiers de sessions antérieures ne sont plus sur l'appareil.
+            </FinoraText>
+          </View>
+          <Pressable
+            style={styles.cleanButton}
+            onPress={handleCleanOrphans}
+            accessibilityRole="button"
+            accessibilityLabel="Nettoyer les fichiers manquants"
+          >
+            <FinoraText variant="caption" style={styles.cleanButtonText}>
+              Nettoyer
+            </FinoraText>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Active & Failed Downloads Section */}
+      {pendingOrFailedDownloads.length > 0 && (
         <View style={styles.activeSection}>
           <FinoraText variant="caption" style={styles.sectionTitle}>
-            Downloading Now
+            Téléchargements en cours & alertes
           </FinoraText>
-          {activeDownloads
-            .filter((d) => d.status === "downloading")
-            .map((download) => (
+          {pendingOrFailedDownloads.map((download) => {
+            const isFailed = download.status === "failed";
+            const progressPercent = Math.round(download.progress * 100);
+
+            return (
               <View key={download.itemId} style={styles.downloadProgressRow}>
-                <FinoraText variant="body" style={styles.downloadTitle} numberOfLines={1}>
-                  {download.title}
-                </FinoraText>
-                <View style={styles.progressBar}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${Math.round(download.progress * 100)}%` }
-                    ]}
-                  />
+                <View style={styles.downloadRowHeader}>
+                  <FinoraText variant="body" style={styles.downloadTitle} numberOfLines={1}>
+                    {download.title}
+                  </FinoraText>
+                  <View style={styles.rowActions}>
+                    {isFailed ? (
+                      <Pressable
+                        style={styles.retryButton}
+                        onPress={() => handleRetry(download.itemId)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Réessayer"
+                      >
+                        <Ionicons name="refresh" size={14} color="#FFFFFF" />
+                        <FinoraText variant="caption" style={styles.retryButtonText}>
+                          Réessayer
+                        </FinoraText>
+                      </Pressable>
+                    ) : null}
+                    <Pressable
+                      style={styles.cancelButton}
+                      onPress={() => handleCancelDownload(download.itemId)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Annuler"
+                      hitSlop={6}
+                    >
+                      <Ionicons name="close-circle-outline" size={18} color={colors.textSecondary} />
+                    </Pressable>
+                  </View>
                 </View>
-                <FinoraText variant="caption" style={styles.progressPercent}>
-                  {Math.round(download.progress * 100)}%
-                </FinoraText>
+
+                {isFailed ? (
+                  <View style={styles.errorNotice}>
+                    <Ionicons name="alert-circle" size={14} color="#E50914" style={{ marginRight: 4 }} />
+                    <FinoraText variant="caption" style={styles.errorText}>
+                      {download.error || "Échec du téléchargement"}
+                    </FinoraText>
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.progressBar}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          {
+                            width:
+                              download.totalBytes > 0
+                                ? `${progressPercent}%`
+                                : download.bytesDownloaded > 0
+                                ? "100%"
+                                : "5%"
+                          }
+                        ]}
+                      />
+                    </View>
+                    <View style={styles.progressStatusRow}>
+                      <FinoraText variant="caption" style={styles.progressMeta}>
+                        {download.totalBytes > 0
+                          ? `${formatBytes(download.bytesDownloaded)} / ${formatBytes(download.totalBytes)}`
+                          : download.bytesDownloaded > 0
+                          ? `${formatBytes(download.bytesDownloaded)} reçus`
+                          : "Connexion au serveur..."}
+                      </FinoraText>
+                      <FinoraText variant="caption" style={styles.progressPercent}>
+                        {download.totalBytes > 0 ? `${progressPercent}%` : "En cours"}
+                      </FinoraText>
+                    </View>
+                  </>
+                )}
               </View>
-            ))}
+            );
+          })}
         </View>
       )}
 
@@ -345,5 +463,100 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: "center",
     maxWidth: 280
+  },
+  orphanBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(245, 166, 35, 0.12)",
+    borderColor: "rgba(245, 166, 35, 0.3)",
+    borderWidth: 1,
+    padding: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    borderRadius: 8
+  },
+  orphanTitle: {
+    color: "#F5A623",
+    fontWeight: "700"
+  },
+  orphanSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 11
+  },
+  cleanButton: {
+    backgroundColor: "#F5A623",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: 6
+  },
+  cleanButtonText: {
+    color: "#000000",
+    fontWeight: "700",
+    fontSize: 12
+  },
+  downloadRowHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4
+  },
+  rowActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  retryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    gap: 4
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "600"
+  },
+  cancelButton: {
+    padding: 2
+  },
+  errorNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(229, 9, 20, 0.1)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginTop: 2
+  },
+  errorText: {
+    color: "#E50914",
+    fontSize: 11
+  },
+  progressStatusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4
+  },
+  progressMeta: {
+    color: colors.textSecondary,
+    fontSize: 11
+  },
+  missingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(229, 9, 20, 0.15)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4
+  },
+  missingText: {
+    color: "#E50914",
+    fontSize: 11,
+    fontWeight: "600"
   }
 });

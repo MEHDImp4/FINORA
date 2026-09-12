@@ -45,6 +45,17 @@ export const DOWNLOAD_QUALITIES: DownloadQualityProfile[] = [
 ];
 
 /**
+ * Builds standard Jellyfin authentication headers for download requests.
+ */
+export function getDownloadHeaders(token: string): Record<string, string> {
+  if (!token) return {};
+  return {
+    "X-Emby-Token": token,
+    Authorization: `MediaBrowser Client="Finora", Device="Finora Mobile", DeviceId="finora-mobile", Version="1.0.0", Token="${token}"`
+  };
+}
+
+/**
  * Builds the appropriate Jellyfin download URL.
  * If 'original', downloads the raw file directly via /Items/{id}/Download.
  * If transcode quality is selected, requests a progressive MP4 stream encoded by Jellyfin.
@@ -69,6 +80,8 @@ export function buildDownloadUrl(
     "videoCodec=h264",
     "audioCodec=aac",
     "audioChannels=2",
+    "transcodingContainer=mp4",
+    "transcodingProtocol=http",
     `maxHeight=${profile.maxHeight || 720}`,
     `maxWidth=${profile.maxWidth || 1280}`,
     `videoBitRate=${profile.videoBitRate || 3500000}`,

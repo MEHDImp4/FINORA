@@ -188,4 +188,51 @@ describe("OfflineStorageService", () => {
       expect.arrayContaining(["fresh-item", "unplayed-item"])
     );
   });
+
+  it("verifies physical files and detects orphans", async () => {
+    const FileSystem = require("expo-file-system/legacy");
+    // Mock getInfoAsync to return exists=false for missing item
+    (FileSystem.getInfoAsync as jest.Mock).mockImplementation(async (path: string) => {
+      if (path.includes("missing")) {
+        return { exists: false, isDirectory: false };
+      }
+      return { exists: true, isDirectory: false, size: 450000000 };
+    });
+
+    const existingRecord: OfflineMediaRecord = {
+      itemId: "real-1",
+      title: "Real File",
+      type: "Movie",
+      localPath: "file:///mock-documents/finora_downloads/real.mp4",
+      fileSizeBytes: 450000000,
+      totalTicks: 1000,
+      playbackPositionTicks: 0,
+      savedAt: Date.now()
+    };
+
+    const orphanRecord: OfflineMediaRecord = {
+      itemId: "phantom-1",
+      title: "Phantom File",
+      type: "Movie",
+      localPath: "file:///mock-documents/finora_downloads/missing.mp4",
+      fileSizeBytes: 7500000000, // 7.5 GB fake size!
+      totalTicks: 1000,
+      playbackPositionTicks: 0,
+      savedAt: Date.now()
+    };
+
+    await service.saveOfflineMedia(existingRecord);
+    await service.saveOfflineMedia(orphanRecord);
+
+    const verified = await service.getVerifiedOfflineMedia();
+    expect(verified.hasOrphans).toBe(true);
+    expect(verified.totalPhysicalBytes).toBe(450000000); // Only counts the real file!
+
+    const orphanCount = await service.cleanupOrphanMedia();
+    expect(orphanCount).toBe(1);
+
+    const afterCleanup = await service.getAllOfflineMedia();
+    expect(afterCleanup).toHaveLength(1);
+    expect(afterCleanup[0].itemId).toBe("real-1");
+  });
 });

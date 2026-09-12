@@ -44,4 +44,15 @@ describe("Download Quality & Transcoding URL Builder", () => {
     const recommended = DOWNLOAD_QUALITIES.find((q) => q.id === "720p");
     expect(recommended?.badge).toBe("Recommandé");
   });
+
+  it("builds correct authentication headers for Jellyfin downloads", () => {
+    const { getDownloadHeaders } = require("../downloadQuality");
+    const headers = getDownloadHeaders("token-abc-123");
+    expect(headers["X-Emby-Token"]).toBe("token-abc-123");
+    expect(headers["Authorization"]).toContain('Token="token-abc-123"');
+    expect(headers["Authorization"]).toContain('Client="Finora"');
+
+    const empty = getDownloadHeaders("");
+    expect(empty).toEqual({});
+  });
 });

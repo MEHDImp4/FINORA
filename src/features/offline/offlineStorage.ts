@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as FileSystem from "expo-file-system/legacy";
 import { OfflineMediaRecord, SyncQueueEntry } from "./types";
 
 export const OFFLINE_CATALOG_STORAGE_KEY = "@finora_offline_catalog";
@@ -177,6 +178,96 @@ export class OfflineStorageService {
   public async clearAll(): Promise<void> {
     await AsyncStorage.removeItem(OFFLINE_CATALOG_STORAGE_KEY);
     await AsyncStorage.removeItem(OFFLINE_SYNC_QUEUE_STORAGE_KEY);
+  }
+
+  /**
+   * Checks real physical disk space used by downloaded files.
+   * Returns items with their verified physical status and size.
+   */
+  public async getVerifiedOfflineMedia(): Promise<{
+    items: (OfflineMediaRecord & { fileExists: boolean; actualBytes: number })[];
+    totalPhysicalBytes: number;
+    hasOrphans: boolean;
+  }> {
+    const all = await this.getAllOfflineMedia();
+    let totalPhysicalBytes = 0;
+    let hasOrphans = false;
+
+    const items = await Promise.all(
+      all.map(async (record) => {
+        let fileExists = false;
+        let actualBytes = 0;
+
+        if (record.localPath && typeof FileSystem.getInfoAsync === "function") {
+          try {
+            const info = await FileSystem.getInfoAsync(record.localPath);
+            if (info && info.exists) {
+              fileExists = true;
+              actualBytes =
+                "size" in info && typeof info.size === "number"
+                  ? info.size
+                  : record.fileSizeBytes || 0;
+            }
+          } catch {
+            fileExists = false;
+          }
+        }
+
+        if (fileExists) {
+          totalPhysicalBytes += actualBytes;
+        } else {
+          hasOrphans = true;
+        }
+
+        return {
+          ...record,
+          fileExists,
+          actualBytes
+        };
+      })
+    );
+
+    return {
+      items,
+      totalPhysicalBytes,
+      hasOrphans
+    };
+  }
+
+  /**
+   * Deletes all offline records whose media files no longer exist on physical storage.
+   * Returns the count of removed phantom/orphan records.
+   */
+  public async cleanupOrphanMedia(): Promise<number> {
+    const all = await this.getAllOfflineMedia();
+    const remaining: OfflineMediaRecord[] = [];
+    let orphanCount = 0;
+
+    for (const record of all) {
+      let exists = false;
+      if (record.localPath && typeof FileSystem.getInfoAsync === "function") {
+        try {
+          const info = await FileSystem.getInfoAsync(record.localPath);
+          exists = !!(info && info.exists);
+        } catch {
+          exists = false;
+        }
+      }
+      if (exists) {
+        remaining.push(record);
+      } else {
+        orphanCount++;
+      }
+    }
+
+    if (orphanCount > 0) {
+      await AsyncStorage.setItem(
+        OFFLINE_CATALOG_STORAGE_KEY,
+        JSON.stringify(remaining)
+      );
+    }
+
+    return orphanCount;
   }
 }
 

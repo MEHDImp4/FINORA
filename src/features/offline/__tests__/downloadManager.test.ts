@@ -85,4 +85,26 @@ describe("DownloadManager", () => {
     manager.updateProgress("movie-3", 100, 200);
     expect(mockListener).toHaveBeenCalledTimes(2); // no more calls after unsubscribe
   });
+
+  it("supports retrying a download with stored configuration", async () => {
+    await manager.startDownload(
+      {
+        itemId: "movie-retry",
+        title: "Inception",
+        type: "Movie",
+        downloadUrl: "https://jellyfin.example.com/Items/movie-retry/Download",
+        localPath: "finora_downloads/movie-retry.mp4"
+      },
+      undefined,
+      { headers: { "X-Emby-Token": "test-token" } }
+    );
+
+    manager.markFailed("movie-retry", "Erreur réseau");
+    expect(manager.getDownload("movie-retry")?.status).toBe("failed");
+    expect(manager.getDownload("movie-retry")?.error).toBe("Erreur réseau");
+
+    await manager.retryDownload("movie-retry");
+    expect(manager.getDownload("movie-retry")?.status).toBe("downloading");
+    expect(manager.getDownload("movie-retry")?.error).toBeUndefined();
+  });
 });

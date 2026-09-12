@@ -17,7 +17,8 @@ import { offlineStorageService } from "../../features/offline/offlineStorage";
 import { OfflineMediaRecord, DownloadItem } from "../../features/offline/types";
 import {
   DownloadQuality,
-  buildDownloadUrl
+  buildDownloadUrl,
+  getDownloadHeaders
 } from "../../features/offline/downloadQuality";
 
 export default function DetailsScreen() {
@@ -30,8 +31,8 @@ export default function DetailsScreen() {
   const token = session?.token || "";
 
   const { data: item, isLoading, isError } = useItemDetails(userId, id);
-  const toggleFavorite = useToggleFavorite(userId);
-  const markPlayed = useMarkPlayed(userId);
+  const toggleFavoriteMutation = useToggleFavorite(userId);
+  const markPlayedMutation = useMarkPlayed(userId);
 
   const [offlineRecord, setOfflineRecord] = React.useState<OfflineMediaRecord | null>(null);
   const [activeDownload, setActiveDownload] = React.useState<DownloadItem | undefined>(undefined);
@@ -47,26 +48,32 @@ export default function DetailsScreen() {
     return unsub;
   }, [id]);
 
-  const handlePlay = (mediaItem: MediaItem) => {
+  const handlePlay = (mediaId?: string | MediaItem) => {
+    hapticService.impactMedium();
+    const targetId = typeof mediaId === "string" ? mediaId : mediaId?.id || id;
     router.push({
       pathname: "/player/[id]",
-      params: { id: mediaItem.id }
+      params: { id: targetId }
     });
   };
 
-  const handleToggleFavorite = (mediaItem: MediaItem) => {
-    hapticService.impactMedium();
-    toggleFavorite.mutate({
-      itemId: mediaItem.id,
-      isFavorite: !mediaItem.isFavorite,
-      item: mediaItem
+  const handleToggleFavorite = (mediaItem?: MediaItem) => {
+    const targetItem = mediaItem || item;
+    if (!targetItem) return;
+    hapticService.selection();
+    toggleFavoriteMutation.mutate({
+      itemId: targetItem.id,
+      isFavorite: !targetItem.isFavorite,
+      item: targetItem
     });
   };
 
-  const handleTogglePlayed = (mediaItem: MediaItem) => {
-    markPlayed.mutate({
-      itemId: mediaItem.id,
-      played: !mediaItem.isPlayed
+  const handleTogglePlayed = (mediaItem?: MediaItem) => {
+    const targetItem = mediaItem || item;
+    if (!targetItem) return;
+    markPlayedMutation.mutate({
+      itemId: targetItem.id,
+      played: !targetItem.isPlayed
     });
   };
 
@@ -77,6 +84,7 @@ export default function DetailsScreen() {
     hapticService.impactMedium();
     const downloadUrl = buildDownloadUrl(serverUrl, mediaItem.id, token, quality);
     const localPath = `finora_downloads/movie_${mediaItem.id}.mp4`;
+    const headers = getDownloadHeaders(token);
 
     await downloadManager.startDownload(
       {
@@ -92,7 +100,8 @@ export default function DetailsScreen() {
         playbackPositionTicks: mediaItem.playbackPositionTicks || 0,
         overview: mediaItem.overview,
         posterPath: mediaItem.primaryImageTag
-      }
+      },
+      { headers }
     );
 
     hapticService.notificationSuccess();
@@ -103,6 +112,8 @@ export default function DetailsScreen() {
     quality: DownloadQuality = "720p"
   ) => {
     hapticService.impactMedium();
+    const headers = getDownloadHeaders(token);
+
     for (const ep of episodes) {
       const downloadUrl = buildDownloadUrl(serverUrl, ep.id, token, quality);
       const localPath = `finora_downloads/ep_${ep.id}.mp4`;
@@ -129,7 +140,8 @@ export default function DetailsScreen() {
           seriesName: item?.name,
           seasonIndex: ep.seasonIndex,
           episodeIndex: ep.episodeIndex
-        }
+        },
+        { headers }
       );
     }
 

@@ -1,17 +1,32 @@
 import { DownloadItem, DownloadStatus, OfflineMediaRecord } from "./types";
 import { offlineStorageService } from "./offlineStorage";
 import * as FileSystem from "expo-file-system/legacy";
+import { logger } from "../../core/network/logger";
 
 export type DownloadListener = (downloads: DownloadItem[]) => void;
 
+export interface DownloadOptions {
+  headers?: Record<string, string>;
+}
+
+interface StoredDownloadTask {
+  item: Omit<
+    DownloadItem,
+    "status" | "progress" | "bytesDownloaded" | "totalBytes" | "startedAt"
+  >;
+  metadata?: Partial<OfflineMediaRecord>;
+  options?: DownloadOptions;
+}
+
 /**
  * DownloadManager coordinates media downloads, progress tracking,
- * pausing, resuming, and cancellation with safe file system operations.
+ * pausing, resuming, retry, and cancellation with safe file system operations.
  */
 export class DownloadManager {
   private downloads: Map<string, DownloadItem> = new Map();
   private listeners: Set<DownloadListener> = new Set();
   private activeTasks: Map<string, any> = new Map();
+  private downloadConfigs: Map<string, StoredDownloadTask> = new Map();
 
   public subscribe(listener: DownloadListener): () => void {
     this.listeners.add(listener);
@@ -45,8 +60,11 @@ export class DownloadManager {
       DownloadItem,
       "status" | "progress" | "bytesDownloaded" | "totalBytes" | "startedAt"
     >,
-    metadata?: Partial<OfflineMediaRecord>
+    metadata?: Partial<OfflineMediaRecord>,
+    options?: DownloadOptions
   ): Promise<DownloadItem> {
+    this.downloadConfigs.set(item.itemId, { item, metadata, options });
+
     const existing = this.downloads.get(item.itemId);
     if (existing && existing.status === "downloading") {
       return existing;
@@ -70,11 +88,14 @@ export class DownloadManager {
       progress: 0,
       bytesDownloaded: 0,
       totalBytes: 0,
+      error: undefined,
       startedAt: Date.now()
     };
 
     this.downloads.set(item.itemId, downloadItem);
     this.notify();
+
+    logger.info(`[DownloadManager] Starting download: ${item.title} -> ${localPath}`);
 
     // Start real network download with expo-file-system if available
     if (typeof FileSystem.createDownloadResumable === "function" && localPath.startsWith("file://")) {
@@ -82,7 +103,9 @@ export class DownloadManager {
         const downloadResumable = FileSystem.createDownloadResumable(
           item.downloadUrl,
           localPath,
-          {},
+          {
+            headers: options?.headers || {}
+          },
           (progressData) => {
             this.updateProgress(
               item.itemId,
@@ -99,28 +122,52 @@ export class DownloadManager {
           .downloadAsync()
           .then(async (result) => {
             this.activeTasks.delete(item.itemId);
-            if (result && result.uri) {
-              const fileInfo = await FileSystem.getInfoAsync(result.uri).catch(() => null);
-              const finalSize =
-                fileInfo && "size" in fileInfo
-                  ? (fileInfo as any).size
-                  : downloadItem.bytesDownloaded || 1000000;
-              await this.completeDownload(item.itemId, finalSize, {
-                ...metadata,
-                localPath: result.uri
-              });
+            if (result) {
+              if (result.status && result.status >= 400) {
+                const errMsg = `Erreur HTTP ${result.status} lors du téléchargement`;
+                logger.error(`[DownloadManager] ${errMsg} for ${item.itemId}`);
+                if (localPath && typeof FileSystem.deleteAsync === "function") {
+                  await FileSystem.deleteAsync(localPath, { idempotent: true }).catch(() => {});
+                }
+                this.markFailed(item.itemId, errMsg);
+                return;
+              }
+
+              if (result.uri) {
+                const fileInfo = await FileSystem.getInfoAsync(result.uri).catch(() => null);
+                const finalSize =
+                  fileInfo && "size" in fileInfo
+                    ? (fileInfo as any).size
+                    : downloadItem.bytesDownloaded || 1000000;
+                logger.info(
+                  `[DownloadManager] Download complete: ${item.title} (${finalSize} bytes)`
+                );
+                await this.completeDownload(item.itemId, finalSize, {
+                  ...metadata,
+                  localPath: result.uri
+                });
+              }
             }
           })
           .catch((err) => {
             this.activeTasks.delete(item.itemId);
+            logger.error(`[DownloadManager] Download error for ${item.itemId}:`, err?.message || err);
             this.markFailed(item.itemId, err?.message || "Échec du téléchargement");
           });
       } catch (err: any) {
+        logger.error(`[DownloadManager] Initialization error for ${item.itemId}:`, err?.message || err);
         this.markFailed(item.itemId, err?.message || "Erreur d'initialisation du téléchargement");
       }
     }
 
     return downloadItem;
+  }
+
+  public async retryDownload(itemId: string): Promise<void> {
+    const config = this.downloadConfigs.get(itemId);
+    if (config) {
+      await this.startDownload(config.item, config.metadata, config.options);
+    }
   }
 
   public updateProgress(
@@ -132,7 +179,7 @@ export class DownloadManager {
     if (!item || item.status !== "downloading") return;
 
     item.bytesDownloaded = bytesDownloaded;
-    item.totalBytes = totalBytes;
+    item.totalBytes = totalBytes > 0 ? totalBytes : 0;
     item.progress = totalBytes > 0 ? Math.min(1, bytesDownloaded / totalBytes) : 0;
 
     if (bytesDownloaded >= totalBytes && totalBytes > 0) {
