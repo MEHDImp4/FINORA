@@ -62,8 +62,8 @@ export function FinoraButton({
 
     const sizePadding = {
       sm: { paddingVertical: 6, paddingHorizontal: 12, minHeight: 32 },
-      md: { paddingVertical: 12, paddingHorizontal: 20, minHeight: 44 },
-      lg: { paddingVertical: 16, paddingHorizontal: 28, minHeight: 52 }
+      md: { paddingVertical: 12, paddingHorizontal: 16, minHeight: 44 },
+      lg: { paddingVertical: 16, paddingHorizontal: 24, minHeight: 52 }
     }[size];
 
     return {
@@ -118,6 +118,7 @@ export function FinoraButton({
             color={getTextColor()}
             weight="600"
             style={styles.label}
+            numberOfLines={1}
           >
             {label}
           </FinoraText>

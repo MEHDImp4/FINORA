@@ -330,14 +330,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.md,
-    width: "100%"
+    width: "100%",
+    paddingHorizontal: spacing.md
   },
   playButton: {
     flex: 1,
-    maxWidth: 160
+    maxWidth: 150
   },
   watchlistButton: {
     flex: 1,
-    maxWidth: 160
+    maxWidth: 180,
+    paddingHorizontal: 12
   }
 });
