@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20
   },
   watchlistButton: {
-    minWidth: 155,
-    paddingHorizontal: 20
+    minWidth: 175,
+    paddingHorizontal: 16
   }
 });

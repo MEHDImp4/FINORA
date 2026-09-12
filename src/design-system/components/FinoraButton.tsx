@@ -137,6 +137,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   label: {
-    letterSpacing: 0.3
+    flexShrink: 0,
+    paddingRight: 4
   }
 });
