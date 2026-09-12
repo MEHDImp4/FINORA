@@ -34,14 +34,15 @@ export const HeroBanner = React.memo(function HeroBanner({
   const candidateKey = candidateUrls.join("|");
   const [candidateIndex, setCandidateIndex] = useState(0);
 
-  // Netflix-style smooth fade transition when the featured item changes
+  // Netflix-style smooth gentle dissolve when the featured item changes
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    fadeAnim.setValue(0);
+    // Gentle dissolve: starts at 0.35 so it never flashes black, smoothly transitioning to 1.0
+    fadeAnim.setValue(0.35);
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 500,
+      duration: 450,
       useNativeDriver: true
     }).start();
   }, [item?.id]);
@@ -109,15 +110,14 @@ export const HeroBanner = React.memo(function HeroBanner({
       accessibilityRole="imagebutton"
       accessibilityLabel={`Featured: ${displayTitle}`}
     >
-      {/* Dynamic Backdrop with smooth crossfade */}
+      {/* Dynamic Backdrop with continuous smooth crossfade without remounting */}
       {currentUri && candidateIndex < candidateUrls.length ? (
         <Image
-          key={currentUri}
           source={{ uri: currentUri }}
           placeholder={item.blurhash ? { blurhash: item.blurhash } : undefined}
           style={styles.backdropImage}
           contentFit="cover"
-          transition={500}
+          transition={600}
           cachePolicy="memory-disk"
           onError={handleImageError}
         />
@@ -137,86 +137,89 @@ export const HeroBanner = React.memo(function HeroBanner({
         style={styles.gradientOverlay}
       />
 
-      {/* Content Container with Netflix-style smooth fade animation */}
-      <Animated.View style={[styles.contentContainer, { opacity: fadeAnim }]}>
-        {/* Title or Logo */}
-        {logoUri ? (
-          <Image
-            source={{ uri: logoUri }}
-            style={styles.logoImage}
-            contentFit="contain"
-            accessibilityLabel={displayTitle}
-          />
-        ) : (
-          <FinoraText variant="title" color="textPrimary" weight="800" style={styles.titleFallback}>
-            {displayTitle}
-          </FinoraText>
-        )}
+      {/* Content Container */}
+      <View style={styles.contentContainer}>
+        {/* Animated Metadata Info (Logo/Title and Badges) with gentle dissolve */}
+        <Animated.View style={[styles.infoContainer, { opacity: fadeAnim }]}>
+          {/* Title or Logo */}
+          {logoUri ? (
+            <Image
+              source={{ uri: logoUri }}
+              style={styles.logoImage}
+              contentFit="contain"
+              accessibilityLabel={displayTitle}
+            />
+          ) : (
+            <FinoraText variant="title" color="textPrimary" weight="800" style={styles.titleFallback}>
+              {displayTitle}
+            </FinoraText>
+          )}
 
-        {/* Metadata Badges */}
-        <View style={styles.badgeRow}>
-          {item.communityRating ? (
-            <View style={[styles.badge, styles.ratingBadge]}>
-              <Ionicons name="star" size={14} color="#FFD700" style={styles.starIcon} />
-              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
-                {typeof item.communityRating === "number"
-                  ? item.communityRating.toFixed(1)
-                  : item.communityRating}
-              </FinoraText>
-            </View>
-          ) : null}
+          {/* Metadata Badges */}
+          <View style={styles.badgeRow}>
+            {item.communityRating ? (
+              <View style={[styles.badge, styles.ratingBadge]}>
+                <Ionicons name="star" size={14} color="#FFD700" style={styles.starIcon} />
+                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                  {typeof item.communityRating === "number"
+                    ? item.communityRating.toFixed(1)
+                    : item.communityRating}
+                </FinoraText>
+              </View>
+            ) : null}
 
-          {item.officialRating ? (
-            <View style={styles.badge}>
-              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
-                {item.officialRating}
-              </FinoraText>
-            </View>
-          ) : null}
+            {item.officialRating ? (
+              <View style={styles.badge}>
+                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                  {item.officialRating}
+                </FinoraText>
+              </View>
+            ) : null}
 
-          {item.year ? (
-            <View style={styles.badge}>
-              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
-                {item.year}
-              </FinoraText>
-            </View>
-          ) : null}
+            {item.year ? (
+              <View style={styles.badge}>
+                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                  {item.year}
+                </FinoraText>
+              </View>
+            ) : null}
 
-          {runtimeString ? (
-            <View style={styles.badge}>
-              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
-                {runtimeString}
-              </FinoraText>
-            </View>
-          ) : null}
+            {runtimeString ? (
+              <View style={styles.badge}>
+                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                  {runtimeString}
+                </FinoraText>
+              </View>
+            ) : null}
 
-          {primaryGenre ? (
-            <View style={styles.badge}>
-              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
-                {primaryGenre}
-              </FinoraText>
-            </View>
-          ) : null}
+            {primaryGenre ? (
+              <View style={styles.badge}>
+                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                  {primaryGenre}
+                </FinoraText>
+              </View>
+            ) : null}
 
-          {/* Guaranteed fallback badges when rating or genre is missing */}
-          {(!hasRating || !hasGenre) && typeLabel ? (
-            <View style={styles.badge}>
-              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
-                {typeLabel}
-              </FinoraText>
-            </View>
-          ) : null}
+            {/* Guaranteed fallback badges when rating or genre is missing */}
+            {(!hasRating || !hasGenre) && typeLabel ? (
+              <View style={styles.badge}>
+                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                  {typeLabel}
+                </FinoraText>
+              </View>
+            ) : null}
 
-          {(!hasRating || !hasRuntime) && isHD ? (
-            <View style={styles.badge}>
-              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
-                HD
-              </FinoraText>
-            </View>
-          ) : null}
-        </View>
+            {(!hasRating || !hasRuntime) && isHD ? (
+              <View style={styles.badge}>
+                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                  HD
+                </FinoraText>
+              </View>
+            ) : null}
+          </View>
+        </Animated.View>
 
-        {/* Action CTAs */}
+        {/* Action CTAs: Solid and stable, never flash or disappear during rotation */}
         <View style={styles.actionsRow}>
           <FinoraButton
             label="Play"
@@ -242,7 +245,7 @@ export const HeroBanner = React.memo(function HeroBanner({
             onPress={() => onToggleFavorite && onToggleFavorite(item)}
           />
         </View>
-      </Animated.View>
+      </View>
     </Pressable>
   );
 });
@@ -273,6 +276,10 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     alignItems: "center",
     zIndex: 10
+  },
+  infoContainer: {
+    width: "100%",
+    alignItems: "center"
   },
   logoImage: {
     width: 240,
