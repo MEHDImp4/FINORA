@@ -146,16 +146,18 @@ export const HeroBanner = React.memo(function HeroBanner({
 
           {item.communityRating ? (
             <View style={[styles.badge, styles.ratingBadge]}>
-              <Ionicons name="star" size={11} color="#FFD700" style={{ marginRight: 3 }} />
+              <Ionicons name="star" size={12} color="#FFD700" style={styles.starIcon} />
               <FinoraText variant="caption" color="textPrimary" weight="700">
-                {item.communityRating}
+                {typeof item.communityRating === "number"
+                  ? item.communityRating.toFixed(1)
+                  : item.communityRating}
               </FinoraText>
             </View>
           ) : null}
 
           {primaryGenre ? (
             <View style={styles.badge}>
-              <FinoraText variant="caption" color="textMuted" weight="500">
+              <FinoraText variant="caption" color="textSecondary" weight="600">
                 {primaryGenre}
               </FinoraText>
             </View>
@@ -237,18 +239,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm,
-    marginBottom: spacing.lg
+    marginBottom: spacing.lg,
+    flexWrap: "wrap"
   },
   badge: {
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 4
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.22)",
+    borderColor: "rgba(255, 255, 255, 0.15)",
+    borderWidth: 0.5,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+    borderRadius: 6
   },
   ratingBadge: {
-    backgroundColor: "rgba(255, 184, 0, 0.2)",
-    borderColor: colors.accent,
-    borderWidth: 0.5
+    backgroundColor: "rgba(255, 184, 0, 0.25)",
+    borderColor: "rgba(255, 215, 0, 0.4)",
+    borderWidth: 1
+  },
+  starIcon: {
+    marginRight: 4
   },
   actionsRow: {
     flexDirection: "row",
