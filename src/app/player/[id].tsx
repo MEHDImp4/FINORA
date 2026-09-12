@@ -10,14 +10,24 @@ import { colors, spacing } from "../../design-system/tokens";
 import { offlineStorageService } from "../../features/offline/offlineStorage";
 import { OfflineMediaRecord } from "../../features/offline/types";
 import { MediaItem } from "../../types/media";
+import { jellyfinClient } from "../../core/jellyfin/jellyfinClient";
 
 export default function PlayerRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const session = useAuthStore((state) => state.session);
+  const authStatus = useAuthStore((state) => state.status);
+  const restoreSession = useAuthStore((state) => state.restoreSession);
+
+  useEffect(() => {
+    if (!session && (authStatus === "idle" || authStatus === "unauthenticated")) {
+      restoreSession().catch(() => {});
+    }
+  }, [session, authStatus, restoreSession]);
+
   const userId = session?.userId || "";
-  const serverUrl = session?.serverUrl || "";
-  const token = session?.token || "";
+  const serverUrl = session?.serverUrl || jellyfinClient.getServerUrl() || "";
+  const token = session?.token || jellyfinClient.getAuthToken() || "";
 
   const [offlineRecord, setOfflineRecord] = useState<OfflineMediaRecord | null>(null);
   const [checkingOffline, setCheckingOffline] = useState(true);
@@ -46,10 +56,24 @@ export default function PlayerRoute() {
 
   const { data: item, isLoading, isError } = useItemDetails(userId, id);
 
-  if (isLoading || checkingOffline) {
+  if (isLoading || checkingOffline || authStatus === "restoring" || authStatus === "authenticating") {
     return (
       <View style={styles.centerContainer} testID="player-route-loading">
         <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!token && !offlineRecord) {
+    return (
+      <View style={styles.centerContainer} testID="player-route-auth-error">
+        <FinoraText variant="title" style={styles.errorTitle}>
+          Authentication required
+        </FinoraText>
+        <FinoraText variant="caption" style={{ color: colors.textSecondary, marginBottom: spacing.md }}>
+          Please sign in to stream content.
+        </FinoraText>
+        <FinoraButton label="Go Back" variant="secondary" onPress={() => router.back()} />
       </View>
     );
   }

@@ -5,6 +5,7 @@ import { FinoraPlayerControls, FinoraPlayerSnapshot, IFinoraPlayerEngine } from 
 
 export interface UseFinoraPlayerOptions {
   sourceUrl?: string;
+  headers?: Record<string, string>;
   initialPositionSeconds?: number;
   autoPlay?: boolean;
 }
@@ -18,6 +19,7 @@ export interface UseFinoraPlayerResult {
 
 export function useFinoraPlayer({
   sourceUrl,
+  headers,
   initialPositionSeconds = 0,
   autoPlay = false
 }: UseFinoraPlayerOptions = {}): UseFinoraPlayerResult {
@@ -29,8 +31,20 @@ export function useFinoraPlayer({
 
   const engine = engineRef.current;
 
+  // Prepare video source with optional auth headers
+  const videoSource = useMemo(() => {
+    if (!sourceUrl) return null;
+    if (headers && Object.keys(headers).length > 0) {
+      return {
+        uri: sourceUrl,
+        headers
+      };
+    }
+    return sourceUrl;
+  }, [sourceUrl, headers]);
+
   // Initialize native expo-video player
-  const player = useVideoPlayer(sourceUrl || null, (p) => {
+  const player = useVideoPlayer(videoSource, (p) => {
     if (autoPlay) {
       p.play();
     }
@@ -49,7 +63,7 @@ export function useFinoraPlayer({
 
   // If sourceUrl changes, replace in player while preserving position and play state
   useEffect(() => {
-    if (!sourceUrl || !player) return;
+    if (!videoSource || !player) return;
     if (prevSourceUrlRef.current && prevSourceUrlRef.current !== sourceUrl) {
       const currentPos = player.currentTime || engine.getSnapshot().currentTimeSeconds;
       const wasPlaying = player.playing || engine.getSnapshot().state === "playing";
@@ -59,10 +73,10 @@ export function useFinoraPlayer({
         pendingPlayRef.current = wasPlaying;
       }
 
-      player.replace(sourceUrl);
+      player.replace(videoSource);
     }
     prevSourceUrlRef.current = sourceUrl;
-  }, [sourceUrl, player, engine]);
+  }, [videoSource, sourceUrl, player, engine]);
 
   // Restore playback position after source replacement
   useEffect(() => {

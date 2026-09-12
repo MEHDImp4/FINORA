@@ -19,6 +19,7 @@ import { SkipMarkerButton } from "./SkipMarkerButton";
 import { StatsForNerdsModal } from "./StatsForNerdsModal";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
+import { formatAuthorizationHeader } from "../../../core/jellyfin/clientInfo";
 
 export interface PlayerScreenProps {
   item: MediaItem;
@@ -129,9 +130,20 @@ export function PlayerScreen({
     return 0;
   }, [item.playbackPositionTicks, item.playedPercentage]);
 
+  // Auth headers for video engine (ExoPlayer sends these to master.m3u8, main.m3u8, and all segments)
+  const playerHeaders = useMemo(() => {
+    if (!token) return undefined;
+    return {
+      Authorization: formatAuthorizationHeader("finora-mobile", token),
+      "X-Emby-Token": token,
+      "X-MediaBrowser-Token": token
+    };
+  }, [token]);
+
   // Player Engine Hook
   const { engine, player, snapshot, controls } = useFinoraPlayer({
     sourceUrl: plan.url,
+    headers: playerHeaders,
     initialPositionSeconds,
     autoPlay: true
   });
