@@ -4,7 +4,8 @@ module.exports = {
   testMatch: ["**/__tests__/**/*.test.[jt]s?(x)"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
-    "^expo-video$": "<rootDir>/__mocks__/expo-video.js"
+    "^expo-video$": "<rootDir>/__mocks__/expo-video.js",
+    "^react-test-renderer$": "<rootDir>/__mocks__/react-test-renderer.js"
   },
   transform: {
     "^.+\\.tsx?$": [

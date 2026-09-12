@@ -297,13 +297,13 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end"
   },
   backdropImage: {
-    ...StyleSheet.absoluteFillObject
+    ...StyleSheet.absoluteFill
   },
   backdropFallback: {
     backgroundColor: colors.surface
   },
   gradientOverlay: {
-    ...StyleSheet.absoluteFillObject
+    ...StyleSheet.absoluteFill
   },
   topBar: {
     position: "absolute",

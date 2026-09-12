@@ -113,7 +113,6 @@ export function PlayerScreen({
         <VideoView
           player={player}
           style={styles.videoSurface}
-          allowsFullscreen
           allowsPictureInPicture
           nativeControls={false}
         />
@@ -225,15 +224,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#000000"
   },
   videoSurface: {
-    ...StyleSheet.absoluteFillObject
+    ...StyleSheet.absoluteFill
   },
   loaderOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: "center",
     alignItems: "center"
   },
   errorOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0, 0, 0, 0.8)",
     justifyContent: "center",
     alignItems: "center",

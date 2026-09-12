@@ -38,7 +38,7 @@ export function FinoraScreen({
       ]}
       {...props}
     >
-      <StatusBar style={statusBarStyle} backgroundColor={backgroundColor} />
+      <StatusBar style={statusBarStyle} />
       {children}
     </View>
   );

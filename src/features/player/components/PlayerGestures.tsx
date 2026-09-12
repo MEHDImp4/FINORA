@@ -157,10 +157,10 @@ export function PlayerGestures({
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject
+    ...StyleSheet.absoluteFill
   },
   gestureOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 15
   },
   seekRipple: {

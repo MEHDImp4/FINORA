@@ -48,6 +48,13 @@ const StyleSheet = {
   create: (styles) => styles,
   flatten: (style) =>
     Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean)) : style || {},
+  absoluteFill: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0
+  },
   absoluteFillObject: {
     position: "absolute",
     left: 0,

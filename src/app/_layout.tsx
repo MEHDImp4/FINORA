@@ -27,7 +27,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <QueryProvider>
         <View style={styles.container}>
-          <StatusBar style="light" backgroundColor="#0A0A0C" />
+          <StatusBar style="light" />
           {status === "idle" || status === "restoring" ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#E50914" />

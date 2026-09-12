@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     padding: spacing.md
   },
   dismissArea: {
-    ...StyleSheet.absoluteFillObject
+    ...StyleSheet.absoluteFill
   },
   card: {
     width: "100%",

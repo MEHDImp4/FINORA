@@ -169,10 +169,10 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border
   },
   backdropImage: {
-    ...StyleSheet.absoluteFillObject
+    ...StyleSheet.absoluteFill
   },
   gradientOverlay: {
-    ...StyleSheet.absoluteFillObject
+    ...StyleSheet.absoluteFill
   },
   contentContainer: {
     paddingHorizontal: spacing.lg,

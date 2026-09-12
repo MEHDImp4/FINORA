@@ -26,7 +26,9 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-video"
+      "expo-video",
+      "expo-asset",
+      "expo-splash-screen"
     ],
     "experiments": {
       "typedRoutes": true

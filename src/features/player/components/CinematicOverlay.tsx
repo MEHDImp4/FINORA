@@ -228,11 +228,11 @@ export function CinematicOverlay({
 
 const styles = StyleSheet.create({
   hiddenSurfaceTouch: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "transparent"
   },
   overlayContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0, 0, 0, 0.55)",
     justifyContent: "space-between",
     padding: spacing.lg,

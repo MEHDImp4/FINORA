@@ -5,6 +5,8 @@
     "noImplicitAny": true,
     "strictNullChecks": true,
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "types": ["jest", "node"],
     "paths": {
       "@/*": ["src/*"]
     }
