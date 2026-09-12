@@ -31,6 +31,7 @@ describe("HttpClient", () => {
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 401,
+      text: async () => JSON.stringify({ message: "Invalid credentials" }),
       json: async () => ({ message: "Invalid credentials" })
     } as Response);
 

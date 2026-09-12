@@ -101,11 +101,17 @@ export class HttpClient {
 
         if (!response.ok) {
           const status = response.status;
+          let rawText = "";
           let errorBody: unknown;
           try {
-            errorBody = await response.json();
+            rawText = await response.text();
+            try {
+              errorBody = JSON.parse(rawText);
+            } catch {
+              errorBody = rawText;
+            }
           } catch {
-            errorBody = await response.text();
+            errorBody = "Failed to read response body";
           }
 
           logger.warn(`[HTTP ERROR ${status}] ${url}`, sanitizeData(errorBody));
