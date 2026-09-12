@@ -72,8 +72,14 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
     parentBackdropImageTag = dto.ParentBackdropImageTags[0];
   }
 
-  const parentBackdropItemId = dto.ParentBackdropItemId || undefined;
-  const seriesPrimaryImageTag = dto.SeriesPrimaryImageTag || undefined;
+  const parentBackdropItemId =
+    dto.ParentBackdropItemId || dto.SeriesId || dto.ParentId || undefined;
+  const seriesPrimaryImageTag =
+    dto.SeriesPrimaryImageTag || dto.ParentPrimaryImageTag || undefined;
+  const parentPrimaryImageTag = dto.ParentPrimaryImageTag || undefined;
+  const parentThumbImageTag = dto.ParentThumbImageTag || undefined;
+  const parentThumbItemId = dto.ParentThumbItemId || dto.SeriesId || undefined;
+  const parentId = dto.ParentId || undefined;
   const primaryImageTag = dto.ImageTags?.Primary;
   const logoImageTag = dto.ImageTags?.Logo || dto.ParentLogoImageTag || undefined;
   const thumbImageTag = dto.ImageTags?.Thumb || dto.ParentThumbImageTag || undefined;
@@ -147,8 +153,12 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
     backdropImageTag,
     primaryImageTag,
     seriesPrimaryImageTag,
+    parentPrimaryImageTag,
     parentBackdropImageTag,
     parentBackdropItemId,
+    parentThumbImageTag,
+    parentThumbItemId,
+    parentId,
     thumbImageTag,
     logoImageTag,
     blurhash,

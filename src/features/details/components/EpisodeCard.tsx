@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { MediaItem } from "../../../types/media";
-import { getMediaThumbnailUrl } from "../../../core/repositories/imageUrlBuilder";
+import { getMediaThumbnailUrls } from "../../../core/repositories/imageUrlBuilder";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
 
@@ -18,7 +18,26 @@ const THUMBNAIL_HEIGHT = 73;
 
 export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
   ({ episode, serverUrl, onPlay }) => {
-    const thumbUri = getMediaThumbnailUrl(serverUrl, episode, 300);
+    const candidateUrls = useMemo(
+      () => getMediaThumbnailUrls(serverUrl, episode, 300),
+      [serverUrl, episode]
+    );
+
+    const [candidateIndex, setCandidateIndex] = useState(0);
+
+    useEffect(() => {
+      setCandidateIndex(0);
+    }, [candidateUrls]);
+
+    const currentUrl = candidateUrls[candidateIndex];
+
+    const handleImageError = () => {
+      if (candidateIndex < candidateUrls.length - 1) {
+        setCandidateIndex((prev) => prev + 1);
+      } else {
+        setCandidateIndex(candidateUrls.length);
+      }
+    };
 
     const hasProgress = episode.playedPercentage > 0 && !episode.isPlayed;
     const episodePrefix =
@@ -37,14 +56,16 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
       >
         {/* Thumbnail with Progress Bar & Play Overlay */}
         <View style={styles.thumbnailContainer}>
-          {thumbUri ? (
+          {currentUrl && candidateIndex < candidateUrls.length ? (
             <Image
-              source={{ uri: thumbUri }}
+              key={currentUrl}
+              source={{ uri: currentUrl }}
               style={styles.thumbnail}
               contentFit="cover"
               transition={200}
-              placeholder={episode.blurhash}
+              placeholder={episode.blurhash ? { blurhash: episode.blurhash } : undefined}
               cachePolicy="memory-disk"
+              onError={handleImageError}
             />
           ) : (
             <View style={[styles.thumbnail, styles.thumbnailFallback]}>

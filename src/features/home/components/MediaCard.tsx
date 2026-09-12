@@ -4,8 +4,8 @@ import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { MediaItem } from "../../../types/media";
 import {
-  getMediaPosterUrl,
-  getMediaThumbnailUrl
+  getMediaPosterUrls,
+  getMediaThumbnailUrls
 } from "../../../core/repositories/imageUrlBuilder";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
@@ -43,15 +43,28 @@ export const MediaCard = React.memo(
     const width = cardWidth ?? (isThumbnail ? THUMBNAIL_WIDTH : POSTER_WIDTH);
     const height = cardHeight ?? (isThumbnail ? THUMBNAIL_HEIGHT : POSTER_HEIGHT);
 
-    // Determine target image URL: Thumbnails prefer 16:9 (episode still / backdrop), posters prefer 2:3 (series poster / movie poster)
-    const imageUrl = isThumbnail
-      ? getMediaThumbnailUrl(serverUrl, item, width)
-      : getMediaPosterUrl(serverUrl, item, width);
+    // Determine target candidate image URLs with fallback chain
+    const candidateUrls = React.useMemo(() => {
+      return isThumbnail
+        ? getMediaThumbnailUrls(serverUrl, item, width)
+        : getMediaPosterUrls(serverUrl, item, width);
+    }, [isThumbnail, serverUrl, item, width]);
 
-    const [imageError, setImageError] = useState(false);
+    const [candidateIndex, setCandidateIndex] = useState(0);
+
     useEffect(() => {
-      setImageError(false);
-    }, [imageUrl]);
+      setCandidateIndex(0);
+    }, [candidateUrls]);
+
+    const currentUrl = candidateUrls[candidateIndex];
+
+    const handleImageError = () => {
+      if (candidateIndex < candidateUrls.length - 1) {
+        setCandidateIndex((prev) => prev + 1);
+      } else {
+        setCandidateIndex(candidateUrls.length);
+      }
+    };
 
     const hasProgress = item.playedPercentage > 0 && !item.isPlayed;
     const progressLabel = hasProgress ? `, ${Math.round(item.playedPercentage)}% watched` : "";
@@ -98,15 +111,16 @@ export const MediaCard = React.memo(
       >
         {/* Media Poster / Thumbnail Image */}
         <View style={[styles.imageContainer, { width, height }]}>
-          {imageUrl && !imageError ? (
+          {currentUrl && candidateIndex < candidateUrls.length ? (
             <Image
-              source={{ uri: imageUrl }}
+              key={currentUrl}
+              source={{ uri: currentUrl }}
               placeholder={item.blurhash ? { blurhash: item.blurhash } : undefined}
               style={styles.image}
               contentFit="cover"
               transition={200}
               cachePolicy="memory-disk"
-              onError={() => setImageError(true)}
+              onError={handleImageError}
             />
           ) : (
             <View style={styles.fallbackContainer}>

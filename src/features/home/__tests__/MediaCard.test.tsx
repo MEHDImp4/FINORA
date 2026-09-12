@@ -90,4 +90,36 @@ describe("MediaCard", () => {
     expect(root.findByProps({ children: "Breaking Bad" })).toBeDefined();
     expect(root.findByProps({ children: "S1:E1 · Pilot" })).toBeDefined();
   });
+
+  it("cycles to next candidate URL when image onError is triggered", () => {
+    const episodeItem: MediaItem = {
+      ...sampleItem,
+      id: "ep-10",
+      name: "Pilot",
+      type: "Episode",
+      seriesId: "series-10",
+      parentBackdropImageTag: "backdrop-tag-series",
+      primaryImageTag: "ep-still-tag"
+    };
+
+    let component: ReactTestRenderer.ReactTestRenderer;
+    ReactTestRenderer.act(() => {
+      component = ReactTestRenderer.create(
+        <MediaCard item={episodeItem} serverUrl={serverUrl} variant="thumbnail" />
+      );
+    });
+
+    const root = component!.root;
+    let image = root.findByProps({ contentFit: "cover" });
+    expect(image.props.source.uri).toContain("ep-still-tag");
+
+    // Trigger onError
+    ReactTestRenderer.act(() => {
+      image.props.onError();
+    });
+
+    // Should now switch to series backdrop
+    image = root.findByProps({ contentFit: "cover" });
+    expect(image.props.source.uri).toContain("backdrop-tag-series");
+  });
 });

@@ -113,4 +113,36 @@ describe("EpisodeCard", () => {
     expect(image.props.source.uri).toContain("tag=tag-ep-thumb");
     expect(image.props.source.uri).not.toContain("Backdrop");
   });
+
+  it("cycles to series backdrop when episode still onError is triggered", () => {
+    const episodeWithBackdrop: MediaItem = {
+      ...mockEpisode,
+      seriesId: "series-got",
+      parentBackdropImageTag: "tag-series-backdrop"
+    };
+
+    let root: renderer.ReactTestRenderer;
+    act(() => {
+      root = renderer.create(
+        <EpisodeCard
+          episode={episodeWithBackdrop}
+          serverUrl="https://jellyfin.example.com"
+          onPlay={jest.fn()}
+        />
+      );
+    });
+
+    const instance = root!.root;
+    let image = instance.findByProps({ contentFit: "cover" });
+    expect(image.props.source.uri).toContain("tag-ep-thumb");
+
+    // Trigger error on episode still
+    act(() => {
+      image.props.onError();
+    });
+
+    // Should now fallback to series backdrop
+    image = instance.findByProps({ contentFit: "cover" });
+    expect(image.props.source.uri).toContain("tag-series-backdrop");
+  });
 });

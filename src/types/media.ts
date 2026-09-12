@@ -48,8 +48,12 @@ export interface MediaItem {
   backdropImageTag?: string;
   primaryImageTag?: string;
   seriesPrimaryImageTag?: string;
+  parentPrimaryImageTag?: string;
   parentBackdropImageTag?: string;
   parentBackdropItemId?: string;
+  parentThumbImageTag?: string;
+  parentThumbItemId?: string;
+  parentId?: string;
   thumbImageTag?: string;
   logoImageTag?: string;
   blurhash?: string;

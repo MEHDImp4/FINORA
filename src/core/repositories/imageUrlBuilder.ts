@@ -6,6 +6,10 @@ export type ImageType = "Primary" | "Backdrop" | "Logo" | "Thumb";
 export interface ImageUrlOptions {
   width?: number;
   height?: number;
+  maxWidth?: number;
+  maxHeight?: number;
+  fillWidth?: number;
+  fillHeight?: number;
   quality?: number;
   tag?: string;
   apiKey?: string;
@@ -24,11 +28,15 @@ export function buildImageUrl(
   const cleanBase = baseUrl.replace(/\/+$/, "");
   const url = new URL(`${cleanBase}/Items/${itemId}/Images/${type}`);
 
-  if (options.width) {
-    url.searchParams.append("fillWidth", String(options.width));
+  if (options.fillWidth && options.fillHeight) {
+    url.searchParams.append("fillWidth", String(options.fillWidth));
+    url.searchParams.append("fillHeight", String(options.fillHeight));
+  } else if (options.maxWidth !== undefined || options.width !== undefined) {
+    url.searchParams.append("maxWidth", String(options.maxWidth ?? options.width));
   }
-  if (options.height) {
-    url.searchParams.append("fillHeight", String(options.height));
+
+  if (options.maxHeight !== undefined || (options.height !== undefined && !options.fillHeight)) {
+    url.searchParams.append("maxHeight", String(options.maxHeight ?? options.height));
   }
   if (options.quality) {
     url.searchParams.append("quality", String(options.quality));
@@ -98,99 +106,317 @@ export function getPersonImageUrl(
 }
 
 /**
- * Resolves the best 2:3 vertical poster URL for an item.
- * For an Episode, it prefers the Series Poster (SeriesId / SeriesPrimaryImageTag)
- * matching the standard Netflix / Jellyfin Web behavior.
+ * Resolves an ordered list of candidate 2:3 vertical poster URLs for an item.
+ * For an Episode, it prefers the Series Poster, falling back to Season Poster,
+ * Episode still, and Series Backdrop.
+ */
+export function getMediaPosterUrls(
+  baseUrl: string,
+  item: MediaItem,
+  targetWidth: number = 340
+): string[] {
+  if (!baseUrl || !item) return [];
+
+  const urls: string[] = [];
+
+  if (item.type === "Episode") {
+    // 1. Series Primary Poster with tag (2:3)
+    const seriesId = item.seriesId;
+    const seriesPosterTag = item.seriesPrimaryImageTag || item.parentPrimaryImageTag;
+    if (seriesId && seriesPosterTag) {
+      urls.push(
+        buildImageUrl(baseUrl, seriesId, "Primary", {
+          width: targetWidth,
+          quality: 85,
+          tag: seriesPosterTag
+        })
+      );
+    }
+
+    // 2. Season Primary Poster
+    if (item.seasonId) {
+      urls.push(
+        buildImageUrl(baseUrl, item.seasonId, "Primary", {
+          width: targetWidth,
+          quality: 85
+        })
+      );
+    }
+
+    // 3. Series Primary Poster fallback without tag
+    if (seriesId) {
+      urls.push(
+        buildImageUrl(baseUrl, seriesId, "Primary", {
+          width: targetWidth,
+          quality: 85
+        })
+      );
+    }
+
+    // 4. Episode Primary still with tag
+    if (item.primaryImageTag) {
+      urls.push(
+        buildImageUrl(baseUrl, item.id, "Primary", {
+          width: targetWidth,
+          quality: 85,
+          tag: item.primaryImageTag
+        })
+      );
+    }
+
+    // 5. Parent Series Backdrop
+    const parentBackdropId = item.parentBackdropItemId || item.seriesId;
+    if (parentBackdropId) {
+      urls.push(
+        buildImageUrl(baseUrl, parentBackdropId, "Backdrop", {
+          width: targetWidth,
+          quality: 80,
+          tag: item.parentBackdropImageTag || item.backdropImageTag
+        })
+      );
+    }
+
+    return Array.from(new Set(urls.filter(Boolean)));
+  }
+
+  // For Movies, Series, BoxSets:
+  // 1. Primary with tag
+  if (item.primaryImageTag) {
+    urls.push(
+      buildImageUrl(baseUrl, item.id, "Primary", {
+        width: targetWidth,
+        quality: 85,
+        tag: item.primaryImageTag
+      })
+    );
+  }
+
+  // 2. Thumb with tag
+  if (item.thumbImageTag) {
+    urls.push(
+      buildImageUrl(baseUrl, item.id, "Thumb", {
+        width: targetWidth,
+        quality: 85,
+        tag: item.thumbImageTag
+      })
+    );
+  }
+
+  // 3. Backdrop with tag
+  if (item.backdropImageTag) {
+    urls.push(
+      buildImageUrl(baseUrl, item.id, "Backdrop", {
+        width: targetWidth,
+        quality: 80,
+        tag: item.backdropImageTag
+      })
+    );
+  }
+
+  // 4. Primary fallback without tag
+  urls.push(
+    buildImageUrl(baseUrl, item.id, "Primary", {
+      width: targetWidth,
+      quality: 85
+    })
+  );
+
+  return Array.from(new Set(urls.filter(Boolean)));
+}
+
+/**
+ * Resolves the primary 2:3 vertical poster URL for an item.
  */
 export function getMediaPosterUrl(
   baseUrl: string,
   item: MediaItem,
   targetWidth: number = 340
 ): string {
-  if (!baseUrl || !item) return "";
-
-  // For Episodes, prefer the parent series poster
-  if (item.type === "Episode" && item.seriesId) {
-    return buildImageUrl(baseUrl, item.seriesId, "Primary", {
-      width: targetWidth,
-      quality: 85,
-      tag: item.seriesPrimaryImageTag
-    });
-  }
-
-  // Fallback to item's own Primary image
-  return buildImageUrl(baseUrl, item.id, "Primary", {
-    width: targetWidth,
-    quality: 85,
-    tag: item.primaryImageTag
-  });
+  const urls = getMediaPosterUrls(baseUrl, item, targetWidth);
+  return urls.length > 0 ? urls[0] : "";
 }
 
 /**
- * Resolves the best 16:9 horizontal thumbnail URL for an item.
- * - For an Episode: its Primary image is the 16:9 episode still frame! (NOT Backdrop!)
- *   Fallback to Series Backdrop if episode still tag is missing.
- * - For a Movie or Series: uses Backdrop (16:9).
- *   Fallback to Thumb or Primary.
+ * Resolves an ordered list of candidate 16:9 horizontal thumbnail URLs for an item.
+ * - For an Episode:
+ *   1. Episode Still (Primary 16:9)
+ *   2. Series Backdrop (16:9) with tag
+ *   3. Series Poster (Primary 2:3) with tag
+ *   4. Series Thumb (16:9) with tag
+ *   5. Season Poster
+ *   6. Series Backdrop fallback without tag
+ *   7. Series Poster fallback without tag
+ *   8. Episode Still fallback without tag
+ * - For Movies & Series:
+ *   1. Backdrop (16:9) with tag
+ *   2. Thumb (16:9) with tag
+ *   3. Primary with tag
+ *   4. Fallbacks without tag
+ */
+export function getMediaThumbnailUrls(
+  baseUrl: string,
+  item: MediaItem,
+  targetWidth: number = 440
+): string[] {
+  if (!baseUrl || !item) return [];
+
+  const urls: string[] = [];
+
+  if (item.type === "Episode") {
+    // 1. Episode still is type "Primary" (16:9) with tag
+    if (item.primaryImageTag) {
+      urls.push(
+        buildImageUrl(baseUrl, item.id, "Primary", {
+          width: targetWidth,
+          quality: 85,
+          tag: item.primaryImageTag
+        })
+      );
+    }
+
+    // 2. Parent Series Backdrop with tag (16:9) - only if tag exists
+    const parentBackdropId = item.parentBackdropItemId || item.seriesId;
+    const parentBackdropTag = item.parentBackdropImageTag || item.backdropImageTag;
+    if (parentBackdropId && parentBackdropTag) {
+      urls.push(
+        buildImageUrl(baseUrl, parentBackdropId, "Backdrop", {
+          width: targetWidth,
+          quality: 80,
+          tag: parentBackdropTag
+        })
+      );
+    }
+
+    // 3. Parent Series Primary Poster with tag (2:3)
+    const seriesId = item.seriesId;
+    const seriesPosterTag = item.seriesPrimaryImageTag || item.parentPrimaryImageTag;
+    if (seriesId && seriesPosterTag) {
+      urls.push(
+        buildImageUrl(baseUrl, seriesId, "Primary", {
+          width: targetWidth,
+          quality: 85,
+          tag: seriesPosterTag
+        })
+      );
+    }
+
+    // 4. Parent Series Thumb with tag (16:9)
+    const parentThumbId = item.parentThumbItemId || item.seriesId;
+    const parentThumbTag = item.parentThumbImageTag || item.thumbImageTag;
+    if (parentThumbId && parentThumbTag) {
+      urls.push(
+        buildImageUrl(baseUrl, parentThumbId, "Thumb", {
+          width: targetWidth,
+          quality: 85,
+          tag: parentThumbTag
+        })
+      );
+    }
+
+    // 5. Season Primary Poster
+    if (item.seasonId) {
+      urls.push(
+        buildImageUrl(baseUrl, item.seasonId, "Primary", {
+          width: targetWidth,
+          quality: 85
+        })
+      );
+    }
+
+    // 6. Parent Backdrop fallback without tag
+    if (parentBackdropId) {
+      urls.push(
+        buildImageUrl(baseUrl, parentBackdropId, "Backdrop", {
+          width: targetWidth,
+          quality: 80
+        })
+      );
+    }
+
+    // 7. Series Primary fallback without tag
+    if (seriesId) {
+      urls.push(
+        buildImageUrl(baseUrl, seriesId, "Primary", {
+          width: targetWidth,
+          quality: 85
+        })
+      );
+    }
+
+    // 8. Episode Primary fallback without tag
+    urls.push(
+      buildImageUrl(baseUrl, item.id, "Primary", {
+        width: targetWidth,
+        quality: 85
+      })
+    );
+
+    return Array.from(new Set(urls.filter(Boolean)));
+  }
+
+  // For Movies, Series, BoxSets:
+  // 1. Backdrop (16:9 fanart) with tag
+  if (item.backdropImageTag) {
+    urls.push(
+      buildImageUrl(baseUrl, item.id, "Backdrop", {
+        width: targetWidth,
+        quality: 80,
+        tag: item.backdropImageTag
+      })
+    );
+  }
+
+  // 2. Thumb (16:9) with tag
+  if (item.thumbImageTag) {
+    urls.push(
+      buildImageUrl(baseUrl, item.id, "Thumb", {
+        width: targetWidth,
+        quality: 85,
+        tag: item.thumbImageTag
+      })
+    );
+  }
+
+  // 3. Primary with tag
+  if (item.primaryImageTag) {
+    urls.push(
+      buildImageUrl(baseUrl, item.id, "Primary", {
+        width: targetWidth,
+        quality: 85,
+        tag: item.primaryImageTag
+      })
+    );
+  }
+
+  // 4. Backdrop fallback without tag
+  urls.push(
+    buildImageUrl(baseUrl, item.id, "Backdrop", {
+      width: targetWidth,
+      quality: 80
+    })
+  );
+
+  // 5. Primary fallback without tag
+  urls.push(
+    buildImageUrl(baseUrl, item.id, "Primary", {
+      width: targetWidth,
+      quality: 85
+    })
+  );
+
+  return Array.from(new Set(urls.filter(Boolean)));
+}
+
+/**
+ * Resolves the primary 16:9 horizontal thumbnail URL for an item.
  */
 export function getMediaThumbnailUrl(
   baseUrl: string,
   item: MediaItem,
   targetWidth: number = 440
 ): string {
-  if (!baseUrl || !item) return "";
-
-  if (item.type === "Episode") {
-    // 1. Episode still is type "Primary" (16:9)
-    if (item.primaryImageTag) {
-      return buildImageUrl(baseUrl, item.id, "Primary", {
-        width: targetWidth,
-        quality: 85,
-        tag: item.primaryImageTag
-      });
-    }
-
-    // 2. Fallback to Series Backdrop if episode still is missing
-    const parentId = item.parentBackdropItemId || item.seriesId;
-    if (parentId) {
-      return buildImageUrl(baseUrl, parentId, "Backdrop", {
-        width: targetWidth,
-        quality: 80,
-        tag: item.parentBackdropImageTag || item.backdropImageTag
-      });
-    }
-
-    // 3. Fallback: item Primary without tag
-    return buildImageUrl(baseUrl, item.id, "Primary", {
-      width: targetWidth,
-      quality: 85
-    });
-  }
-
-  // For Movies & Series: Backdrop is the standard 16:9 fanart
-  if (item.backdropImageTag) {
-    return buildImageUrl(baseUrl, item.id, "Backdrop", {
-      width: targetWidth,
-      quality: 80,
-      tag: item.backdropImageTag
-    });
-  }
-
-  // Fallback to Thumb
-  if (item.thumbImageTag) {
-    return buildImageUrl(baseUrl, item.id, "Thumb", {
-      width: targetWidth,
-      quality: 85,
-      tag: item.thumbImageTag
-    });
-  }
-
-  // Fallback to Primary
-  return buildImageUrl(baseUrl, item.id, "Primary", {
-    width: targetWidth,
-    quality: 85,
-    tag: item.primaryImageTag
-  });
+  const urls = getMediaThumbnailUrls(baseUrl, item, targetWidth);
+  return urls.length > 0 ? urls[0] : "";
 }
 
 
