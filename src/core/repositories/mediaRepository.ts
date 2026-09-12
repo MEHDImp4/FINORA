@@ -17,7 +17,51 @@ export interface GetItemsOptions {
 }
 
 const MEDIA_FIELDS =
-  "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ParentBackdropImageTags,ParentBackdropItemId,SeriesPrimaryImageTag,ParentPrimaryImageTag,ParentThumbImageTag,ParentThumbItemId,ParentId,PrimaryImageAspectRatio,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber,SeriesId,SeriesName,SeasonId,LocationType,MediaSources";
+  "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ParentBackdropImageTags,ParentBackdropItemId,SeriesPrimaryImageTag,ParentPrimaryImageTag,ParentThumbImageTag,ParentThumbItemId,ParentId,PrimaryImageAspectRatio,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber,SeriesId,SeriesName,SeasonId,LocationType,MediaSources,ChildCount,RecursiveItemCount,MediaSourceCount,ItemCounts";
+
+export function isValidMediaDto(dto: any): boolean {
+  if (!dto) return false;
+  if (dto.LocationType === "Virtual" || dto.IsMissing === true) {
+    return false;
+  }
+  // Items with explicit 0 episode count (empty seasons, series, or collections)
+  if (dto.ItemCounts) {
+    if (typeof dto.ItemCounts.EpisodeCount === "number" && dto.ItemCounts.EpisodeCount === 0) {
+      return false;
+    }
+    if (typeof dto.ItemCounts.ChildCount === "number" && dto.ItemCounts.ChildCount === 0) {
+      return false;
+    }
+  }
+  if (dto.EpisodeCount !== undefined && dto.EpisodeCount === 0) {
+    return false;
+  }
+  // Series without any episodes or seasons (deleted series or ghost metadata)
+  if (dto.Type === "Series") {
+    if (dto.RecursiveItemCount !== undefined && dto.RecursiveItemCount === 0) {
+      return false;
+    }
+    if (dto.ChildCount !== undefined && dto.ChildCount === 0) {
+      return false;
+    }
+  }
+  // Season without episodes
+  if (dto.Type === "Season") {
+    if (dto.ChildCount !== undefined && dto.ChildCount === 0) {
+      return false;
+    }
+  }
+  // Movie or Episode with explicit 0 media sources (unplayable / deleted file)
+  if (dto.Type === "Movie" || dto.Type === "Episode") {
+    if (dto.MediaSourceCount !== undefined && dto.MediaSourceCount === 0) {
+      return false;
+    }
+    if (Array.isArray(dto.MediaSources) && dto.MediaSources.length === 0) {
+      return false;
+    }
+  }
+  return true;
+}
 
 export class MediaRepository {
   private client: JellyfinClient;
@@ -81,7 +125,7 @@ export class MediaRepository {
 
     const items = response?.Items || [];
     return items
-      .filter((dto) => dto.LocationType !== "Virtual" && !dto.IsMissing)
+      .filter(isValidMediaDto)
       .map(mapJellyfinItemToMediaItem);
   }
 
@@ -108,7 +152,7 @@ export class MediaRepository {
 
     const items = response?.Items || [];
     return items
-      .filter((dto) => dto.LocationType !== "Virtual" && !dto.IsMissing)
+      .filter(isValidMediaDto)
       .map(mapJellyfinItemToMediaItem);
   }
 
@@ -138,7 +182,7 @@ export class MediaRepository {
 
     const items = Array.isArray(response) ? response : [];
     return items
-      .filter((dto) => dto.LocationType !== "Virtual" && !dto.IsMissing)
+      .filter(isValidMediaDto)
       .map(mapJellyfinItemToMediaItem);
   }
 
@@ -181,19 +225,7 @@ export class MediaRepository {
 
     const items = response?.Items || [];
     return items
-      .filter((dto) => {
-        if (dto.LocationType === "Virtual" || dto.IsMissing) {
-          return false;
-        }
-        if (
-          dto.ItemCounts &&
-          typeof dto.ItemCounts.EpisodeCount === "number" &&
-          dto.ItemCounts.EpisodeCount === 0
-        ) {
-          return false;
-        }
-        return true;
-      })
+      .filter(isValidMediaDto)
       .map(mapJellyfinItemToMediaItem);
   }
 
@@ -222,7 +254,7 @@ export class MediaRepository {
 
     const items = response?.Items || [];
     return items
-      .filter((dto) => dto.LocationType !== "Virtual" && !dto.IsMissing)
+      .filter(isValidMediaDto)
       .map(mapJellyfinItemToMediaItem);
   }
 
@@ -262,7 +294,7 @@ export class MediaRepository {
 
     const items = response?.Items || [];
     return items
-      .filter((dto) => dto.LocationType !== "Virtual" && !dto.IsMissing)
+      .filter(isValidMediaDto)
       .map(mapJellyfinItemToMediaItem);
   }
 

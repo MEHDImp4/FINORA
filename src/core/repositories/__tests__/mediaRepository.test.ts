@@ -204,6 +204,19 @@ describe("MediaRepository", () => {
     expect(seasons[0].id).toBe("s-1");
   });
 
+  it("filters out empty deleted series (0 episodes / 0 seasons) from recently added and items", async () => {
+    mockHttpClient.request.mockResolvedValueOnce([
+      { Id: "show-active", Name: "Active Show", Type: "Series", RecursiveItemCount: 20, ChildCount: 2 },
+      { Id: "show-deleted", Name: "Prison Break", Type: "Series", RecursiveItemCount: 0, ChildCount: 0 },
+      { Id: "show-no-seasons", Name: "Ghost Show", Type: "Series", ChildCount: 0 },
+      { Id: "movie-empty", Name: "Deleted Movie", Type: "Movie", MediaSourceCount: 0 }
+    ]);
+
+    const recent = await repository.getRecentlyAdded("user-123", undefined, 10, mockHttpClient);
+    expect(recent).toHaveLength(1);
+    expect(recent[0].id).toBe("show-active");
+  });
+
   it("throws FinoraError on missing userId parameter", async () => {
     await expect(repository.getLibraries("", mockHttpClient)).rejects.toThrow(FinoraError);
   });

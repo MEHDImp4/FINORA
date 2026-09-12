@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl, Pressable } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { FinoraScreen } from "../../design-system/components/FinoraScreen";
 import { HeroBanner } from "../../features/home/components/HeroBanner";
 import { MediaCarousel } from "../../features/home/components/MediaCarousel";
@@ -9,7 +10,8 @@ import { useAuthStore } from "../../stores/authStore";
 import {
   useResumeItems,
   useRecentlyAdded,
-  useLibraries
+  useLibraries,
+  mediaKeys
 } from "../../hooks/useMediaQueries";
 import { useToggleFavorite } from "../../hooks/useUserDataMutations";
 import { colors, spacing } from "../../design-system/tokens";
@@ -45,6 +47,7 @@ function HomeLibraryRow({
 
 export default function HomeScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const session = useAuthStore((state) => state.session);
   const userId = session?.userId;
   const serverUrl = session?.serverUrl || "";
@@ -72,20 +75,29 @@ export default function HomeScreen() {
 
   const isRefreshing = isResumeLoading || isRecentLoading || isLibrariesLoading;
 
-  const onRefresh = () => {
-    refetchResume();
-    refetchRecent();
-    refetchLibraries();
-  };
+  const onRefresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: mediaKeys.all });
+  }, [queryClient]);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Revalidate active queries when navigating back to Home
+      queryClient.invalidateQueries({ queryKey: mediaKeys.all, refetchType: "active" });
+    }, [queryClient])
+  );
 
   // Derive featured hero item (prefer first recently added with backdrop or first resume item)
   const featuredItem =
-    recentItems?.find((i) => i.backdropImageTag) ||
-    resumeItems?.find((i) => i.backdropImageTag) ||
+    recentItems?.find((i) => i.backdropImageTag && !i.isMissing && i.locationType !== "Virtual") ||
+    resumeItems?.find((i) => i.backdropImageTag && !i.isMissing && i.locationType !== "Virtual") ||
     recentItems?.[0] ||
     null;
 
   const handlePlay = (item: MediaItem) => {
+    if (item.type === "Series" || item.type === "Season") {
+      router.push({ pathname: "/details/[id]", params: { id: item.id } });
+      return;
+    }
     router.push({ pathname: "/player/[id]", params: { id: item.id } });
   };
 

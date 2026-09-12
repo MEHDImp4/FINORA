@@ -51,10 +51,11 @@ export const MediaCard = React.memo(
     }, [isThumbnail, serverUrl, item, width]);
 
     const [candidateIndex, setCandidateIndex] = useState(0);
+    const candidateKey = candidateUrls.join("|");
 
     useEffect(() => {
       setCandidateIndex(0);
-    }, [candidateUrls]);
+    }, [candidateKey]);
 
     const currentUrl = candidateUrls[candidateIndex];
 

@@ -24,10 +24,11 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
     );
 
     const [candidateIndex, setCandidateIndex] = useState(0);
+    const candidateKey = candidateUrls.join("|");
 
     useEffect(() => {
       setCandidateIndex(0);
-    }, [candidateUrls]);
+    }, [candidateKey]);
 
     const currentUrl = candidateUrls[candidateIndex];
 

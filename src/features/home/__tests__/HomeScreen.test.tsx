@@ -1,16 +1,36 @@
 import React from "react";
 import ReactTestRenderer from "react-test-renderer";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import HomeScreen from "../../../app/(tabs)/index";
 import { useAuthStore } from "../../../stores/authStore";
 import { useResumeItems, useRecentlyAdded, useLibraries } from "../../../hooks/useMediaQueries";
 import { useToggleFavorite } from "../../../hooks/useUserDataMutations";
+
+jest.mock("expo-router", () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    back: jest.fn()
+  }),
+  useFocusEffect: jest.fn((cb) => {
+    cb();
+  })
+}));
 
 jest.mock("../../../stores/authStore");
 jest.mock("../../../hooks/useMediaQueries");
 jest.mock("../../../hooks/useUserDataMutations");
 
 describe("HomeScreen", () => {
+  let queryClient: QueryClient;
+
   beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false }
+      }
+    });
+
     (useAuthStore as unknown as jest.Mock).mockReturnValue({
       userId: "user-123",
       userName: "FinoraTester",
@@ -60,7 +80,11 @@ describe("HomeScreen", () => {
   });
 
   it("renders HeroBanner and carousels without crashing", () => {
-    const component = ReactTestRenderer.create(<HomeScreen />);
+    const component = ReactTestRenderer.create(
+      <QueryClientProvider client={queryClient}>
+        <HomeScreen />
+      </QueryClientProvider>
+    );
     const root = component.root;
 
     // Check that sections render

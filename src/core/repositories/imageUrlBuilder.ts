@@ -275,7 +275,8 @@ export function getMediaThumbnailUrls(
     }
 
     // 2. Parent Series Backdrop with tag (16:9) - only if tag exists
-    const parentBackdropId = item.parentBackdropItemId || item.seriesId;
+    const seriesId = item.seriesId || item.parentId;
+    const parentBackdropId = item.parentBackdropItemId || item.seriesId || item.parentId;
     const parentBackdropTag = item.parentBackdropImageTag || item.backdropImageTag;
     if (parentBackdropId && parentBackdropTag) {
       urls.push(
@@ -288,7 +289,6 @@ export function getMediaThumbnailUrls(
     }
 
     // 3. Parent Series Primary Poster with tag (2:3)
-    const seriesId = item.seriesId;
     const seriesPosterTag = item.seriesPrimaryImageTag || item.parentPrimaryImageTag;
     if (seriesId && seriesPosterTag) {
       urls.push(
@@ -301,7 +301,7 @@ export function getMediaThumbnailUrls(
     }
 
     // 4. Parent Series Thumb with tag (16:9)
-    const parentThumbId = item.parentThumbItemId || item.seriesId;
+    const parentThumbId = item.parentThumbItemId || item.seriesId || item.parentId;
     const parentThumbTag = item.parentThumbImageTag || item.thumbImageTag;
     if (parentThumbId && parentThumbTag) {
       urls.push(
@@ -314,9 +314,10 @@ export function getMediaThumbnailUrls(
     }
 
     // 5. Season Primary Poster
-    if (item.seasonId) {
+    const seasonId = item.seasonId || item.parentId;
+    if (seasonId) {
       urls.push(
-        buildImageUrl(baseUrl, item.seasonId, "Primary", {
+        buildImageUrl(baseUrl, seasonId, "Primary", {
           width: targetWidth,
           quality: 85
         })
