@@ -47,6 +47,10 @@ export interface MediaItem {
   genres: string[];
   backdropImageTag?: string;
   primaryImageTag?: string;
+  seriesPrimaryImageTag?: string;
+  parentBackdropImageTag?: string;
+  parentBackdropItemId?: string;
+  thumbImageTag?: string;
   logoImageTag?: string;
   blurhash?: string;
   playbackPositionTicks: number;

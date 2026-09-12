@@ -39,12 +39,22 @@ export const HeroBanner = React.memo(function HeroBanner({
 
   const backdropUri = item.backdropImageTag
     ? getBackdropUrl(serverUrl, item.id, item.backdropImageTag, SCREEN_WIDTH)
+    : item.parentBackdropItemId || item.seriesId
+    ? getBackdropUrl(
+        serverUrl,
+        (item.parentBackdropItemId || item.seriesId)!,
+        item.parentBackdropImageTag || item.backdropImageTag,
+        SCREEN_WIDTH
+      )
     : item.primaryImageTag
     ? getPosterUrl(serverUrl, item.id, item.primaryImageTag, SCREEN_WIDTH)
     : "";
   const logoUri = item.logoImageTag
     ? getLogoUrl(serverUrl, item.id, item.logoImageTag, 400)
+    : item.seriesId
+    ? getLogoUrl(serverUrl, item.seriesId, undefined, 400)
     : undefined;
+  const displayTitle = item.type === "Episode" && item.seriesName ? item.seriesName : item.name;
 
   const formatRuntime = (mins?: number): string | null => {
     if (!mins || mins <= 0) return null;
@@ -61,7 +71,7 @@ export const HeroBanner = React.memo(function HeroBanner({
       style={styles.container}
       onPress={() => onPressDetails && onPressDetails(item)}
       accessibilityRole="imagebutton"
-      accessibilityLabel={`Featured: ${item.name}`}
+      accessibilityLabel={`Featured: ${displayTitle}`}
     >
       {/* Dynamic Backdrop */}
       <Image
@@ -92,11 +102,11 @@ export const HeroBanner = React.memo(function HeroBanner({
             source={{ uri: logoUri }}
             style={styles.logoImage}
             contentFit="contain"
-            accessibilityLabel={item.name}
+            accessibilityLabel={displayTitle}
           />
         ) : (
           <FinoraText variant="title" color="textPrimary" weight="800" style={styles.titleFallback}>
-            {item.name}
+            {displayTitle}
           </FinoraText>
         )}
 

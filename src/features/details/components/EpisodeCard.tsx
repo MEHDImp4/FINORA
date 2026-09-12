@@ -3,7 +3,7 @@ import { View, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { MediaItem } from "../../../types/media";
-import { getBackdropUrl } from "../../../core/repositories/imageUrlBuilder";
+import { getMediaThumbnailUrl } from "../../../core/repositories/imageUrlBuilder";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
 
@@ -18,11 +18,7 @@ const THUMBNAIL_HEIGHT = 73;
 
 export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
   ({ episode, serverUrl, onPlay }) => {
-    const thumbUri = episode.primaryImageTag
-      ? getBackdropUrl(serverUrl, episode.id, episode.primaryImageTag, 300)
-      : episode.backdropImageTag
-      ? getBackdropUrl(serverUrl, episode.id, episode.backdropImageTag, 300)
-      : null;
+    const thumbUri = getMediaThumbnailUrl(serverUrl, episode, 300);
 
     const hasProgress = episode.playedPercentage > 0 && !episode.isPlayed;
     const episodePrefix =

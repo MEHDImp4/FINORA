@@ -94,4 +94,23 @@ describe("EpisodeCard", () => {
       expect.arrayContaining([expect.objectContaining({ width: "55%" })])
     );
   });
+
+  it("uses 16:9 Primary image for episode thumbnail", () => {
+    let root: renderer.ReactTestRenderer;
+    act(() => {
+      root = renderer.create(
+        <EpisodeCard
+          episode={mockEpisode}
+          serverUrl="https://jellyfin.example.com"
+          onPlay={jest.fn()}
+        />
+      );
+    });
+
+    const instance = root!.root;
+    const image = instance.findByProps({ contentFit: "cover" });
+    expect(image.props.source.uri).toContain("/Items/ep-1/Images/Primary");
+    expect(image.props.source.uri).toContain("tag=tag-ep-thumb");
+    expect(image.props.source.uri).not.toContain("Backdrop");
+  });
 });

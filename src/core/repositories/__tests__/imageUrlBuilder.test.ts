@@ -2,7 +2,9 @@ import {
   buildImageUrl,
   getPosterUrl,
   getBackdropUrl,
-  getLogoUrl
+  getLogoUrl,
+  getMediaPosterUrl,
+  getMediaThumbnailUrl
 } from "../imageUrlBuilder";
 
 describe("imageUrlBuilder", () => {
@@ -52,5 +54,79 @@ describe("imageUrlBuilder", () => {
       apiKey: "secret-token-xyz"
     });
     expect(url).toContain("api_key=secret-token-xyz");
+  });
+
+  describe("getMediaPosterUrl", () => {
+    it("uses seriesId and seriesPrimaryImageTag for episodes", () => {
+      const episodeItem: any = {
+        id: "ep-1",
+        type: "Episode",
+        name: "Pilot",
+        seriesId: "series-99",
+        seriesPrimaryImageTag: "series-tag-123",
+        primaryImageTag: "ep-still-456"
+      };
+
+      const url = getMediaPosterUrl(baseUrl, episodeItem);
+      expect(url).toContain("/Items/series-99/Images/Primary");
+      expect(url).toContain("tag=series-tag-123");
+    });
+
+    it("uses item id and primaryImageTag for movies and series", () => {
+      const movieItem: any = {
+        id: "movie-1",
+        type: "Movie",
+        name: "Inception",
+        primaryImageTag: "movie-tag-123"
+      };
+
+      const url = getMediaPosterUrl(baseUrl, movieItem);
+      expect(url).toContain("/Items/movie-1/Images/Primary");
+      expect(url).toContain("tag=movie-tag-123");
+    });
+  });
+
+  describe("getMediaThumbnailUrl", () => {
+    it("uses episode Primary image (16:9 still frame) for episodes", () => {
+      const episodeItem: any = {
+        id: "ep-1",
+        type: "Episode",
+        name: "Pilot",
+        seriesId: "series-99",
+        primaryImageTag: "ep-still-456"
+      };
+
+      const url = getMediaThumbnailUrl(baseUrl, episodeItem);
+      expect(url).toContain("/Items/ep-1/Images/Primary");
+      expect(url).toContain("tag=ep-still-456");
+      expect(url).not.toContain("Backdrop");
+    });
+
+    it("falls back to series backdrop for episodes without still frame", () => {
+      const episodeWithoutStill: any = {
+        id: "ep-1",
+        type: "Episode",
+        name: "Pilot",
+        seriesId: "series-99",
+        parentBackdropImageTag: "series-bd-789"
+      };
+
+      const url = getMediaThumbnailUrl(baseUrl, episodeWithoutStill);
+      expect(url).toContain("/Items/series-99/Images/Backdrop");
+      expect(url).toContain("tag=series-bd-789");
+    });
+
+    it("uses item backdrop for movies and series", () => {
+      const movieItem: any = {
+        id: "movie-1",
+        type: "Movie",
+        name: "Inception",
+        backdropImageTag: "bd-tag-abc"
+      };
+
+      const url = getMediaThumbnailUrl(baseUrl, movieItem);
+      expect(url).toContain("/Items/movie-1/Images/Backdrop");
+      expect(url).toContain("tag=bd-tag-abc");
+    });
   });
 });

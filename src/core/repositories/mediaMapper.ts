@@ -67,8 +67,16 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
     backdropImageTag = dto.ImageTags.Backdrop;
   }
 
+  let parentBackdropImageTag: string | undefined = undefined;
+  if (Array.isArray(dto.ParentBackdropImageTags) && dto.ParentBackdropImageTags.length > 0) {
+    parentBackdropImageTag = dto.ParentBackdropImageTags[0];
+  }
+
+  const parentBackdropItemId = dto.ParentBackdropItemId || undefined;
+  const seriesPrimaryImageTag = dto.SeriesPrimaryImageTag || undefined;
   const primaryImageTag = dto.ImageTags?.Primary;
-  const logoImageTag = dto.ImageTags?.Logo;
+  const logoImageTag = dto.ImageTags?.Logo || dto.ParentLogoImageTag || undefined;
+  const thumbImageTag = dto.ImageTags?.Thumb || dto.ParentThumbImageTag || undefined;
 
   let tagline: string | undefined = undefined;
   if (Array.isArray(dto.Taglines) && dto.Taglines.length > 0) {
@@ -138,6 +146,10 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
     genres: Array.isArray(dto.Genres) ? dto.Genres : [],
     backdropImageTag,
     primaryImageTag,
+    seriesPrimaryImageTag,
+    parentBackdropImageTag,
+    parentBackdropItemId,
+    thumbImageTag,
     logoImageTag,
     blurhash,
     playbackPositionTicks,

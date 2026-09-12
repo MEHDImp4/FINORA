@@ -60,15 +60,34 @@ describe("MediaCard", () => {
     expect(progressFill).toBeDefined();
   });
 
-  it("dispatches onPress callback when pressed", () => {
+  it("calls onPress when pressed", () => {
     const onPressMock = jest.fn();
     const component = ReactTestRenderer.create(
       <MediaCard item={sampleItem} serverUrl={serverUrl} onPress={onPressMock} />
     );
 
-    const pressable = component.root.findByProps({ accessibilityRole: "button" });
+    const pressable = component.root.findByType("Pressable" as any);
     pressable.props.onPress();
-
     expect(onPressMock).toHaveBeenCalledWith(sampleItem);
+  });
+
+  it("renders series name and episode subtitle when item is an Episode", () => {
+    const episodeItem: MediaItem = {
+      ...sampleItem,
+      id: "ep-1",
+      name: "Pilot",
+      type: "Episode",
+      seriesName: "Breaking Bad",
+      seasonIndex: 1,
+      episodeIndex: 1
+    };
+
+    const component = ReactTestRenderer.create(
+      <MediaCard item={episodeItem} serverUrl={serverUrl} variant="thumbnail" />
+    );
+
+    const root = component.root;
+    expect(root.findByProps({ children: "Breaking Bad" })).toBeDefined();
+    expect(root.findByProps({ children: "S1:E1 · Pilot" })).toBeDefined();
   });
 });

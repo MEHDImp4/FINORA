@@ -1,9 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, StyleSheet, Pressable, StyleProp, ViewStyle } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { MediaItem } from "../../../types/media";
-import { getPosterUrl, getBackdropUrl } from "../../../core/repositories/imageUrlBuilder";
+import {
+  getMediaPosterUrl,
+  getMediaThumbnailUrl
+} from "../../../core/repositories/imageUrlBuilder";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
 import { hapticService } from "../../../core/feedback/hapticService";
@@ -36,18 +39,34 @@ export const MediaCard = React.memo(
     style,
     onPress
   }: MediaCardProps) {
-    const [imageError, setImageError] = useState(false);
     const isThumbnail = variant === "thumbnail";
     const width = cardWidth ?? (isThumbnail ? THUMBNAIL_WIDTH : POSTER_WIDTH);
     const height = cardHeight ?? (isThumbnail ? THUMBNAIL_HEIGHT : POSTER_HEIGHT);
 
-    // Determine target image URL: Thumbnails prefer backdrop or primary, posters prefer primary
+    // Determine target image URL: Thumbnails prefer 16:9 (episode still / backdrop), posters prefer 2:3 (series poster / movie poster)
     const imageUrl = isThumbnail
-      ? getBackdropUrl(serverUrl, item.id, item.backdropImageTag || item.primaryImageTag, width)
-      : getPosterUrl(serverUrl, item.id, item.primaryImageTag, width);
+      ? getMediaThumbnailUrl(serverUrl, item, width)
+      : getMediaPosterUrl(serverUrl, item, width);
+
+    const [imageError, setImageError] = useState(false);
+    useEffect(() => {
+      setImageError(false);
+    }, [imageUrl]);
 
     const hasProgress = item.playedPercentage > 0 && !item.isPlayed;
     const progressLabel = hasProgress ? `, ${Math.round(item.playedPercentage)}% watched` : "";
+
+    const isEpisode = item.type === "Episode";
+    const mainTitle = isEpisode && item.seriesName ? item.seriesName : item.name;
+    const subTitle = isEpisode
+      ? typeof item.episodeIndex === "number"
+        ? typeof item.seasonIndex === "number"
+          ? `S${item.seasonIndex}:E${item.episodeIndex} · ${item.name}`
+          : `E${item.episodeIndex} · ${item.name}`
+        : item.name
+      : item.year
+      ? String(item.year)
+      : null;
 
     const handlePress = () => {
       hapticService.impactLight();
@@ -67,7 +86,7 @@ export const MediaCard = React.memo(
         ]}
         onPress={handlePress}
         accessibilityRole="button"
-        accessibilityLabel={`${item.name}${item.year ? `, ${item.year}` : ""}${progressLabel}`}
+        accessibilityLabel={`${mainTitle}${subTitle ? `, ${subTitle}` : ""}${progressLabel}`}
         accessibilityHint="Double tap to open media details"
       >
         {/* Media Poster / Thumbnail Image */}
@@ -79,6 +98,7 @@ export const MediaCard = React.memo(
               style={styles.image}
               contentFit="cover"
               transition={200}
+              cachePolicy="memory-disk"
               onError={() => setImageError(true)}
             />
           ) : (
@@ -94,7 +114,7 @@ export const MediaCard = React.memo(
                 numberOfLines={2}
                 style={styles.fallbackText}
               >
-                {item.name}
+                {mainTitle}
               </FinoraText>
             </View>
           )}
@@ -121,17 +141,23 @@ export const MediaCard = React.memo(
             numberOfLines={1}
             style={styles.titleText}
           >
-            {item.name}
+            {mainTitle}
           </FinoraText>
 
           <View style={styles.subrow}>
-            {item.year ? (
-              <FinoraText variant="caption" color="textMuted" weight="500">
-                {item.year}
+            {subTitle ? (
+              <FinoraText
+                variant="caption"
+                color="textMuted"
+                weight="500"
+                numberOfLines={1}
+                style={{ flex: 1, marginRight: 4 }}
+              >
+                {subTitle}
               </FinoraText>
             ) : null}
 
-            {item.communityRating ? (
+            {!isEpisode && item.communityRating ? (
               <View style={styles.ratingRow}>
                 <Ionicons name="star" size={10} color={colors.accent} style={styles.starIcon} />
                 <FinoraText variant="caption" color="accent" weight="700">

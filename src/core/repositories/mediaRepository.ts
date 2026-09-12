@@ -16,6 +16,9 @@ export interface GetItemsOptions {
   recursive?: boolean;
 }
 
+const MEDIA_FIELDS =
+  "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ParentBackdropImageTags,ParentBackdropItemId,SeriesPrimaryImageTag,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber,SeriesId,SeriesName,SeasonId";
+
 export class MediaRepository {
   private client: JellyfinClient;
 
@@ -55,7 +58,7 @@ export class MediaRepository {
       Limit: options.limit,
       StartIndex: options.startIndex,
       Recursive: options.recursive ?? true,
-      Fields: "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber"
+      Fields: MEDIA_FIELDS
     };
 
     if (options.includeItemTypes && options.includeItemTypes.length > 0) {
@@ -90,7 +93,7 @@ export class MediaRepository {
     const http = this.getHttp(customClient);
     const params: Record<string, string | number | boolean | undefined> = {
       Limit: limit,
-      Fields: "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber",
+      Fields: MEDIA_FIELDS,
       EnableImageTypes: "Primary,Backdrop,Thumb"
     };
 
@@ -116,7 +119,7 @@ export class MediaRepository {
     const params: Record<string, string | number | boolean | undefined> = {
       ParentId: parentId,
       Limit: limit,
-      Fields: "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber",
+      Fields: MEDIA_FIELDS,
       EnableImageTypes: "Primary,Backdrop,Thumb"
     };
 
@@ -140,8 +143,7 @@ export class MediaRepository {
     const http = this.getHttp(customClient);
     const dto = await http.request<any>(`/Users/${userId}/Items/${itemId}`, {
       params: {
-        Fields:
-          "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,OfficialRating,Taglines,People,MediaStreams,MediaSources,ImageTags,BackdropImageTags,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber"
+        Fields: `${MEDIA_FIELDS},OfficialRating,Taglines,People,MediaStreams,MediaSources`
       }
     });
     return mapJellyfinItemToMediaItem(dto);
