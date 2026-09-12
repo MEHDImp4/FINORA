@@ -96,11 +96,12 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   // If user selected a non-default audio track and video is supported:
   // Use Direct Stream with copy video and copy/transcode audio with AudioStreamIndex
   if (!isDefaultAudioSelected && isVideoSupported) {
-    const targetAudioCodec = isAudioSupported ? "copy" : "aac";
-    const audioChannelsParam = !isAudioSupported ? "&audioChannels=2" : "";
+    const isSourceAac = normAudioCodec === "aac";
+    const targetAudioCodec = isSourceAac ? "copy" : "aac";
+    const audioChannelsParam = !isSourceAac ? "&audioChannels=2" : "";
     const directStreamUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=copy&audioCodec=${targetAudioCodec}${audioChannelsParam}${
       token ? `&api_key=${encodeURIComponent(token)}` : ""
-    }${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`;
+    }${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls&allowVideoStreamCopy=true`;
 
     return {
       mode: "direct-stream",

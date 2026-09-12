@@ -75,52 +75,90 @@ export function findMatchingAudioTrack(
 
   const targetOrdinal = audioStreams.findIndex((s) => s.index === targetStreamIndex);
   const targetStream = targetOrdinal >= 0 ? audioStreams[targetOrdinal] : undefined;
+  if (!targetStream) return undefined;
 
-  // 1. Direct ID match (e.g. t.id === "2" or t.id === "1/2")
+  const targetNorm = normalizeLanguage(targetStream.language);
+  const targetTitle = (targetStream.displayTitle || (targetStream as any).title || "").toLowerCase();
+
+  // 1. Language match (primary criteria)
+  if (targetNorm) {
+    // Find all tracks matching target language
+    const langCandidates = availableTracks.filter((t) => {
+      const trackNorm = normalizeLanguage(t.language);
+      if (trackNorm && trackNorm === targetNorm) return true;
+      const trackLabel = (t.label || "").toLowerCase();
+      if (trackLabel && (trackLabel === targetNorm || trackLabel.startsWith(`${targetNorm} `) || trackLabel.includes(`(${targetNorm})`))) {
+        return true;
+      }
+      return false;
+    });
+
+    if (langCandidates.length === 1) {
+      return langCandidates[0];
+    }
+
+    if (langCandidates.length > 1) {
+      // Multiple tracks of same language: match title or channel/codec layout
+      if (targetTitle) {
+        const byTitle = langCandidates.find((t) => {
+          const trackLabel = (t.label || "").toLowerCase();
+          const trackName = (t.name || "").toLowerCase();
+          return (
+            (trackLabel && (targetTitle.includes(trackLabel) || trackLabel.includes(targetTitle))) ||
+            (trackName && (targetTitle.includes(trackName) || trackName.includes(targetTitle)))
+          );
+        });
+        if (byTitle) return byTitle;
+      }
+
+      // Match relative ordinal among tracks with same language
+      const sameLangStreams = audioStreams.filter((s) => normalizeLanguage(s.language) === targetNorm);
+      const streamLangRank = sameLangStreams.findIndex((s) => s.index === targetStreamIndex);
+      if (streamLangRank >= 0 && streamLangRank < langCandidates.length) {
+        return langCandidates[streamLangRank];
+      }
+
+      return langCandidates[0];
+    }
+  }
+
+  // 2. Title / Label match (if language wasn't matched or wasn't specified)
+  if (targetTitle) {
+    const byTitle = availableTracks.find((t) => {
+      const trackLabel = (t.label || "").toLowerCase();
+      const trackName = (t.name || "").toLowerCase();
+      return (
+        (trackLabel && (targetTitle.includes(trackLabel) || trackLabel.includes(targetTitle))) ||
+        (trackName && (targetTitle.includes(trackName) || trackName.includes(targetTitle)))
+      );
+    });
+    if (byTitle) return byTitle;
+  }
+
+  // 3. ID match ONLY IF languages don't conflict
   const byId = availableTracks.find(
     (t) =>
       t.id === String(targetStreamIndex) ||
-      (targetStream?.index !== undefined && t.id?.endsWith?.(`/${targetStream.index}`))
+      (targetStream.index !== undefined && t.id?.endsWith?.(`/${targetStream.index}`))
   );
-  if (byId) return byId;
-
-  // 2. Normalized language & title heuristics
-  if (targetStream) {
-    const targetNorm = normalizeLanguage(targetStream.language);
-    const targetTitle = (targetStream.displayTitle || (targetStream as any).title || "").toLowerCase();
-
-    // Check language match
-    if (targetNorm) {
-      const byLang = availableTracks.find((t) => {
-        const trackNorm = normalizeLanguage(t.language);
-        if (trackNorm && trackNorm === targetNorm) return true;
-        const trackLabel = (t.label || "").toLowerCase();
-        if (trackLabel && (trackLabel.startsWith(targetNorm) || trackLabel.includes(targetNorm))) return true;
-        return false;
-      });
-      if (byLang) return byLang;
-    }
-
-    // Check display title or label substring
-    if (targetTitle) {
-      const byTitle = availableTracks.find((t) => {
-        const trackLabel = (t.label || "").toLowerCase();
-        const trackName = (t.name || "").toLowerCase();
-        return (
-          (trackLabel && (targetTitle.includes(trackLabel) || trackLabel.includes(targetTitle))) ||
-          (trackName && (targetTitle.includes(trackName) || trackName.includes(targetTitle)))
-        );
-      });
-      if (byTitle) return byTitle;
+  if (byId) {
+    const trackNorm = normalizeLanguage(byId.language);
+    // If target has a language and track has a language, they must not conflict
+    if (!targetNorm || !trackNorm || targetNorm === trackNorm) {
+      return byId;
     }
   }
 
-  // 3. Container stream ordinal fallback
-  // In container formats (MKV, MP4), tracks in ExoPlayer are enumerated in identical order to Jellyfin
+  // 4. Ordinal fallback ONLY IF languages don't conflict
   if (targetOrdinal >= 0 && targetOrdinal < availableTracks.length) {
-    return availableTracks[targetOrdinal];
+    const candidate = availableTracks[targetOrdinal];
+    const candidateNorm = normalizeLanguage(candidate?.language);
+    if (!targetNorm || !candidateNorm || targetNorm === candidateNorm) {
+      return candidate;
+    }
   }
 
+  // No reliable match found: return undefined so Tier 2 server stream switch can take over
   return undefined;
 }
 
@@ -144,43 +182,75 @@ export function findMatchingSubtitleTrack(
 
   const targetOrdinal = subtitleStreams.findIndex((s) => s.index === targetStreamIndex);
   const targetStream = targetOrdinal >= 0 ? subtitleStreams[targetOrdinal] : undefined;
+  if (!targetStream) return undefined;
 
-  // 1. Direct ID match (e.g. t.id === "2" or t.id === "1/2")
-  const byId = availableTracks.find(
-    (t) =>
-      t.id === String(targetStreamIndex) ||
-      (targetStream?.index !== undefined && t.id?.endsWith?.(`/${targetStream.index}`))
-  );
-  if (byId) return byId;
+  const targetNorm = normalizeLanguage(targetStream.language);
+  const targetTitle = (targetStream.displayTitle || (targetStream as any).title || "").toLowerCase();
 
-  // 2. Normalized language & title heuristics
-  if (targetStream) {
-    const targetNorm = normalizeLanguage(targetStream.language);
-    const targetTitle = (targetStream.displayTitle || (targetStream as any).title || "").toLowerCase();
+  // 1. Language match (primary criteria)
+  if (targetNorm) {
+    const langCandidates = availableTracks.filter((t) => {
+      const trackNorm = normalizeLanguage(t.language);
+      if (trackNorm && trackNorm === targetNorm) return true;
+      const trackLabel = (t.label || "").toLowerCase();
+      if (trackLabel && (trackLabel === targetNorm || trackLabel.startsWith(`${targetNorm} `) || trackLabel.includes(`(${targetNorm})`))) {
+        return true;
+      }
+      return false;
+    });
 
-    if (targetNorm) {
-      const byLang = availableTracks.find((t) => {
-        const trackNorm = normalizeLanguage(t.language);
-        if (trackNorm && trackNorm === targetNorm) return true;
-        const trackLabel = (t.label || "").toLowerCase();
-        if (trackLabel && (trackLabel.startsWith(targetNorm) || trackLabel.includes(targetNorm))) return true;
-        return false;
-      });
-      if (byLang) return byLang;
+    if (langCandidates.length === 1) {
+      return langCandidates[0];
     }
 
-    if (targetTitle) {
-      const byTitle = availableTracks.find((t) => {
-        const trackLabel = (t.label || "").toLowerCase();
-        return trackLabel && (targetTitle.includes(trackLabel) || trackLabel.includes(targetTitle));
-      });
-      if (byTitle) return byTitle;
+    if (langCandidates.length > 1) {
+      if (targetTitle) {
+        const byTitle = langCandidates.find((t) => {
+          const trackLabel = (t.label || "").toLowerCase();
+          return trackLabel && (targetTitle.includes(trackLabel) || trackLabel.includes(targetTitle));
+        });
+        if (byTitle) return byTitle;
+      }
+
+      const sameLangStreams = subtitleStreams.filter((s) => normalizeLanguage(s.language) === targetNorm);
+      const streamLangRank = sameLangStreams.findIndex((s) => s.index === targetStreamIndex);
+      if (streamLangRank >= 0 && streamLangRank < langCandidates.length) {
+        return langCandidates[streamLangRank];
+      }
+
+      return langCandidates[0];
     }
   }
 
-  // 3. Container stream ordinal fallback
+  // 2. Title match
+  if (targetTitle) {
+    const byTitle = availableTracks.find((t) => {
+      const trackLabel = (t.label || "").toLowerCase();
+      return trackLabel && (targetTitle.includes(trackLabel) || trackLabel.includes(targetTitle));
+    });
+    if (byTitle) return byTitle;
+  }
+
+  // 3. ID match ONLY IF languages don't conflict
+  const byId = availableTracks.find(
+    (t) =>
+      t.id === String(targetStreamIndex) ||
+      (targetStream.index !== undefined && t.id?.endsWith?.(`/${targetStream.index}`))
+  );
+  if (byId) {
+    const trackNorm = normalizeLanguage(byId.language);
+    if (!targetNorm || !trackNorm || targetNorm === trackNorm) {
+      return byId;
+    }
+  }
+
+  // 4. Ordinal fallback ONLY IF languages don't conflict
   if (targetOrdinal >= 0 && targetOrdinal < availableTracks.length) {
-    return availableTracks[targetOrdinal];
+    const candidate = availableTracks[targetOrdinal];
+    const candidateNorm = normalizeLanguage(candidate?.language);
+    if (!targetNorm || !candidateNorm || targetNorm === candidateNorm) {
+      return candidate;
+    }
   }
 
   return undefined;

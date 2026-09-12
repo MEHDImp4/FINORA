@@ -105,6 +105,28 @@ describe("trackUtils", () => {
       const match = findMatchingAudioTrack(availableTracks, audioStreams, 5);
       expect(match).toEqual(availableTracks[2]);
     });
+
+    it("returns undefined when available tracks only contain another language (rejects false positive)", () => {
+      // In HLS / server transcode, often only 1 track (e.g. English) is available in memory
+      const singleTrackEnglish = [
+        { id: "2", language: "en", label: "English" }
+      ];
+
+      // Requesting French (index 2 in audioStreams) MUST NOT return English just because id === "2" or ordinal === 0
+      const match = findMatchingAudioTrack(singleTrackEnglish, audioStreams, 2);
+      expect(match).toBeUndefined();
+    });
+
+    it("does not fall back to ordinal if language conflicts", () => {
+      const conflictingTracks = [
+        { id: "10", language: "de", label: "German" },
+        { id: "11", language: "es", label: "Spanish" }
+      ];
+
+      // Stream index 1 is English; neither German nor Spanish should be returned
+      const match = findMatchingAudioTrack(conflictingTracks, audioStreams, 1);
+      expect(match).toBeUndefined();
+    });
   });
 
   describe("findMatchingSubtitleTrack", () => {

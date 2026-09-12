@@ -350,10 +350,15 @@ export function PlayerScreen({
           setTracksModalVisible(false);
 
           const audioStreams = item.mediaStreams?.filter((s) => s.type === "Audio") || [];
+          const targetStream = audioStreams.find((s) => s.index === idx);
           const currentTracks =
             player.availableAudioTracks && player.availableAudioTracks.length > 0
               ? player.availableAudioTracks
               : availableAudioTracks;
+
+          logger.info(
+            `[PlayerScreen] onSelectAudio requested for stream index ${idx} (${targetStream?.displayTitle || targetStream?.language || "unknown"}). Available native tracks: ${currentTracks?.length || 0}`
+          );
 
           // Tier 1: Instant native track switch without interrupting or reloading playback
           if (currentTracks && currentTracks.length > 0) {
@@ -372,7 +377,9 @@ export function PlayerScreen({
           }
 
           // Tier 2: Server transcode/remux stream replacement fallback
-          logger.info(`[PlayerScreen] Requesting server-side audio switch for stream index ${idx}`);
+          logger.info(
+            `[PlayerScreen] Tier 2 server-side audio switch required for stream index ${idx} (${targetStream?.displayTitle || targetStream?.language || "unknown"})`
+          );
           setServerAudioIndex(idx);
         }}
         onSelectSubtitle={(idx) => {

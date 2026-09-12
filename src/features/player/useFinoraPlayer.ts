@@ -78,7 +78,7 @@ export function useFinoraPlayer({
         player
           .replaceAsync(videoSource)
           .then(() => {
-            if (pendingSeekPositionRef.current !== null) {
+            if (player.status === "readyToPlay" && pendingSeekPositionRef.current !== null) {
               const targetPos = pendingSeekPositionRef.current;
               const shouldPlay = pendingPlayRef.current;
               pendingSeekPositionRef.current = null;
