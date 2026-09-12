@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
   ActivityIndicator,
   StatusBar
 } from "react-native";
+import * as ScreenOrientation from "expo-screen-orientation";
 import { VideoView } from "expo-video";
 import { MediaItem } from "../../../types/media";
 import { useFinoraPlayer } from "../useFinoraPlayer";
@@ -45,6 +46,47 @@ export function PlayerScreen({
   const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | undefined>(undefined);
   const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState<number | null>(null);
   const [selectedQuality, setSelectedQuality] = useState<string>("auto");
+  const [isLandscape, setIsLandscape] = useState(false);
+
+  // Auto/Manual screen orientation handling
+  useEffect(() => {
+    ScreenOrientation.unlockAsync().catch(() => {});
+
+    ScreenOrientation.getOrientationAsync()
+      .then((orientation) => {
+        const isLand =
+          orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
+          orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT;
+        setIsLandscape(isLand);
+      })
+      .catch(() => {});
+
+    const subscription = ScreenOrientation.addOrientationChangeListener((event) => {
+      const isLand =
+        event.orientationInfo.orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
+        event.orientationInfo.orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT;
+      setIsLandscape(isLand);
+    });
+
+    return () => {
+      subscription.remove();
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+    };
+  }, []);
+
+  const handleToggleOrientation = async () => {
+    try {
+      if (isLandscape) {
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+        setIsLandscape(false);
+      } else {
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        setIsLandscape(true);
+      }
+    } catch {
+      // Ignored
+    }
+  };
 
   // Scrubbing & Trickplay state
   const [isScrubbing, setIsScrubbing] = useState(false);
@@ -88,6 +130,7 @@ export function PlayerScreen({
 
   const handleBack = () => {
     controls.pause();
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
     onBack();
   };
 
@@ -164,6 +207,8 @@ export function PlayerScreen({
         onBack={handleBack}
         onOpenTracks={() => setTracksModalVisible(true)}
         onOpenStats={() => setStatsModalVisible(true)}
+        onToggleOrientation={handleToggleOrientation}
+        isLandscape={isLandscape}
         onScrubbingChange={setIsScrubbing}
         onScrubMove={(seconds, percent) => {
           setScrubPositionSeconds(seconds);

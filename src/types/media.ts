@@ -62,6 +62,8 @@ export interface MediaItem {
   people?: Person[];
   mediaStreams?: MediaStreamInfo[];
   chapters?: ChapterMarker[];
+  container?: string;
+  mediaSourceId?: string;
 }
 
 export interface MediaLibrary {

@@ -141,7 +141,7 @@ export class MediaRepository {
     const dto = await http.request<any>(`/Users/${userId}/Items/${itemId}`, {
       params: {
         Fields:
-          "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,OfficialRating,Taglines,People,MediaStreams,ImageTags,BackdropImageTags,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber"
+          "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,OfficialRating,Taglines,People,MediaStreams,MediaSources,ImageTags,BackdropImageTags,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber"
       }
     });
     return mapJellyfinItemToMediaItem(dto);

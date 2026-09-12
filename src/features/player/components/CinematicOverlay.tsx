@@ -26,6 +26,8 @@ export interface CinematicOverlayProps {
   onBack: () => void;
   onOpenTracks: () => void;
   onOpenStats?: () => void;
+  onToggleOrientation?: () => void;
+  isLandscape?: boolean;
   onScrubbingChange?: (isScrubbing: boolean) => void;
   onScrubMove?: (seconds: number, percent: number) => void;
   autoHideMs?: number;
@@ -46,6 +48,8 @@ export function CinematicOverlay({
   onBack,
   onOpenTracks,
   onOpenStats,
+  onToggleOrientation,
+  isLandscape = false,
   onScrubbingChange,
   onScrubMove,
   autoHideMs = 4000
@@ -79,17 +83,12 @@ export function CinematicOverlay({
   };
 
   if (!visible) {
-    return (
-      <Pressable
-        style={styles.hiddenSurfaceTouch}
-        onPress={onToggleVisible}
-        testID="overlay-surface-touch"
-      />
-    );
+    return null;
   }
 
   return (
-    <Pressable
+    <View
+      pointerEvents="box-none"
       style={[
         styles.overlayContainer,
         {
@@ -99,9 +98,15 @@ export function CinematicOverlay({
           paddingRight: Math.max(insets.right, spacing.lg)
         }
       ]}
-      onPress={handleInteraction}
       testID="cinematic-overlay"
     >
+      {/* Backdrop touch area to dismiss overlay */}
+      <Pressable
+        style={styles.overlayBackdrop}
+        onPress={onToggleVisible}
+        testID="overlay-backdrop"
+      />
+
       {/* Top Bar (Back, Title, Actions) */}
       <View style={styles.topBar} testID="overlay-top-bar">
         <FinoraIconButton
@@ -139,6 +144,26 @@ export function CinematicOverlay({
               testID="overlay-stats-button"
             >
               <Ionicons name="information-circle-outline" size={20} color="#FFFFFF" />
+            </FinoraIconButton>
+          )}
+
+          {Boolean(onToggleOrientation) && (
+            <FinoraIconButton
+              accessibilityLabel={isLandscape ? "Switch to portrait" : "Switch to landscape"}
+              onPress={() => {
+                resetTimer();
+                onToggleOrientation?.();
+              }}
+              size={36}
+              backgroundColor="rgba(20, 20, 26, 0.6)"
+              style={styles.actionButton}
+              testID="overlay-orientation-button"
+            >
+              <Ionicons
+                name={isLandscape ? "phone-portrait-outline" : "scan-outline"}
+                size={18}
+                color="#FFFFFF"
+              />
             </FinoraIconButton>
           )}
 
@@ -236,21 +261,20 @@ export function CinematicOverlay({
           onScrubMove={onScrubMove}
         />
       </View>
-    </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  hiddenSurfaceTouch: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "transparent"
-  },
   overlayContainer: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0, 0, 0, 0.55)",
     justifyContent: "space-between",
     padding: spacing.lg,
     zIndex: 20
+  },
+  overlayBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(0, 0, 0, 0.55)"
   },
   topBar: {
     flexDirection: "row",

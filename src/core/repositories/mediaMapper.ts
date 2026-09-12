@@ -87,8 +87,19 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
       }))
     : undefined;
 
-  const mediaStreams = Array.isArray(dto.MediaStreams)
-    ? dto.MediaStreams.map((s: any) => ({
+  // Extract MediaStreams and container (supports both root and MediaSources[0])
+  const primaryMediaSource = Array.isArray(dto.MediaSources) && dto.MediaSources.length > 0
+    ? dto.MediaSources[0]
+    : undefined;
+
+  const rawStreams = Array.isArray(dto.MediaStreams) && dto.MediaStreams.length > 0
+    ? dto.MediaStreams
+    : Array.isArray(primaryMediaSource?.MediaStreams)
+    ? primaryMediaSource.MediaStreams
+    : undefined;
+
+  const mediaStreams = rawStreams
+    ? rawStreams.map((s: any) => ({
         type: s.Type as "Video" | "Audio" | "Subtitle",
         index: typeof s.Index === "number" ? s.Index : undefined,
         codec: s.Codec || undefined,
@@ -101,6 +112,9 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
         isDefault: Boolean(s.IsDefault)
       }))
     : undefined;
+
+  const container = primaryMediaSource?.Container || dto.Container || undefined;
+  const mediaSourceId = primaryMediaSource?.Id || undefined;
 
   const chapters = Array.isArray(dto.Chapters)
     ? dto.Chapters.map((c: any) => ({
@@ -138,7 +152,9 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
     episodeIndex: typeof dto.IndexNumber === "number" ? dto.IndexNumber : undefined,
     people,
     mediaStreams,
-    chapters
+    chapters,
+    container,
+    mediaSourceId
   };
 }
 

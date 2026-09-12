@@ -5,6 +5,7 @@ module.exports = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
     "^expo-video$": "<rootDir>/__mocks__/expo-video.js",
+    "^expo-screen-orientation$": "<rootDir>/__mocks__/expo-screen-orientation.js",
     "^react-test-renderer$": "<rootDir>/__mocks__/react-test-renderer.js"
   },
   transform: {
