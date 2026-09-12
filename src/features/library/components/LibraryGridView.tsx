@@ -10,7 +10,9 @@ interface LibraryGridViewProps {
   serverUrl: string;
   isLoading: boolean;
   onItemPress: (item: MediaItem) => void;
+  emptyTitle?: string;
   emptyMessage?: string;
+  loadingMessage?: string;
 }
 
 const HORIZONTAL_PADDING = spacing.md; // 16
@@ -21,7 +23,9 @@ export const LibraryGridView = React.memo(function LibraryGridView({
   serverUrl,
   isLoading,
   onItemPress,
-  emptyMessage = "No media found in this library"
+  emptyTitle = "No Items",
+  emptyMessage = "No media found in this library",
+  loadingMessage = "Loading library items..."
 }: LibraryGridViewProps) {
   const screenWidth = Dimensions.get("window").width || 375;
   const cardWidth = Math.max(90, Math.floor((screenWidth - (HORIZONTAL_PADDING * 2) - (GRID_GAP * 2)) / 3));
@@ -50,7 +54,7 @@ export const LibraryGridView = React.memo(function LibraryGridView({
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
         <FinoraText variant="caption" style={styles.loadingText}>
-          Loading library items...
+          {loadingMessage}
         </FinoraText>
       </View>
     );
@@ -72,7 +76,7 @@ export const LibraryGridView = React.memo(function LibraryGridView({
         !isLoading ? (
           <View style={styles.centerContainer}>
             <FinoraText variant="title" style={styles.emptyTitle}>
-              No Items
+              {emptyTitle}
             </FinoraText>
             <FinoraText variant="caption" style={styles.emptySubtitle}>
               {emptyMessage}

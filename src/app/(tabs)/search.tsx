@@ -18,7 +18,7 @@ import { SearchHistoryList } from "../../features/search/components/SearchHistor
 import { searchHistoryService } from "../../features/search/searchHistory";
 import { useSearchMedia } from "../../hooks/useSearchQueries";
 import { useAuthStore } from "../../stores/authStore";
-import { MediaCard } from "../../features/home/components/MediaCard";
+import { LibraryGridView } from "../../features/library/components/LibraryGridView";
 import { MediaItem } from "../../types/media";
 import { FinoraText } from "../../design-system/components/FinoraText";
 import { colors, spacing } from "../../design-system/tokens";
@@ -89,20 +89,6 @@ export default function SearchScreen() {
     [query, router]
   );
 
-  const renderItem = useCallback(
-    ({ item }: { item: MediaItem }) => (
-      <View style={styles.gridItem}>
-        <MediaCard
-          item={item}
-          serverUrl={serverUrl}
-          variant="poster"
-          onPress={handleItemPress}
-        />
-      </View>
-    ),
-    [serverUrl, handleItemPress]
-  );
-
   const hasSearchTerm = query.trim().length > 0;
   const isSearching = (isLoading || isFetching) && debouncedQuery.trim().length >= 2;
 
@@ -124,37 +110,25 @@ export default function SearchScreen() {
         />
       </View>
 
-      {isSearching && results.length === 0 ? (
-        <View style={styles.centeredState}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <FinoraText variant="caption" style={styles.stateSubtitle}>
-            Searching catalog...
-          </FinoraText>
+      {hasSearchTerm ? (
+        <View style={styles.resultsContainer}>
+          {results.length > 0 && (
+            <View style={styles.resultsHeader}>
+              <FinoraText variant="caption" color="textSecondary" weight="600">
+                {results.length} {results.length === 1 ? "item found" : "items found"}
+              </FinoraText>
+            </View>
+          )}
+          <LibraryGridView
+            items={results}
+            serverUrl={serverUrl}
+            isLoading={isSearching}
+            onItemPress={handleItemPress}
+            loadingMessage="Searching catalog..."
+            emptyTitle="No Results Found"
+            emptyMessage="Try a different search term or category"
+          />
         </View>
-      ) : hasSearchTerm ? (
-        <FlatList
-          data={results}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          numColumns={3}
-          contentContainerStyle={styles.gridContainer}
-          initialNumToRender={12}
-          maxToRenderPerBatch={12}
-          windowSize={5}
-          removeClippedSubviews={true}
-          ListEmptyComponent={
-            !isLoading && debouncedQuery.trim().length >= 2 ? (
-              <View style={styles.centeredState}>
-                <FinoraText variant="title" style={styles.stateTitle}>
-                  No Results Found
-                </FinoraText>
-                <FinoraText variant="caption" style={styles.stateSubtitle}>
-                  Try a different search term or category
-                </FinoraText>
-              </View>
-            ) : null
-          }
-        />
       ) : (
         <View style={styles.idleContainer}>
           <SearchHistoryList
@@ -188,15 +162,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm
   },
-  gridContainer: {
-    paddingHorizontal: spacing.sm,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl
+  resultsContainer: {
+    flex: 1
   },
-  gridItem: {
-    flex: 1 / 3,
-    alignItems: "center",
-    marginBottom: spacing.md
+  resultsHeader: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs
   },
   idleContainer: {
     flex: 1
