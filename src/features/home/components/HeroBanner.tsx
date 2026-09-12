@@ -130,7 +130,7 @@ export const HeroBanner = React.memo(function HeroBanner({
         <View style={styles.badgeRow}>
           {item.year ? (
             <View style={styles.badge}>
-              <FinoraText variant="caption" color="textSecondary" weight="600">
+              <FinoraText variant="caption" color="textPrimary" weight="700">
                 {item.year}
               </FinoraText>
             </View>
@@ -138,7 +138,7 @@ export const HeroBanner = React.memo(function HeroBanner({
 
           {runtimeString ? (
             <View style={styles.badge}>
-              <FinoraText variant="caption" color="textSecondary" weight="600">
+              <FinoraText variant="caption" color="textPrimary" weight="700">
                 {runtimeString}
               </FinoraText>
             </View>
@@ -157,7 +157,7 @@ export const HeroBanner = React.memo(function HeroBanner({
 
           {primaryGenre ? (
             <View style={styles.badge}>
-              <FinoraText variant="caption" color="textSecondary" weight="600">
+              <FinoraText variant="caption" color="textPrimary" weight="700">
                 {primaryGenre}
               </FinoraText>
             </View>
@@ -246,16 +246,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.22)",
-    borderColor: "rgba(255, 255, 255, 0.15)",
-    borderWidth: 0.5,
+    backgroundColor: "rgba(255, 255, 255, 0.38)",
+    borderColor: "rgba(255, 255, 255, 0.30)",
+    borderWidth: 1,
     paddingVertical: 4,
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
     borderRadius: 6
   },
   ratingBadge: {
-    backgroundColor: "rgba(255, 184, 0, 0.25)",
-    borderColor: "rgba(255, 215, 0, 0.4)",
+    backgroundColor: "rgba(255, 184, 0, 0.45)",
+    borderColor: "rgba(255, 215, 0, 0.70)",
     borderWidth: 1
   },
   starIcon: {
