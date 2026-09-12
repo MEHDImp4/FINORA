@@ -73,8 +73,12 @@ export function normalizeServerUrl(rawInput: string): ServerUrlValidationResult 
     ? "Warning: Connecting over unencrypted HTTP. Your credentials and streaming traffic will not be protected across the network."
     : undefined;
 
+  let pathname = parsedUrl.pathname !== "/" ? parsedUrl.pathname.replace(/\/+$/, "") : "";
+  // Strip Jellyfin web client UI path if user pasted browser URL (e.g. /web, /web/index.html)
+  pathname = pathname.replace(/\/web(\/.*)?$/i, "");
+
   return {
-    url: parsedUrl.origin + (parsedUrl.pathname !== "/" ? parsedUrl.pathname.replace(/\/+$/, "") : ""),
+    url: parsedUrl.origin + pathname,
     isHttps,
     hasWarning,
     warningMessage

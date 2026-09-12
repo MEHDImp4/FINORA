@@ -2,9 +2,11 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   ScrollView
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { FinoraScreen } from "../../design-system/components/FinoraScreen";
 import { FinoraButton } from "../../design-system/components/FinoraButton";
 import { useAuthStore } from "../../stores/authStore";
@@ -16,6 +18,7 @@ import {
 
 export default function SettingsScreen() {
   const session = useAuthStore((state) => state.session);
+  const login = useAuthStore((state) => state.login);
   const logout = useAuthStore((state) => state.logout);
   const savedAccounts = useServerStore((state) => state.savedAccounts);
   const loadSavedAccounts = useServerStore((state) => state.loadSavedAccounts);
@@ -25,12 +28,58 @@ export default function SettingsScreen() {
   const [isRunning, setIsRunning] = useState(false);
   const [diagResult, setDiagResult] = useState<ServerDiagnosticsResult | null>(null);
 
+  // Connect form state
+  const [serverInput, setServerInput] = useState("https://azeur-jelly-web.smp4.xyz");
+  const [usernameInput, setUsernameInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginSuccess, setLoginSuccess] = useState<string | null>(null);
+
   useEffect(() => {
     loadSavedAccounts();
   }, [loadSavedAccounts]);
 
+  const handleConnect = async () => {
+    if (!serverInput.trim()) {
+      setLoginError("Please enter a Jellyfin server URL.");
+      return;
+    }
+    if (!usernameInput.trim()) {
+      setLoginError("Please enter your username.");
+      return;
+    }
+
+    setIsLoggingIn(true);
+    setLoginError(null);
+    setLoginSuccess(null);
+
+    try {
+      const success = await login(
+        {
+          username: usernameInput.trim(),
+          password: passwordInput
+        },
+        serverInput.trim()
+      );
+
+      if (success) {
+        setLoginSuccess("Connected successfully!");
+        setPasswordInput("");
+        await loadSavedAccounts();
+      } else {
+        const err = useAuthStore.getState().errorMessage;
+        setLoginError(err || "Authentication failed. Check credentials.");
+      }
+    } catch (e) {
+      setLoginError((e as Error).message || "Failed to connect to server.");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
   const handleRunDiagnostics = async () => {
-    const url = session?.serverUrl || "https://demo.jellyfin.org";
+    const url = session?.serverUrl || serverInput.trim() || "https://azeur-jelly-web.smp4.xyz";
     setIsRunning(true);
     try {
       const res = await diagnosticsService.runDiagnostics(url, session?.token);
@@ -71,6 +120,81 @@ export default function SettingsScreen() {
           ) : (
             <Text style={styles.emptyText}>Not connected to any Jellyfin server.</Text>
           )}
+        </View>
+
+        {/* Connect to Server / Login Form */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>
+            {session ? "Add Another Server / Switch User" : "Connect to Jellyfin Server"}
+          </Text>
+          <Text style={styles.cardDescription}>
+            Enter your Jellyfin server address and user credentials to connect.
+          </Text>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.inputLabel}>Server URL</Text>
+            <TextInput
+              style={styles.textInput}
+              value={serverInput}
+              onChangeText={setServerInput}
+              placeholder="https://your-jellyfin-server.com"
+              placeholderTextColor="#666680"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.inputLabel}>Username</Text>
+            <TextInput
+              style={styles.textInput}
+              value={usernameInput}
+              onChangeText={setUsernameInput}
+              placeholder="Username"
+              placeholderTextColor="#666680"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.inputLabel}>Password</Text>
+            <TextInput
+              style={styles.textInput}
+              value={passwordInput}
+              onChangeText={setPasswordInput}
+              placeholder="Password"
+              placeholderTextColor="#666680"
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          {loginError ? (
+            <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle" size={18} color="#FF4D4D" style={{ marginRight: 6 }} />
+              <Text style={styles.errorText}>{loginError}</Text>
+            </View>
+          ) : null}
+
+          {loginSuccess ? (
+            <View style={styles.successBanner}>
+              <Ionicons name="checkmark-circle" size={18} color="#4BB543" style={{ marginRight: 6 }} />
+              <Text style={styles.successText}>{loginSuccess}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.actionRow}>
+            <FinoraButton
+              label={isLoggingIn ? "Connecting..." : "Connect & Log In"}
+              variant="primary"
+              size="md"
+              loading={isLoggingIn}
+              onPress={handleConnect}
+            />
+          </View>
         </View>
 
         {/* Saved Accounts / Multi-Server Switching (AUTH-04) */}
@@ -276,5 +400,55 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#1E1E26"
+  },
+  formGroup: {
+    marginBottom: 14
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#B3B3CC",
+    marginBottom: 6
+  },
+  textInput: {
+    backgroundColor: "#1C1C26",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#2D2D3D",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: "#FFFFFF"
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(229, 9, 20, 0.15)",
+    borderColor: "rgba(229, 9, 20, 0.4)",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12
+  },
+  errorText: {
+    color: "#FF6B6B",
+    fontSize: 13,
+    flex: 1
+  },
+  successBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(75, 181, 67, 0.15)",
+    borderColor: "rgba(75, 181, 67, 0.4)",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12
+  },
+  successText: {
+    color: "#4BB543",
+    fontSize: 13,
+    fontWeight: "600",
+    flex: 1
   }
 });
