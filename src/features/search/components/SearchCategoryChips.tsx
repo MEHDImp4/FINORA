@@ -10,11 +10,10 @@ export interface SearchCategory {
 }
 
 export const SEARCH_CATEGORIES: SearchCategory[] = [
-  { id: "all", label: "All" },
+  { id: "all", label: "All", itemTypes: ["Movie", "Series", "BoxSet"] },
   { id: "movies", label: "Movies", itemTypes: ["Movie"] },
   { id: "series", label: "Series", itemTypes: ["Series"] },
-  { id: "episodes", label: "Episodes", itemTypes: ["Episode"] },
-  { id: "people", label: "People", itemTypes: ["Person"] }
+  { id: "episodes", label: "Episodes", itemTypes: ["Episode"] }
 ];
 
 interface SearchCategoryChipsProps {

@@ -237,6 +237,30 @@ describe("MediaRepository", () => {
     await expect(freshRepo.refreshLibrary(mockHttpClient)).resolves.not.toThrow();
   });
 
+  it("searchMedia excludes Person items and enforces Movie, Series, BoxSet by default", async () => {
+    mockHttpClient.request.mockResolvedValueOnce({
+      Items: [
+        { Id: "m-1", Name: "Inception", Type: "Movie" },
+        { Id: "p-1", Name: "Christopher Nolan", Type: "Person" }
+      ]
+    });
+
+    const results = await repository.searchMedia("user-123", "Inception", undefined, mockHttpClient);
+
+    expect(mockHttpClient.request).toHaveBeenCalledWith(
+      "/Users/user-123/Items",
+      expect.objectContaining({
+        params: expect.objectContaining({
+          SearchTerm: "Inception",
+          ExcludeItemTypes: "Person",
+          IncludeItemTypes: "Movie,Series,BoxSet"
+        })
+      })
+    );
+    expect(results).toHaveLength(1);
+    expect(results[0].id).toBe("m-1");
+  });
+
   it("throws FinoraError on missing userId parameter", async () => {
     await expect(repository.getLibraries("", mockHttpClient)).rejects.toThrow(FinoraError);
   });

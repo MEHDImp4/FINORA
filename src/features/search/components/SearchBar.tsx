@@ -17,7 +17,7 @@ export function SearchBar({
   onChangeText,
   onClear,
   onSubmitEditing,
-  placeholder = "Search movies, shows, people...",
+  placeholder = "Search movies, TV shows, series...",
   autoFocus = false
 }: SearchBarProps) {
   return (

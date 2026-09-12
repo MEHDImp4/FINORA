@@ -22,7 +22,7 @@ const MEDIA_FIELDS =
 
 export function isValidMediaDto(dto: any): boolean {
   if (!dto) return false;
-  if (dto.LocationType === "Virtual" || dto.IsMissing === true) {
+  if (dto.Type === "Person" || dto.LocationType === "Virtual" || dto.IsMissing === true) {
     return false;
   }
   // Items with explicit 0 episode count (empty seasons, series, or collections)
@@ -293,19 +293,21 @@ export class MediaRepository {
     }
 
     const http = this.getHttp(customClient);
+    const validTypes = itemTypes && itemTypes.length > 0
+      ? itemTypes.filter((t) => t !== "Person")
+      : ["Movie", "Series", "BoxSet"];
+
     const params: Record<string, string | number | boolean | undefined> = {
       SearchTerm: trimmed,
       Recursive: true,
       Limit: 50,
       IsMissing: false,
       ExcludeLocationTypes: "Virtual",
+      ExcludeItemTypes: "Person",
+      IncludeItemTypes: validTypes.join(","),
       Fields: MEDIA_FIELDS,
       EnableImageTypes: "Primary,Backdrop,Thumb"
     };
-
-    if (itemTypes && itemTypes.length > 0) {
-      params.IncludeItemTypes = itemTypes.join(",");
-    }
 
     const response = await http.request<{ Items?: any[] }>(`/Users/${userId}/Items`, {
       params
