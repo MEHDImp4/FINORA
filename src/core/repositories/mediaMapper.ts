@@ -166,7 +166,9 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
     mediaStreams,
     chapters,
     container,
-    mediaSourceId
+    mediaSourceId,
+    locationType: dto.LocationType || undefined,
+    isMissing: Boolean(dto.IsMissing)
   };
 }
 

@@ -17,7 +17,7 @@ export interface GetItemsOptions {
 }
 
 const MEDIA_FIELDS =
-  "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ParentBackdropImageTags,ParentBackdropItemId,SeriesPrimaryImageTag,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber,SeriesId,SeriesName,SeasonId";
+  "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ParentBackdropImageTags,ParentBackdropItemId,SeriesPrimaryImageTag,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber,SeriesId,SeriesName,SeasonId,LocationType,MediaSources";
 
 export class MediaRepository {
   private client: JellyfinClient;
@@ -58,7 +58,9 @@ export class MediaRepository {
       Limit: options.limit,
       StartIndex: options.startIndex,
       Recursive: options.recursive ?? true,
-      Fields: MEDIA_FIELDS
+      Fields: MEDIA_FIELDS,
+      IsMissing: false,
+      ExcludeLocationTypes: "Virtual"
     };
 
     if (options.includeItemTypes && options.includeItemTypes.length > 0) {
@@ -78,7 +80,9 @@ export class MediaRepository {
     });
 
     const items = response?.Items || [];
-    return items.map(mapJellyfinItemToMediaItem);
+    return items
+      .filter((dto) => dto.LocationType !== "Virtual" && !dto.IsMissing)
+      .map(mapJellyfinItemToMediaItem);
   }
 
   public async getResumeItems(
@@ -92,6 +96,7 @@ export class MediaRepository {
 
     const http = this.getHttp(customClient);
     const params: Record<string, string | number | boolean | undefined> = {
+      UserId: userId,
       Limit: limit,
       Fields: MEDIA_FIELDS,
       EnableImageTypes: "Primary,Backdrop,Thumb"
@@ -102,7 +107,9 @@ export class MediaRepository {
     });
 
     const items = response?.Items || [];
-    return items.map(mapJellyfinItemToMediaItem);
+    return items
+      .filter((dto) => dto.LocationType !== "Virtual" && !dto.IsMissing)
+      .map(mapJellyfinItemToMediaItem);
   }
 
   public async getRecentlyAdded(
@@ -120,7 +127,9 @@ export class MediaRepository {
       ParentId: parentId,
       Limit: limit,
       Fields: MEDIA_FIELDS,
-      EnableImageTypes: "Primary,Backdrop,Thumb"
+      EnableImageTypes: "Primary,Backdrop,Thumb",
+      GroupItems: true,
+      IsMissing: false
     };
 
     const response = await http.request<any[]>(`/Users/${userId}/Items/Latest`, {
@@ -128,7 +137,9 @@ export class MediaRepository {
     });
 
     const items = Array.isArray(response) ? response : [];
-    return items.map(mapJellyfinItemToMediaItem);
+    return items
+      .filter((dto) => dto.LocationType !== "Virtual" && !dto.IsMissing)
+      .map(mapJellyfinItemToMediaItem);
   }
 
   public async getItem(
@@ -162,13 +173,28 @@ export class MediaRepository {
     const response = await http.request<{ Items?: any[] }>(`/Shows/${seriesId}/Seasons`, {
       params: {
         UserId: userId,
+        IsMissing: false,
         Fields:
-          "Overview,ProductionYear,CommunityRating,ImageTags,BackdropImageTags,ImageBlurHashes,UserData,ItemCounts"
+          "Overview,ProductionYear,CommunityRating,ImageTags,BackdropImageTags,ImageBlurHashes,UserData,ItemCounts,LocationType"
       }
     });
 
     const items = response?.Items || [];
-    return items.map(mapJellyfinItemToMediaItem);
+    return items
+      .filter((dto) => {
+        if (dto.LocationType === "Virtual" || dto.IsMissing) {
+          return false;
+        }
+        if (
+          dto.ItemCounts &&
+          typeof dto.ItemCounts.EpisodeCount === "number" &&
+          dto.ItemCounts.EpisodeCount === 0
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .map(mapJellyfinItemToMediaItem);
   }
 
   public async getEpisodes(
@@ -185,8 +211,8 @@ export class MediaRepository {
     const params: Record<string, string | number | boolean | undefined> = {
       UserId: userId,
       SeasonId: seasonId,
-      Fields:
-        "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber",
+      IsMissing: false,
+      Fields: MEDIA_FIELDS,
       EnableImageTypes: "Primary,Backdrop,Thumb"
     };
 
@@ -195,7 +221,9 @@ export class MediaRepository {
     });
 
     const items = response?.Items || [];
-    return items.map(mapJellyfinItemToMediaItem);
+    return items
+      .filter((dto) => dto.LocationType !== "Virtual" && !dto.IsMissing)
+      .map(mapJellyfinItemToMediaItem);
   }
 
   public async searchMedia(
@@ -218,8 +246,9 @@ export class MediaRepository {
       SearchTerm: trimmed,
       Recursive: true,
       Limit: 50,
-      Fields:
-        "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber",
+      IsMissing: false,
+      ExcludeLocationTypes: "Virtual",
+      Fields: MEDIA_FIELDS,
       EnableImageTypes: "Primary,Backdrop,Thumb"
     };
 
@@ -232,7 +261,9 @@ export class MediaRepository {
     });
 
     const items = response?.Items || [];
-    return items.map(mapJellyfinItemToMediaItem);
+    return items
+      .filter((dto) => dto.LocationType !== "Virtual" && !dto.IsMissing)
+      .map(mapJellyfinItemToMediaItem);
   }
 
   public async getGenres(

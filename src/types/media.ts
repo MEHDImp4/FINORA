@@ -68,6 +68,8 @@ export interface MediaItem {
   chapters?: ChapterMarker[];
   container?: string;
   mediaSourceId?: string;
+  locationType?: string;
+  isMissing?: boolean;
 }
 
 export interface MediaLibrary {

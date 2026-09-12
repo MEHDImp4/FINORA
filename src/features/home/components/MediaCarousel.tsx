@@ -21,7 +21,11 @@ export const MediaCarousel = React.memo(
     variant = "poster",
     onItemPress
   }: MediaCarouselProps) {
-    if (!items || items.length === 0) {
+    const validItems = React.useMemo(() => {
+      return (items || []).filter((item) => !item.isMissing && item.locationType !== "Virtual");
+    }, [items]);
+
+    if (validItems.length === 0) {
       return null;
     }
 
@@ -39,7 +43,7 @@ export const MediaCarousel = React.memo(
 
         {/* Optimized Horizontal Virtualized FlatList */}
         <FlatList
-          data={items}
+          data={validItems}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.listContent}

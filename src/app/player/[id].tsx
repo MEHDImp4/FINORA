@@ -100,11 +100,24 @@ export default function PlayerRoute() {
         }
       : null);
 
-  if (!effectiveItem) {
+  if (
+    !effectiveItem ||
+    effectiveItem.locationType === "Virtual" ||
+    effectiveItem.isMissing ||
+    effectiveItem.type === "Season" ||
+    effectiveItem.type === "Series" ||
+    effectiveItem.type === "Folder"
+  ) {
     return (
       <View style={styles.centerContainer} testID="player-route-error">
         <FinoraText variant="title" style={styles.errorTitle}>
           Video unavailable
+        </FinoraText>
+        <FinoraText
+          variant="caption"
+          style={{ color: colors.textSecondary, marginBottom: spacing.md, textAlign: "center" }}
+        >
+          This media file is not present on the server.
         </FinoraText>
         <FinoraButton label="Go Back" variant="secondary" onPress={() => router.back()} />
       </View>

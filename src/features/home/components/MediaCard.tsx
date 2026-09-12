@@ -57,13 +57,20 @@ export const MediaCard = React.memo(
     const progressLabel = hasProgress ? `, ${Math.round(item.playedPercentage)}% watched` : "";
 
     const isEpisode = item.type === "Episode";
-    const mainTitle = isEpisode && item.seriesName ? item.seriesName : item.name;
+    const isSeason = item.type === "Season";
+    const mainTitle = isEpisode && item.seriesName
+      ? item.seriesName
+      : isSeason && item.seriesName
+      ? item.seriesName
+      : item.name;
     const subTitle = isEpisode
       ? typeof item.episodeIndex === "number"
         ? typeof item.seasonIndex === "number"
           ? `S${item.seasonIndex}:E${item.episodeIndex} · ${item.name}`
           : `E${item.episodeIndex} · ${item.name}`
         : item.name
+      : isSeason
+      ? item.name
       : item.year
       ? String(item.year)
       : null;

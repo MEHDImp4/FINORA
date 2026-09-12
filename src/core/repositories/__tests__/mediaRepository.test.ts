@@ -166,6 +166,44 @@ describe("MediaRepository", () => {
     expect(episodes[0].name).toBe("Pilot");
   });
 
+  it("filters out virtual and missing items from resume and recently added", async () => {
+    mockHttpClient.request.mockResolvedValueOnce({
+      Items: [
+        { Id: "res-real", Name: "Real Episode", LocationType: "FileSystem" },
+        { Id: "res-virt", Name: "Deleted Episode", LocationType: "Virtual" },
+        { Id: "res-miss", Name: "Missing Episode", IsMissing: true }
+      ]
+    });
+
+    const resumeItems = await repository.getResumeItems("user-123", 10, mockHttpClient);
+    expect(resumeItems).toHaveLength(1);
+    expect(resumeItems[0].id).toBe("res-real");
+
+    mockHttpClient.request.mockResolvedValueOnce([
+      { Id: "rec-real", Name: "Real Show", LocationType: "FileSystem" },
+      { Id: "rec-virt", Name: "Virtual Season", LocationType: "Virtual" }
+    ]);
+
+    const recentItems = await repository.getRecentlyAdded("user-123", undefined, 10, mockHttpClient);
+    expect(recentItems).toHaveLength(1);
+    expect(recentItems[0].id).toBe("rec-real");
+  });
+
+  it("getSeasons excludes virtual, missing, and 0-episode seasons", async () => {
+    mockHttpClient.request.mockResolvedValue({
+      Items: [
+        { Id: "s-1", Name: "Season 1", LocationType: "FileSystem", ItemCounts: { EpisodeCount: 8 } },
+        { Id: "s-2", Name: "Season 2", LocationType: "Virtual" },
+        { Id: "s-3", Name: "Season 3", IsMissing: true },
+        { Id: "s-4", Name: "Season 4", LocationType: "FileSystem", ItemCounts: { EpisodeCount: 0 } }
+      ]
+    });
+
+    const seasons = await repository.getSeasons("user-123", "series-1", mockHttpClient);
+    expect(seasons).toHaveLength(1);
+    expect(seasons[0].id).toBe("s-1");
+  });
+
   it("throws FinoraError on missing userId parameter", async () => {
     await expect(repository.getLibraries("", mockHttpClient)).rejects.toThrow(FinoraError);
   });

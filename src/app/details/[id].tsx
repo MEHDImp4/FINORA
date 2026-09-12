@@ -53,11 +53,26 @@ export default function DetailsScreen() {
     );
   }
 
-  if (isError || !item) {
+  React.useEffect(() => {
+    if (item && item.type === "Season" && item.seriesId) {
+      router.replace({
+        pathname: "/details/[id]",
+        params: { id: item.seriesId }
+      });
+    }
+  }, [item, router]);
+
+  if (isError || !item || item.locationType === "Virtual" || item.isMissing) {
     return (
       <View style={styles.centerContainer} testID="details-error">
         <FinoraText variant="title" style={styles.errorTitle}>
           Item not found
+        </FinoraText>
+        <FinoraText
+          variant="caption"
+          style={{ color: colors.textSecondary, marginBottom: spacing.md, textAlign: "center" }}
+        >
+          This media is not available on the server.
         </FinoraText>
         <FinoraButton
           label="Go Back"
