@@ -21,6 +21,8 @@ export interface PlaybackPlanOptions {
   deviceProfile?: DeviceProfile;
   container?: string;
   localPath?: string;
+  audioStreamIndex?: number;
+  subtitleStreamIndex?: number | null;
 }
 
 export function getSanitizedPlaybackUrl(url: string): string {
@@ -34,7 +36,9 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     token = "",
     deviceProfile = getDefaultDeviceProfile(),
     container,
-    localPath
+    localPath,
+    audioStreamIndex,
+    subtitleStreamIndex
   } = options;
 
   if (localPath) {
@@ -50,13 +54,32 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   // Find video and audio streams
   const streams = item.mediaStreams || [];
   const videoStream = streams.find((s) => s.type === "Video");
-  const audioStream = streams.find((s) => s.type === "Audio");
+  const audioStreams = streams.filter((s) => s.type === "Audio");
+  const audioStream =
+    (audioStreamIndex !== undefined
+      ? audioStreams.find((s) => s.index === audioStreamIndex)
+      : undefined) ||
+    audioStreams.find((s) => s.isDefault) ||
+    audioStreams[0];
+
+  const defaultAudio = audioStreams.find((s) => s.isDefault) || audioStreams[0];
+  const isDefaultAudioSelected =
+    audioStreamIndex === undefined ||
+    (defaultAudio && audioStream?.index === defaultAudio.index);
 
   const videoCodec = videoStream?.codec?.toLowerCase();
   const audioCodec = audioStream?.codec?.toLowerCase();
   const mediaContainer = (container || item.container || "mp4").toLowerCase();
   const mediaSourceId = item.mediaSourceId;
   const mediaSourceParam = mediaSourceId ? `&mediaSourceId=${encodeURIComponent(mediaSourceId)}` : "";
+  const audioIndexParam =
+    audioStreamIndex !== undefined
+      ? `&audioStreamIndex=${audioStreamIndex}&AudioStreamIndex=${audioStreamIndex}`
+      : "";
+  const subtitleIndexParam =
+    subtitleStreamIndex !== undefined && subtitleStreamIndex !== null
+      ? `&subtitleStreamIndex=${subtitleStreamIndex}&SubtitleStreamIndex=${subtitleStreamIndex}`
+      : "";
 
   // Normalize codecs (e.g. h265 -> hevc, dca -> dts)
   const normVideoCodec = videoCodec === "h265" ? "hevc" : videoCodec;
@@ -70,8 +93,28 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     !normAudioCodec ||
     (deviceProfile.supportedAudioCodecs.includes(normAudioCodec) && !isMultichannel);
 
+  // If user selected a non-default audio track and video is supported:
+  // Use Direct Stream with copy video and copy/transcode audio with AudioStreamIndex
+  if (!isDefaultAudioSelected && isVideoSupported) {
+    const targetAudioCodec = isAudioSupported ? "copy" : "aac";
+    const audioChannelsParam = !isAudioSupported ? "&audioChannels=2" : "";
+    const directStreamUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=copy&audioCodec=${targetAudioCodec}${audioChannelsParam}${
+      token ? `&api_key=${encodeURIComponent(token)}` : ""
+    }${mediaSourceParam}${audioIndexParam}${subtitleIndexParam}&transcodingProtocol=hls`;
+
+    return {
+      mode: "direct-stream",
+      url: directStreamUrl,
+      mediaSourceId,
+      videoCodec: normVideoCodec,
+      audioCodec: targetAudioCodec,
+      container: "m3u8",
+      reason: `Selected audio track index ${audioStreamIndex}; streaming with video copy.`
+    };
+  }
+
   // Direct Play: container, video codec, and audio codec are all natively supported
-  if (isContainerSupported && isVideoSupported && isAudioSupported) {
+  if (isDefaultAudioSelected && isContainerSupported && isVideoSupported && isAudioSupported) {
     const directPlayUrl = `${cleanServerUrl}/Videos/${item.id}/stream?static=true${
       token ? `&api_key=${encodeURIComponent(token)}` : ""
     }${mediaSourceParam}`;
@@ -91,7 +134,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   if (isVideoSupported && isAudioSupported && !isContainerSupported) {
     const directStreamUrl = `${cleanServerUrl}/Videos/${item.id}/stream?videoCodec=copy&audioCodec=copy${
       token ? `&api_key=${encodeURIComponent(token)}` : ""
-    }${mediaSourceParam}`;
+    }${mediaSourceParam}${audioIndexParam}${subtitleIndexParam}`;
 
     return {
       mode: "direct-stream",
@@ -121,9 +164,9 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   }
 
   const targetVideoCodec = isVideoSupported ? "copy" : "h264";
-  const transcodeUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=${targetVideoCodec}&audioCodec=aac${
+  const transcodeUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=${targetVideoCodec}&audioCodec=aac&audioChannels=2${
     token ? `&api_key=${encodeURIComponent(token)}` : ""
-  }${mediaSourceParam}&transcodingProtocol=hls`;
+  }${mediaSourceParam}${audioIndexParam}${subtitleIndexParam}&transcodingProtocol=hls`;
 
   return {
     mode: "transcode",

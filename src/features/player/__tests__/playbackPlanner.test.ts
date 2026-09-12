@@ -118,6 +118,54 @@ describe("PlaybackPlanner", () => {
     expect(plan.mode).toBe("direct-play");
   });
 
+  it("selects Direct Stream with AudioStreamIndex when a non-default audio track is selected", () => {
+    const item: MediaItem = {
+      ...baseItem,
+      mediaStreams: [
+        { type: "Video", codec: "h264", width: 1920, height: 1080 },
+        { type: "Audio", index: 1, codec: "aac", channels: 2, isDefault: true, language: "eng" },
+        { type: "Audio", index: 2, codec: "aac", channels: 2, isDefault: false, language: "fre" }
+      ]
+    };
+
+    const plan = createPlaybackPlan({
+      item,
+      serverUrl,
+      token,
+      container: "mp4",
+      audioStreamIndex: 2
+    });
+
+    expect(plan.mode).toBe("direct-stream");
+    expect(plan.url).toContain("AudioStreamIndex=2");
+    expect(plan.url).toContain("videoCodec=copy&audioCodec=copy");
+    expect(plan.audioCodec).toBe("copy");
+  });
+
+  it("transcodes audio with AudioStreamIndex when selected audio track is DTS", () => {
+    const item: MediaItem = {
+      ...baseItem,
+      mediaStreams: [
+        { type: "Video", codec: "h264", width: 1920, height: 1080 },
+        { type: "Audio", index: 1, codec: "aac", channels: 2, isDefault: true, language: "eng" },
+        { type: "Audio", index: 2, codec: "dts", channels: 6, isDefault: false, language: "fre" }
+      ]
+    };
+
+    const plan = createPlaybackPlan({
+      item,
+      serverUrl,
+      token,
+      container: "mp4",
+      audioStreamIndex: 2
+    });
+
+    expect(plan.mode).toBe("direct-stream");
+    expect(plan.url).toContain("AudioStreamIndex=2");
+    expect(plan.url).toContain("videoCodec=copy&audioCodec=aac&audioChannels=2");
+    expect(plan.audioCodec).toBe("aac");
+  });
+
   it("sanitizes token and api_key from URLs", () => {
     const rawUrl = "https://demo.jellyfin.org/Videos/123/stream?static=true&api_key=super_secret_token";
     const sanitized = getSanitizedPlaybackUrl(rawUrl);

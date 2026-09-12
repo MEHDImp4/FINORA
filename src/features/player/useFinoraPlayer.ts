@@ -43,12 +43,50 @@ export function useFinoraPlayer({
     }
   }, [player, engine, initialPositionSeconds]);
 
-  // If sourceUrl changes, replace in player
+  const pendingSeekPositionRef = useRef<number | null>(null);
+  const pendingPlayRef = useRef<boolean>(false);
+  const prevSourceUrlRef = useRef<string | undefined>(sourceUrl);
+
+  // If sourceUrl changes, replace in player while preserving position and play state
   useEffect(() => {
-    if (sourceUrl && player) {
+    if (!sourceUrl || !player) return;
+    if (prevSourceUrlRef.current && prevSourceUrlRef.current !== sourceUrl) {
+      const currentPos = player.currentTime || engine.getSnapshot().currentTimeSeconds;
+      const wasPlaying = player.playing || engine.getSnapshot().state === "playing";
+
+      if (currentPos > 0) {
+        pendingSeekPositionRef.current = currentPos;
+        pendingPlayRef.current = wasPlaying;
+      }
+
       player.replace(sourceUrl);
     }
-  }, [sourceUrl, player]);
+    prevSourceUrlRef.current = sourceUrl;
+  }, [sourceUrl, player, engine]);
+
+  // Restore playback position after source replacement
+  useEffect(() => {
+    if (!player) return;
+    const sub = player.addListener("statusChange", ({ status }) => {
+      if (status === "readyToPlay" && pendingSeekPositionRef.current !== null) {
+        const targetPos = pendingSeekPositionRef.current;
+        const shouldPlay = pendingPlayRef.current;
+        pendingSeekPositionRef.current = null;
+        try {
+          player.currentTime = targetPos;
+          if (shouldPlay) {
+            player.play();
+          }
+        } catch {
+          // Ignore
+        }
+      }
+    });
+
+    return () => {
+      sub?.remove?.();
+    };
+  }, [player]);
 
   // Subscribe to engine state
   const [snapshot, setSnapshot] = useState<FinoraPlayerSnapshot>(() => engine.getSnapshot());

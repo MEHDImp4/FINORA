@@ -43,10 +43,26 @@ export function PlayerScreen({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [tracksModalVisible, setTracksModalVisible] = useState(false);
   const [statsModalVisible, setStatsModalVisible] = useState(false);
-  const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | undefined>(undefined);
+
+  // Compute default audio stream index
+  const defaultAudioIndex = useMemo(() => {
+    const audioStreams = item.mediaStreams?.filter((s) => s.type === "Audio") || [];
+    const defaultStream = audioStreams.find((s) => s.isDefault);
+    if (defaultStream?.index !== undefined) return defaultStream.index;
+    if (audioStreams[0]?.index !== undefined) return audioStreams[0].index;
+    return undefined;
+  }, [item.mediaStreams]);
+
+  const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | undefined>(defaultAudioIndex);
   const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState<number | null>(null);
   const [selectedQuality, setSelectedQuality] = useState<string>("auto");
   const [isLandscape, setIsLandscape] = useState(false);
+
+  useEffect(() => {
+    if (selectedAudioIndex === undefined && defaultAudioIndex !== undefined) {
+      setSelectedAudioIndex(defaultAudioIndex);
+    }
+  }, [defaultAudioIndex]);
 
   // Auto/Manual screen orientation handling
   useEffect(() => {
@@ -99,9 +115,11 @@ export function PlayerScreen({
       item,
       serverUrl,
       token,
-      localPath
+      localPath,
+      audioStreamIndex: selectedAudioIndex,
+      subtitleStreamIndex: selectedSubtitleIndex
     });
-  }, [item, serverUrl, token, localPath]);
+  }, [item, serverUrl, token, localPath, selectedAudioIndex, selectedSubtitleIndex]);
 
   // Initial resume position in seconds
   const initialPositionSeconds = useMemo(() => {
@@ -228,10 +246,55 @@ export function PlayerScreen({
         onSelectAudio={(idx) => {
           setSelectedAudioIndex(idx);
           setTracksModalVisible(false);
+
+          // Native player track switch (for offline or local container tracks)
+          try {
+            const selectedStream = item.mediaStreams?.find((s) => s.index === idx && s.type === "Audio");
+            if (selectedStream && player.availableAudioTracks && player.availableAudioTracks.length > 1) {
+              const nativeTrack = player.availableAudioTracks.find((t) => {
+                if (!selectedStream.language) return false;
+                const lang = selectedStream.language.toLowerCase();
+                return (
+                  t.language.toLowerCase() === lang ||
+                  t.label.toLowerCase().includes(lang) ||
+                  (selectedStream.displayTitle && t.label.toLowerCase().includes(selectedStream.displayTitle.toLowerCase()))
+                );
+              });
+              if (nativeTrack) {
+                player.audioTrack = nativeTrack;
+              }
+            }
+          } catch {
+            // Ignored
+          }
         }}
         onSelectSubtitle={(idx) => {
           setSelectedSubtitleIndex(idx);
           setTracksModalVisible(false);
+
+          try {
+            if (idx === null) {
+              player.subtitleTrack = null;
+            } else if (player.availableSubtitleTracks && player.availableSubtitleTracks.length > 0) {
+              const selectedStream = item.mediaStreams?.find((s) => s.index === idx && s.type === "Subtitle");
+              if (selectedStream) {
+                const nativeTrack = player.availableSubtitleTracks.find((t) => {
+                  if (!selectedStream.language) return false;
+                  const lang = selectedStream.language.toLowerCase();
+                  return (
+                    t.language.toLowerCase() === lang ||
+                    t.label.toLowerCase().includes(lang) ||
+                    (selectedStream.displayTitle && t.label.toLowerCase().includes(selectedStream.displayTitle.toLowerCase()))
+                  );
+                });
+                if (nativeTrack) {
+                  player.subtitleTrack = nativeTrack;
+                }
+              }
+            }
+          } catch {
+            // Ignored
+          }
         }}
         onSelectQuality={(q) => {
           setSelectedQuality(q);
