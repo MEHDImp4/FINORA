@@ -24,6 +24,8 @@ import { useSeasons, useEpisodes } from "../../../hooks/useMediaQueries";
 import { SeasonPicker } from "./SeasonPicker";
 import { EpisodeCard } from "./EpisodeCard";
 import { CastList } from "./CastList";
+import { DownloadSeriesModal } from "./DownloadSeriesModal";
+import { hapticService } from "../../../core/feedback/hapticService";
 
 export interface SeriesDetailsViewProps {
   series: MediaItem;
@@ -32,16 +34,26 @@ export interface SeriesDetailsViewProps {
   onPlayEpisode: (episode: MediaItem) => void;
   onBack: () => void;
   onToggleFavorite?: (item: MediaItem) => void;
+  onDownloadEpisodes?: (episodes: MediaItem[]) => void;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BACKDROP_HEIGHT = Math.round(SCREEN_WIDTH * 0.72);
 
 export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
-  ({ series, serverUrl, userId, onPlayEpisode, onBack, onToggleFavorite }) => {
+  ({
+    series,
+    serverUrl,
+    userId,
+    onPlayEpisode,
+    onBack,
+    onToggleFavorite,
+    onDownloadEpisodes
+  }) => {
     const insets = useSafeAreaInsets();
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
     const [selectedSeasonId, setSelectedSeasonId] = useState<string>("");
+    const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
     const { data: seasons = [], isLoading: isLoadingSeasons } = useSeasons(
       series.id,
@@ -208,6 +220,18 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
               />
             </FinoraIconButton>
           ) : null}
+
+          <FinoraIconButton
+            accessibilityLabel="Télécharger la série"
+            onPress={() => {
+              hapticService.impactLight();
+              setIsDownloadModalOpen(true);
+            }}
+            size={48}
+            backgroundColor={colors.surface}
+          >
+            <Ionicons name="download-outline" size={22} color="#FFFFFF" />
+          </FinoraIconButton>
         </View>
 
         {/* Overview Synopsis */}
@@ -269,6 +293,19 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
         {series.people && series.people.length > 0 ? (
           <CastList people={series.people} serverUrl={serverUrl} />
         ) : null}
+
+        <DownloadSeriesModal
+          visible={isDownloadModalOpen}
+          onClose={() => setIsDownloadModalOpen(false)}
+          series={series}
+          seasons={seasons}
+          userId={userId}
+          onConfirmDownload={(episodes) => {
+            if (onDownloadEpisodes) {
+              onDownloadEpisodes(episodes);
+            }
+          }}
+        />
       </ScrollView>
     );
   }

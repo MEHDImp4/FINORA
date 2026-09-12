@@ -20,6 +20,10 @@ export interface DownloadItem {
   error?: string;
   startedAt: number;
   completedAt?: number;
+  seriesId?: string;
+  seriesName?: string;
+  seasonIndex?: number;
+  episodeIndex?: number;
 }
 
 export interface OfflineMediaRecord {
@@ -34,6 +38,12 @@ export interface OfflineMediaRecord {
   playbackPositionTicks: number;
   posterPath?: string;
   savedAt: number;
+  isPlayed?: boolean;
+  completedWatchedAt?: number;
+  seriesId?: string;
+  seriesName?: string;
+  seasonIndex?: number;
+  episodeIndex?: number;
 }
 
 export interface SyncQueueEntry {

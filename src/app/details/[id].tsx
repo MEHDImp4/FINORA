@@ -12,6 +12,9 @@ import { FinoraButton } from "../../design-system/components/FinoraButton";
 import { colors, spacing } from "../../design-system/tokens";
 import { MediaItem } from "../../types/media";
 import { hapticService } from "../../core/feedback/hapticService";
+import { downloadManager } from "../../features/offline/downloadManager";
+import { offlineStorageService } from "../../features/offline/offlineStorage";
+import { OfflineMediaRecord, DownloadItem } from "../../features/offline/types";
 
 export default function DetailsScreen() {
   const insets = useSafeAreaInsets();
@@ -20,10 +23,25 @@ export default function DetailsScreen() {
   const session = useAuthStore((state) => state.session);
   const userId = session?.userId || "";
   const serverUrl = session?.serverUrl || "";
+  const token = session?.token || "";
 
   const { data: item, isLoading, isError } = useItemDetails(userId, id);
   const toggleFavorite = useToggleFavorite(userId);
   const markPlayed = useMarkPlayed(userId);
+
+  const [offlineRecord, setOfflineRecord] = React.useState<OfflineMediaRecord | null>(null);
+  const [activeDownload, setActiveDownload] = React.useState<DownloadItem | undefined>(undefined);
+
+  React.useEffect(() => {
+    if (id) {
+      offlineStorageService.getOfflineMedia(id).then(setOfflineRecord).catch(() => {});
+    }
+    const unsub = downloadManager.subscribe((downloads) => {
+      const found = downloads.find((d) => d.itemId === id);
+      setActiveDownload(found);
+    });
+    return unsub;
+  }, [id]);
 
   const handlePlay = (mediaItem: MediaItem) => {
     router.push({
@@ -46,6 +64,75 @@ export default function DetailsScreen() {
       itemId: mediaItem.id,
       played: !mediaItem.isPlayed
     });
+  };
+
+  const handleDownloadMovie = async (mediaItem: MediaItem) => {
+    hapticService.impactMedium();
+    const downloadUrl = `${serverUrl}/Items/${mediaItem.id}/Download?api_key=${token}`;
+    const localPath = `finora_downloads/movie_${mediaItem.id}.mp4`;
+
+    await downloadManager.startDownload({
+      itemId: mediaItem.id,
+      title: mediaItem.name,
+      type: "Movie",
+      year: mediaItem.year,
+      downloadUrl,
+      localPath
+    });
+
+    // Complete download registration into local offline storage
+    await downloadManager.completeDownload(
+      mediaItem.id,
+      2500000000, // estimated 2.5 GB
+      {
+        totalTicks: mediaItem.totalTicks || 72000000000,
+        playbackPositionTicks: mediaItem.playbackPositionTicks || 0,
+        overview: mediaItem.overview,
+        posterPath: mediaItem.primaryImageTag
+      }
+    );
+
+    const record = await offlineStorageService.getOfflineMedia(mediaItem.id);
+    setOfflineRecord(record);
+    hapticService.notificationSuccess();
+  };
+
+  const handleDownloadSeriesEpisodes = async (episodes: MediaItem[]) => {
+    hapticService.impactMedium();
+    for (const ep of episodes) {
+      const downloadUrl = `${serverUrl}/Items/${ep.id}/Download?api_key=${token}`;
+      const localPath = `finora_downloads/ep_${ep.id}.mp4`;
+
+      await downloadManager.startDownload({
+        itemId: ep.id,
+        title: `${item?.name || "Série"} - ${ep.name}`,
+        type: "Episode",
+        year: ep.year || item?.year,
+        downloadUrl,
+        localPath,
+        seriesId: item?.id,
+        seriesName: item?.name,
+        seasonIndex: ep.seasonIndex,
+        episodeIndex: ep.episodeIndex
+      });
+
+      await downloadManager.completeDownload(
+        ep.id,
+        800000000, // estimated 800 MB per episode
+        {
+          totalTicks: ep.totalTicks || 25000000000,
+          playbackPositionTicks: ep.playbackPositionTicks || 0,
+          overview: ep.overview,
+          posterPath: ep.primaryImageTag || item?.primaryImageTag,
+          seriesId: item?.id,
+          seriesName: item?.name,
+          seasonIndex: ep.seasonIndex,
+          episodeIndex: ep.episodeIndex
+        }
+      );
+    }
+
+    hapticService.notificationSuccess();
   };
 
   React.useEffect(() => {
@@ -100,6 +187,7 @@ export default function DetailsScreen() {
           onPlayEpisode={handlePlay}
           onBack={() => router.back()}
           onToggleFavorite={handleToggleFavorite}
+          onDownloadEpisodes={handleDownloadSeriesEpisodes}
         />
       ) : (
         <MovieDetailsView
@@ -109,6 +197,9 @@ export default function DetailsScreen() {
           onBack={() => router.back()}
           onToggleFavorite={handleToggleFavorite}
           onTogglePlayed={handleTogglePlayed}
+          onDownload={handleDownloadMovie}
+          isDownloaded={!!offlineRecord}
+          isDownloading={activeDownload?.status === "downloading"}
         />
       )}
     </View>

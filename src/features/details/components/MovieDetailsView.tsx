@@ -28,13 +28,26 @@ export interface MovieDetailsViewProps {
   onBack: () => void;
   onToggleFavorite?: (item: MediaItem) => void;
   onTogglePlayed?: (item: MediaItem) => void;
+  onDownload?: (item: MediaItem) => void;
+  isDownloaded?: boolean;
+  isDownloading?: boolean;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BACKDROP_HEIGHT = Math.round(SCREEN_WIDTH * 0.72);
 
 export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
-  ({ item, serverUrl, onPlay, onBack, onToggleFavorite, onTogglePlayed }) => {
+  ({
+    item,
+    serverUrl,
+    onPlay,
+    onBack,
+    onToggleFavorite,
+    onTogglePlayed,
+    onDownload,
+    isDownloaded,
+    isDownloading
+  }) => {
     const insets = useSafeAreaInsets();
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
 
@@ -227,6 +240,39 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
                 name={item.isPlayed ? "checkmark-circle" : "checkmark-circle-outline"}
                 size={22}
                 color="#FFFFFF"
+              />
+            </FinoraIconButton>
+          ) : null}
+
+          {onDownload ? (
+            <FinoraIconButton
+              accessibilityLabel={
+                isDownloaded
+                  ? "Film téléchargé"
+                  : isDownloading
+                  ? "Téléchargement en cours"
+                  : "Télécharger le film"
+              }
+              onPress={() => onDownload(item)}
+              size={48}
+              backgroundColor={
+                isDownloaded
+                  ? "#2ECC71"
+                  : isDownloading
+                  ? "rgba(229, 9, 20, 0.25)"
+                  : colors.surface
+              }
+            >
+              <Ionicons
+                name={
+                  isDownloaded
+                    ? "cloud-done"
+                    : isDownloading
+                    ? "hourglass-outline"
+                    : "download-outline"
+                }
+                size={22}
+                color={isDownloaded ? "#FFFFFF" : isDownloading ? colors.primary : "#FFFFFF"}
               />
             </FinoraIconButton>
           ) : null}

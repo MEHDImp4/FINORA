@@ -1,4 +1,5 @@
-import { DownloadItem, DownloadStatus } from "./types";
+import { DownloadItem, DownloadStatus, OfflineMediaRecord } from "./types";
+import { offlineStorageService } from "./offlineStorage";
 
 export type DownloadListener = (downloads: DownloadItem[]) => void;
 
@@ -117,6 +118,35 @@ export class DownloadManager {
     item.totalBytes = totalBytes;
     item.completedAt = Date.now();
     this.notify();
+  }
+
+  public async completeDownload(
+    itemId: string,
+    totalBytes: number,
+    metadata?: Partial<OfflineMediaRecord>
+  ): Promise<void> {
+    this.markCompleted(itemId, totalBytes);
+    const item = this.downloads.get(itemId);
+    if (item) {
+      const record: OfflineMediaRecord = {
+        itemId: item.itemId,
+        title: item.title,
+        type: item.type,
+        year: item.year,
+        localPath: item.localPath,
+        fileSizeBytes: totalBytes,
+        totalTicks: metadata?.totalTicks || 0,
+        playbackPositionTicks: metadata?.playbackPositionTicks || 0,
+        overview: metadata?.overview,
+        posterPath: metadata?.posterPath,
+        seriesId: item.seriesId,
+        seriesName: item.seriesName,
+        seasonIndex: item.seasonIndex,
+        episodeIndex: item.episodeIndex,
+        savedAt: Date.now()
+      };
+      await offlineStorageService.saveOfflineMedia(record);
+    }
   }
 
   public markFailed(itemId: string, error: string): void {

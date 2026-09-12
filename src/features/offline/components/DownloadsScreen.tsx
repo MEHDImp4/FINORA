@@ -23,12 +23,30 @@ interface DownloadsScreenProps {
   onPlayItem?: (record: OfflineMediaRecord) => void;
 }
 
+export function getRetentionLabel(record: OfflineMediaRecord): string | null {
+  if (!record.completedWatchedAt && !record.isPlayed) return null;
+  if (!record.completedWatchedAt) return "Vu • Suppression programmée";
+
+  const elapsedMs = Date.now() - record.completedWatchedAt;
+  const remainingHours = Math.max(0, 48 - Math.floor(elapsedMs / (3600 * 1000)));
+
+  if (remainingHours >= 24) {
+    const days = Math.ceil(remainingHours / 24);
+    return `Vu • Expire dans ${days}j`;
+  }
+  if (remainingHours > 0) {
+    return `Vu • Expire dans ${remainingHours}h`;
+  }
+  return "Vu • Expire bientôt";
+}
+
 export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
   const router = useRouter();
   const [offlineItems, setOfflineItems] = useState<OfflineMediaRecord[]>([]);
   const [activeDownloads, setActiveDownloads] = useState<DownloadItem[]>([]);
 
   const loadData = useCallback(async () => {
+    await offlineStorageService.cleanupExpiredWatchedMedia(48);
     const items = await offlineStorageService.getAllOfflineMedia();
     setOfflineItems(items);
   }, []);
@@ -65,16 +83,33 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: OfflineMediaRecord }) => (
-      <View style={styles.recordRow} testID={`offline-item-${item.itemId}`}>
-        <View style={styles.recordInfo}>
-          <FinoraText variant="body" style={styles.itemTitle} numberOfLines={1}>
-            {item.title}
-          </FinoraText>
-          <FinoraText variant="caption" style={styles.itemMeta}>
-            {item.type} {item.year ? `• ${item.year}` : ""} • {formatBytes(item.fileSizeBytes)}
-          </FinoraText>
-        </View>
+    ({ item }: { item: OfflineMediaRecord }) => {
+      const retentionLabel = getRetentionLabel(item);
+
+      return (
+        <View style={styles.recordRow} testID={`offline-item-${item.itemId}`}>
+          <View style={styles.recordInfo}>
+            <FinoraText variant="body" style={styles.itemTitle} numberOfLines={1}>
+              {item.title}
+            </FinoraText>
+            <View style={styles.metaRow}>
+              <FinoraText variant="caption" style={styles.itemMeta}>
+                {item.seriesName ? `${item.seriesName} • ` : ""}
+                {typeof item.seasonIndex === "number" && typeof item.episodeIndex === "number"
+                  ? `S${item.seasonIndex}:E${item.episodeIndex} • `
+                  : `${item.type} • `}
+                {formatBytes(item.fileSizeBytes)}
+              </FinoraText>
+              {retentionLabel ? (
+                <View style={styles.retentionBadge}>
+                  <Ionicons name="time-outline" size={12} color="#F5A623" style={{ marginRight: 3 }} />
+                  <FinoraText variant="caption" style={styles.retentionText}>
+                    {retentionLabel}
+                  </FinoraText>
+                </View>
+              ) : null}
+            </View>
+          </View>
 
         <View style={styles.actionButtons}>
           <Pressable
@@ -100,9 +135,10 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
           </Pressable>
         </View>
       </View>
-    ),
-    [handlePlay, handleDelete]
-  );
+    );
+  },
+  [handlePlay, handleDelete]
+);
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -249,6 +285,26 @@ const styles = StyleSheet.create({
   },
   itemMeta: {
     color: colors.textSecondary
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 2
+  },
+  retentionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(245, 166, 35, 0.15)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4
+  },
+  retentionText: {
+    color: "#F5A623",
+    fontSize: 11,
+    fontWeight: "600"
   },
   actionButtons: {
     flexDirection: "row",

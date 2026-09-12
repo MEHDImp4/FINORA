@@ -3,6 +3,7 @@ import { AppState, AppStateStatus } from "react-native";
 import { FinoraPlayerSnapshot, IFinoraPlayerEngine } from "./types";
 import { PlaybackMode } from "./playbackPlanner";
 import { playbackRepository, PlaybackRepository } from "../../core/repositories/playbackRepository";
+import { offlineStorageService } from "../offline/offlineStorage";
 
 export interface UsePlaybackSessionOptions {
   itemId: string;
@@ -68,13 +69,25 @@ export function usePlaybackSession({
 
     const reportProgress = (eventName: "TimeUpdate" | "Pause" | "Unpause", isPaused: boolean) => {
       lastReportedPausedRef.current = isPaused;
+      const posTicks = secondsToTicks(snapshotRef.current.currentTimeSeconds);
+      const totalTicks = secondsToTicks(snapshotRef.current.durationSeconds);
+      const isPlayed = totalTicks > 0 && posTicks / totalTicks >= 0.9;
+
+      // Online Jellyfin session reporting
       repository.reportPlaybackProgress({
         itemId,
         mediaSourceId: mediaSourceId || itemId,
-        positionTicks: secondsToTicks(snapshotRef.current.currentTimeSeconds),
+        positionTicks: posTicks,
         isPaused,
         eventName
       });
+
+      // Offline persistent tracking & sync queue
+      offlineStorageService.updateLocalPlaybackPosition(itemId, posTicks, totalTicks).catch(() => {});
+      offlineStorageService.enqueueProgressSync(itemId, posTicks, isPlayed).catch(() => {});
+      if (isPlayed) {
+        offlineStorageService.markAsWatched(itemId).catch(() => {});
+      }
     };
 
     // State transition pause/resume reporting
@@ -127,11 +140,21 @@ export function usePlaybackSession({
   useEffect(() => {
     return () => {
       if (hasStartedRef.current && itemId) {
+        const posTicks = secondsToTicks(snapshotRef.current.currentTimeSeconds);
+        const totalTicks = secondsToTicks(snapshotRef.current.durationSeconds);
+        const isPlayed = totalTicks > 0 && posTicks / totalTicks >= 0.9;
+
         repository.reportPlaybackStopped({
           itemId,
           mediaSourceId: mediaSourceId || itemId,
-          positionTicks: secondsToTicks(snapshotRef.current.currentTimeSeconds)
+          positionTicks: posTicks
         });
+
+        offlineStorageService.updateLocalPlaybackPosition(itemId, posTicks, totalTicks).catch(() => {});
+        offlineStorageService.enqueueProgressSync(itemId, posTicks, isPlayed).catch(() => {});
+        if (isPlayed) {
+          offlineStorageService.markAsWatched(itemId).catch(() => {});
+        }
       }
     };
   }, [itemId, mediaSourceId, repository]);

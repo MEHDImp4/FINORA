@@ -55,16 +55,64 @@ export class OfflineStorageService {
 
   /**
    * Updates playback position locally for an offline media record.
+   * If the playback reaches >= 90% of total duration, it is automatically marked as watched.
    */
   public async updateLocalPlaybackPosition(
     itemId: string,
-    positionTicks: number
+    positionTicks: number,
+    totalTicks?: number
   ): Promise<void> {
     const item = await this.getOfflineMedia(itemId);
     if (!item) return;
 
     item.playbackPositionTicks = positionTicks;
+    const effectiveTotal = totalTicks || item.totalTicks;
+    if (effectiveTotal > 0 && positionTicks / effectiveTotal >= 0.9 && !item.isPlayed) {
+      item.isPlayed = true;
+      item.completedWatchedAt = Date.now();
+    }
     await this.saveOfflineMedia(item);
+  }
+
+  /**
+   * Explicitly marks an offline media record as watched and stamps the completion time.
+   */
+  public async markAsWatched(itemId: string): Promise<void> {
+    const item = await this.getOfflineMedia(itemId);
+    if (!item) return;
+
+    item.isPlayed = true;
+    item.completedWatchedAt = Date.now();
+    await this.saveOfflineMedia(item);
+  }
+
+  /**
+   * Automatically cleans up watched downloads older than retentionHours (default: 48h / 2 days).
+   * Returns the list of deleted itemIds.
+   */
+  public async cleanupExpiredWatchedMedia(retentionHours: number = 48): Promise<string[]> {
+    const all = await this.getAllOfflineMedia();
+    const now = Date.now();
+    const retentionMs = retentionHours * 60 * 60 * 1000;
+    const expiredIds: string[] = [];
+    const remaining: OfflineMediaRecord[] = [];
+
+    for (const item of all) {
+      if (item.completedWatchedAt && now - item.completedWatchedAt >= retentionMs) {
+        expiredIds.push(item.itemId);
+      } else {
+        remaining.push(item);
+      }
+    }
+
+    if (expiredIds.length > 0) {
+      await AsyncStorage.setItem(
+        OFFLINE_CATALOG_STORAGE_KEY,
+        JSON.stringify(remaining)
+      );
+    }
+
+    return expiredIds;
   }
 
   /**

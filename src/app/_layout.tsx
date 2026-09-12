@@ -7,6 +7,7 @@ import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { useAuthStore } from "../stores/authStore";
 import { QueryProvider } from "../providers/QueryProvider";
 import { offlineSyncManager } from "../features/offline/offlineSyncManager";
+import { offlineStorageService } from "../features/offline/offlineStorage";
 
 export default function RootLayout() {
   const status = useAuthStore((state) => state.status);
@@ -15,11 +16,14 @@ export default function RootLayout() {
 
   useEffect(() => {
     restoreSession();
+    // Auto-cleanup watched downloads older than 48h (2-3 days policy)
+    offlineStorageService.cleanupExpiredWatchedMedia(48).catch(() => {});
   }, [restoreSession]);
 
   useEffect(() => {
     if (status === "authenticated" && session?.userId) {
       offlineSyncManager.syncPendingProgress(session.userId).catch(() => {});
+      offlineStorageService.cleanupExpiredWatchedMedia(48).catch(() => {});
     }
   }, [status, session?.userId]);
 
