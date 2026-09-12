@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Modal, Pressable, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
@@ -18,6 +19,7 @@ export function SortOptionsModal({
   onSelectSort,
   onClose
 }: SortOptionsModalProps) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal
       visible={visible}
@@ -26,7 +28,13 @@ export function SortOptionsModal({
       onRequestClose={onClose}
     >
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheetContainer} onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          style={[
+            styles.sheetContainer,
+            { paddingBottom: Math.max(insets.bottom, spacing.lg) + 8 }
+          ]}
+          onPress={(e) => e.stopPropagation()}
+        >
           <View style={styles.header}>
             <FinoraText variant="title" style={styles.title}>
               Sort By

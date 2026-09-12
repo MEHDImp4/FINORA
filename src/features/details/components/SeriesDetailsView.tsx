@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Pressable
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { MediaItem } from "../../../types/media";
@@ -37,6 +38,7 @@ const BACKDROP_HEIGHT = Math.round(SCREEN_WIDTH * 0.72);
 
 export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
   ({ series, serverUrl, userId, onPlayEpisode, onBack, onToggleFavorite }) => {
+    const insets = useSafeAreaInsets();
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
     const [selectedSeasonId, setSelectedSeasonId] = useState<string>("");
 
@@ -106,7 +108,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
           />
 
           {/* Top Back Button */}
-          <View style={styles.topBar}>
+          <View style={[styles.topBar, { top: Math.max(insets.top, 16) + 8 }]}>
             <FinoraIconButton
               accessibilityLabel="Go back"
               onPress={onBack}

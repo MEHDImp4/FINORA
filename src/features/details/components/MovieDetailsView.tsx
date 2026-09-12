@@ -6,6 +6,7 @@ import {
   Dimensions,
   Pressable
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { MediaItem } from "../../../types/media";
@@ -33,6 +34,7 @@ const BACKDROP_HEIGHT = Math.round(SCREEN_WIDTH * 0.72);
 
 export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
   ({ item, serverUrl, onPlay, onBack, onToggleFavorite, onTogglePlayed }) => {
+    const insets = useSafeAreaInsets();
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
 
     const backdropUri = item.backdropImageTag
@@ -106,7 +108,7 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
           />
 
           {/* Top Back Button */}
-          <View style={styles.topBar}>
+          <View style={[styles.topBar, { top: Math.max(insets.top, 16) + 8 }]}>
             <FinoraIconButton
               accessibilityLabel="Go back"
               onPress={onBack}

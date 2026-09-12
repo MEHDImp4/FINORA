@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MediaStreamInfo } from "../../../types/media";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { FinoraIconButton } from "../../../design-system/components/FinoraIconButton";
@@ -43,6 +44,7 @@ export function TrackSelectionModal({
   onSelectSubtitle,
   onSelectQuality
 }: TrackSelectionModalProps) {
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>("audio");
 
   const audioStreams = streams.filter((s) => s.type === "Audio");
@@ -74,7 +76,13 @@ export function TrackSelectionModal({
       <View style={styles.backdrop}>
         <Pressable style={styles.dismissArea} onPress={onClose} testID="modal-backdrop-dismiss" />
 
-        <View style={styles.sheetContainer} testID="track-selection-sheet">
+        <View
+          style={[
+            styles.sheetContainer,
+            { paddingBottom: Math.max(insets.bottom, spacing.xl) }
+          ]}
+          testID="track-selection-sheet"
+        >
           {/* Header Row */}
           <View style={styles.sheetHeader}>
             <FinoraText variant="title" style={styles.sheetTitle}>

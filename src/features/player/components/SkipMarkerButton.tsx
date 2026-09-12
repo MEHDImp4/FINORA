@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, Pressable } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChapterMarker } from "../../../types/media";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
@@ -17,6 +18,7 @@ export function SkipMarkerButton({
   durationSeconds = 0,
   onSeek
 }: SkipMarkerButtonProps) {
+  const insets = useSafeAreaInsets();
   if (!chapters || chapters.length === 0) {
     return null;
   }
@@ -52,7 +54,13 @@ export function SkipMarkerButton({
     const targetSeconds = introEndTicks / 10000000;
     return (
       <Pressable
-        style={styles.container}
+        style={[
+          styles.container,
+          {
+            bottom: Math.max(insets.bottom, 20) + 75,
+            right: Math.max(insets.right, spacing.lg)
+          }
+        ]}
         onPress={() => onSeek(targetSeconds)}
         testID="skip-intro-button"
       >
@@ -79,7 +87,13 @@ export function SkipMarkerButton({
     const targetSeconds = durationSeconds > 0 ? durationSeconds : currentTimeSeconds + 30;
     return (
       <Pressable
-        style={styles.container}
+        style={[
+          styles.container,
+          {
+            bottom: Math.max(insets.bottom, 20) + 75,
+            right: Math.max(insets.right, spacing.lg)
+          }
+        ]}
         onPress={() => onSeek(targetSeconds)}
         testID="skip-credits-button"
       >

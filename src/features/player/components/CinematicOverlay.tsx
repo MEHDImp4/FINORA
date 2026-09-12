@@ -4,6 +4,7 @@ import {
   StyleSheet,
   Pressable
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { FinoraIconButton } from "../../../design-system/components/FinoraIconButton";
 import { TimelineScrubber } from "./TimelineScrubber";
@@ -48,6 +49,7 @@ export function CinematicOverlay({
   onScrubMove,
   autoHideMs = 4000
 }: CinematicOverlayProps) {
+  const insets = useSafeAreaInsets();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const resetTimer = () => {
@@ -87,7 +89,15 @@ export function CinematicOverlay({
 
   return (
     <Pressable
-      style={styles.overlayContainer}
+      style={[
+        styles.overlayContainer,
+        {
+          paddingTop: Math.max(insets.top, spacing.md) + 4,
+          paddingBottom: Math.max(insets.bottom, spacing.md) + 4,
+          paddingLeft: Math.max(insets.left, spacing.lg),
+          paddingRight: Math.max(insets.right, spacing.lg)
+        }
+      ]}
       onPress={handleInteraction}
       testID="cinematic-overlay"
     >

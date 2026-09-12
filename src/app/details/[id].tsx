@@ -1,5 +1,6 @@
 import React from "react";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAuthStore } from "../../stores/authStore";
 import { useItemDetails } from "../../hooks/useMediaQueries";
@@ -12,6 +13,7 @@ import { colors, spacing } from "../../design-system/tokens";
 import { MediaItem } from "../../types/media";
 
 export default function DetailsScreen() {
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const session = useAuthStore((state) => state.session);
@@ -68,7 +70,10 @@ export default function DetailsScreen() {
   }
 
   return (
-    <View style={styles.container} testID="details-screen">
+    <View
+      style={[styles.container, { paddingBottom: insets.bottom }]}
+      testID="details-screen"
+    >
       {item.type === "Series" ? (
         <SeriesDetailsView
           series={item}

@@ -41,7 +41,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <FinoraScreen>
+    <FinoraScreen safeBottom={false}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.headerTitle}>Settings</Text>
 

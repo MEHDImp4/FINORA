@@ -69,7 +69,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <FinoraScreen>
+    <FinoraScreen safeTop={false} safeBottom={false}>
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
