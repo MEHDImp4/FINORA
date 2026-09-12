@@ -11,6 +11,7 @@ import { FinoraText } from "../../design-system/components/FinoraText";
 import { FinoraButton } from "../../design-system/components/FinoraButton";
 import { colors, spacing } from "../../design-system/tokens";
 import { MediaItem } from "../../types/media";
+import { hapticService } from "../../core/feedback/hapticService";
 
 export default function DetailsScreen() {
   const insets = useSafeAreaInsets();
@@ -32,9 +33,11 @@ export default function DetailsScreen() {
   };
 
   const handleToggleFavorite = (mediaItem: MediaItem) => {
+    hapticService.impactMedium();
     toggleFavorite.mutate({
       itemId: mediaItem.id,
-      isFavorite: !mediaItem.isFavorite
+      isFavorite: !mediaItem.isFavorite,
+      item: mediaItem
     });
   };
 

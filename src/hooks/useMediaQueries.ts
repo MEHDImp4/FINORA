@@ -102,7 +102,8 @@ export function useWatchlistItems(
       mediaRepository.getItems(userId!, {
         ...options,
         filters: ["IsFavorite"],
-        includeItemTypes: options?.includeItemTypes || ["Movie", "Series"],
+        isFavorite: true,
+        includeItemTypes: options?.includeItemTypes || ["Movie", "Series", "BoxSet", "Episode"],
         sortBy: options?.sortBy || "DateCreated,SortName",
         sortOrder: options?.sortOrder || "Descending",
         recursive: true

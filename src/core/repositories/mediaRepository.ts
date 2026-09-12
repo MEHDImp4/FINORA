@@ -13,6 +13,7 @@ export interface GetItemsOptions {
   startIndex?: number;
   genres?: string[];
   filters?: string[];
+  isFavorite?: boolean;
   recursive?: boolean;
 }
 
@@ -127,6 +128,10 @@ export class MediaRepository {
 
     if (options.filters && options.filters.length > 0) {
       params.Filters = options.filters.join(",");
+    }
+
+    if (options.isFavorite !== undefined) {
+      params.IsFavorite = options.isFavorite;
     }
 
     if (options.genres && options.genres.length > 0) {

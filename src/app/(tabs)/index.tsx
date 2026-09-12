@@ -20,6 +20,7 @@ import { colors, spacing } from "../../design-system/tokens";
 import { MediaItem, MediaLibrary } from "../../types/media";
 import { mediaRepository } from "../../core/repositories/mediaRepository";
 import { jellyfinClient } from "../../core/jellyfin/jellyfinClient";
+import { hapticService } from "../../core/feedback/hapticService";
 
 function HomeLibraryRow({
   library,
@@ -171,7 +172,12 @@ export default function HomeScreen() {
   };
 
   const handleToggleFavorite = (item: MediaItem) => {
-    toggleFavorite.mutate({ itemId: item.id, isFavorite: !item.isFavorite });
+    hapticService.impactMedium();
+    toggleFavorite.mutate({
+      itemId: item.id,
+      isFavorite: !item.isFavorite,
+      item
+    });
   };
 
   return (

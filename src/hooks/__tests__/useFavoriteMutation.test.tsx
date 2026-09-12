@@ -125,4 +125,58 @@ describe("useToggleFavorite", () => {
     const cached = queryClient.getQueryData<MediaItem>(detailKey);
     expect(cached?.isFavorite).toBe(false);
   });
+
+  it("optimistically adds and removes item from watchlist cache", async () => {
+    const userId = "user-123";
+    const itemId = "item-789";
+    const watchlistKey = mediaKeys.watchlist(userId);
+
+    const testItem: MediaItem = {
+      id: itemId,
+      name: "Inception",
+      type: "Movie",
+      genres: [],
+      playbackPositionTicks: 0,
+      totalTicks: 1000,
+      playedPercentage: 0,
+      isPlayed: false,
+      isFavorite: false
+    };
+
+    queryClient.setQueryData<MediaItem[]>(watchlistKey, []);
+    (userDataRepository.setFavorite as jest.Mock).mockResolvedValue(undefined);
+
+    let capturedMutation: ReturnType<typeof useToggleFavorite> | null = null;
+
+    ReactTestRenderer.act(() => {
+      ReactTestRenderer.create(
+        <QueryClientProvider client={queryClient}>
+          <HookTester
+            userId={userId}
+            onReady={(m) => {
+              capturedMutation = m;
+            }}
+          />
+        </QueryClientProvider>
+      );
+    });
+
+    // 1. Add to favorite
+    await ReactTestRenderer.act(async () => {
+      await capturedMutation!.mutateAsync({ itemId, isFavorite: true, item: testItem });
+    });
+
+    let watchlist = queryClient.getQueryData<MediaItem[]>(watchlistKey);
+    expect(watchlist).toHaveLength(1);
+    expect(watchlist![0].id).toBe(itemId);
+    expect(watchlist![0].isFavorite).toBe(true);
+
+    // 2. Remove from favorite
+    await ReactTestRenderer.act(async () => {
+      await capturedMutation!.mutateAsync({ itemId, isFavorite: false, item: testItem });
+    });
+
+    watchlist = queryClient.getQueryData<MediaItem[]>(watchlistKey);
+    expect(watchlist).toHaveLength(0);
+  });
 });
