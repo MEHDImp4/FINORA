@@ -77,7 +77,7 @@ describe("MovieDetailsView", () => {
     expect(instance.findByProps({ children: "2h 49m" })).toBeTruthy();
 
     // Check community rating and official rating
-    expect(instance.findByProps({ children: "★ 8.7" })).toBeTruthy();
+    expect(instance.findByProps({ children: 8.7 })).toBeTruthy();
     expect(instance.findByProps({ children: "PG-13" })).toBeTruthy();
 
     // Check 4K and 5.1 specs

@@ -7,6 +7,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { FinoraIconButton } from "../../../design-system/components/FinoraIconButton";
+import { Ionicons } from "@expo/vector-icons";
 import { TimelineScrubber } from "./TimelineScrubber";
 import { colors, spacing } from "../../../design-system/tokens";
 
@@ -101,7 +102,7 @@ export function CinematicOverlay({
       onPress={handleInteraction}
       testID="cinematic-overlay"
     >
-      {/* Top Header Bar */}
+      {/* Top Bar (Back, Title, Actions) */}
       <View style={styles.topBar} testID="overlay-top-bar">
         <FinoraIconButton
           accessibilityLabel="Go back"
@@ -110,9 +111,7 @@ export function CinematicOverlay({
           backgroundColor="rgba(20, 20, 26, 0.6)"
           testID="overlay-back-button"
         >
-          <FinoraText variant="title" style={styles.iconGlyph}>
-            ‹
-          </FinoraText>
+          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
         </FinoraIconButton>
 
         <View style={styles.titleColumn}>
@@ -139,9 +138,7 @@ export function CinematicOverlay({
               style={styles.actionButton}
               testID="overlay-stats-button"
             >
-              <FinoraText variant="caption" style={styles.actionGlyph}>
-                ℹ
-              </FinoraText>
+              <Ionicons name="information-circle-outline" size={20} color="#FFFFFF" />
             </FinoraIconButton>
           )}
 
@@ -155,9 +152,7 @@ export function CinematicOverlay({
             backgroundColor="rgba(20, 20, 26, 0.6)"
             testID="overlay-tracks-button"
           >
-            <FinoraText variant="caption" style={styles.actionGlyph}>
-              💬
-            </FinoraText>
+            <Ionicons name="chatbubble-ellipses-outline" size={18} color="#FFFFFF" />
           </FinoraIconButton>
         </View>
       </View>
@@ -174,9 +169,12 @@ export function CinematicOverlay({
           backgroundColor="rgba(20, 20, 26, 0.6)"
           testID="overlay-seek-back-button"
         >
-          <FinoraText variant="body" style={styles.skipGlyph}>
-            ↺ 10
-          </FinoraText>
+          <View style={styles.skipContainer}>
+            <Ionicons name="arrow-undo" size={18} color="#FFFFFF" />
+            <FinoraText variant="caption" style={styles.skipNumber}>
+              10
+            </FinoraText>
+          </View>
         </FinoraIconButton>
 
         <FinoraIconButton
@@ -190,9 +188,12 @@ export function CinematicOverlay({
           style={styles.playPauseButton}
           testID="overlay-play-pause-button"
         >
-          <FinoraText variant="title" style={styles.playPauseGlyph}>
-            {isPlaying ? "❚❚" : "▶"}
-          </FinoraText>
+          <Ionicons
+            name={isPlaying ? "pause" : "play"}
+            size={32}
+            color="#FFFFFF"
+            style={!isPlaying ? { marginLeft: 3 } : undefined}
+          />
         </FinoraIconButton>
 
         <FinoraIconButton
@@ -205,9 +206,12 @@ export function CinematicOverlay({
           backgroundColor="rgba(20, 20, 26, 0.6)"
           testID="overlay-seek-forward-button"
         >
-          <FinoraText variant="body" style={styles.skipGlyph}>
-            10 ↻
-          </FinoraText>
+          <View style={styles.skipContainer}>
+            <Ionicons name="arrow-redo" size={18} color="#FFFFFF" />
+            <FinoraText variant="caption" style={styles.skipNumber}>
+              10
+            </FinoraText>
+          </View>
         </FinoraIconButton>
       </View>
 
@@ -300,6 +304,16 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: colors.textPrimary,
     textAlign: "center"
+  },
+  skipContainer: {
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  skipNumber: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginTop: 1
   },
   bottomBar: {
     width: "100%",

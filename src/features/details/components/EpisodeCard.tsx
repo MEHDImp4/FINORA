@@ -1,6 +1,7 @@
 import React from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import { MediaItem } from "../../../types/media";
 import { getBackdropUrl } from "../../../core/repositories/imageUrlBuilder";
 import { FinoraText } from "../../../design-system/components/FinoraText";
@@ -60,9 +61,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
           {/* Center Play Icon Overlay */}
           <View style={styles.playOverlay}>
             <View style={styles.playCircle}>
-              <FinoraText variant="caption" color="#FFFFFF" style={styles.playIcon}>
-                ▶
-              </FinoraText>
+              <Ionicons name="play" size={16} color="#FFFFFF" style={{ marginLeft: 2 }} />
             </View>
           </View>
 

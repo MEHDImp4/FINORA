@@ -2,6 +2,7 @@ import React from "react";
 import { View, StyleSheet, Dimensions, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import { MediaItem } from "../../../types/media";
 import { getBackdropUrl, getPosterUrl, getLogoUrl } from "../../../core/repositories/imageUrlBuilder";
 import { FinoraButton } from "../../../design-system/components/FinoraButton";
@@ -119,8 +120,9 @@ export const HeroBanner = React.memo(function HeroBanner({
 
           {item.communityRating ? (
             <View style={[styles.badge, styles.ratingBadge]}>
+              <Ionicons name="star" size={11} color="#FFD700" style={{ marginRight: 3 }} />
               <FinoraText variant="caption" color="textPrimary" weight="700">
-                ★ {item.communityRating}
+                {item.communityRating}
               </FinoraText>
             </View>
           ) : null}
@@ -140,12 +142,20 @@ export const HeroBanner = React.memo(function HeroBanner({
             label="Play"
             variant="primary"
             size="md"
+            leftIcon={<Ionicons name="play" size={16} color="#FFFFFF" />}
             style={styles.playButton}
             onPress={() => onPlay && onPlay(item)}
           />
 
           <FinoraButton
-            label={item.isFavorite ? "★ In Watchlist" : "+ Watchlist"}
+            label={item.isFavorite ? "In Watchlist" : "Watchlist"}
+            leftIcon={
+              <Ionicons
+                name={item.isFavorite ? "bookmark" : "add"}
+                size={16}
+                color="#FFFFFF"
+              />
+            }
             variant="secondary"
             size="md"
             style={styles.watchlistButton}

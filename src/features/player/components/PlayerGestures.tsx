@@ -7,6 +7,7 @@ import {
   LayoutChangeEvent
 } from "react-native";
 import { FinoraText } from "../../../design-system/components/FinoraText";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../../../design-system/tokens";
 
 export interface PlayerGesturesProps {
@@ -127,8 +128,9 @@ export function PlayerGestures({
         {/* Double-tap Seek Left Indicator */}
         {rippleSide === "left" && (
           <View style={[styles.seekRipple, styles.seekRippleLeft]} testID="seek-indicator-left">
+            <Ionicons name="play-back" size={24} color="#FFFFFF" style={{ marginRight: 6 }} />
             <FinoraText variant="title" style={styles.seekText}>
-              ◀◀ 10s
+              10s
             </FinoraText>
           </View>
         )}
@@ -137,8 +139,9 @@ export function PlayerGestures({
         {rippleSide === "right" && (
           <View style={[styles.seekRipple, styles.seekRippleRight]} testID="seek-indicator-right">
             <FinoraText variant="title" style={styles.seekText}>
-              10s ▶▶
+              10s
             </FinoraText>
+            <Ionicons name="play-forward" size={24} color="#FFFFFF" style={{ marginLeft: 6 }} />
           </View>
         )}
 
@@ -146,8 +149,9 @@ export function PlayerGestures({
         {is2xActive && (
           <View style={styles.speedBadge} testID="speed-2x-badge">
             <FinoraText variant="caption" style={styles.speedBadgeText}>
-              2.0x »
+              2.0x
             </FinoraText>
+            <Ionicons name="play-forward" size={13} color="#FFFFFF" style={{ marginLeft: 4 }} />
           </View>
         )}
       </Pressable>

@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MediaStreamInfo } from "../../../types/media";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { FinoraIconButton } from "../../../design-system/components/FinoraIconButton";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../../../design-system/tokens";
 
 export interface TrackSelectionModalProps {
@@ -95,9 +96,7 @@ export function TrackSelectionModal({
               backgroundColor={colors.surface}
               testID="close-modal-button"
             >
-              <FinoraText variant="body" style={styles.closeIcon}>
-                ✕
-              </FinoraText>
+              <Ionicons name="close" size={20} color="#FFFFFF" />
             </FinoraIconButton>
           </View>
 
@@ -171,9 +170,7 @@ export function TrackSelectionModal({
                           {formatAudioTitle(stream, idx)}
                         </FinoraText>
                         {isSelected && (
-                          <FinoraText variant="body" style={styles.checkIcon}>
-                            ✓
-                          </FinoraText>
+                          <Ionicons name="checkmark" size={18} color={colors.primary} />
                         )}
                       </Pressable>
                     );
@@ -204,9 +201,7 @@ export function TrackSelectionModal({
                     Off
                   </FinoraText>
                   {selectedSubtitleIndex === null && (
-                    <FinoraText variant="body" style={styles.checkIcon}>
-                      ✓
-                    </FinoraText>
+                    <Ionicons name="checkmark" size={18} color={colors.primary} />
                   )}
                 </Pressable>
 
@@ -228,9 +223,7 @@ export function TrackSelectionModal({
                         {formatSubtitleTitle(stream, idx)}
                       </FinoraText>
                       {isSelected && (
-                        <FinoraText variant="body" style={styles.checkIcon}>
-                          ✓
-                        </FinoraText>
+                        <Ionicons name="checkmark" size={18} color={colors.primary} />
                       )}
                     </Pressable>
                   );
@@ -257,9 +250,7 @@ export function TrackSelectionModal({
                         {opt.label}
                       </FinoraText>
                       {isSelected && (
-                        <FinoraText variant="body" style={styles.checkIcon}>
-                          ✓
-                        </FinoraText>
+                        <Ionicons name="checkmark" size={18} color={colors.primary} />
                       )}
                     </Pressable>
                   );

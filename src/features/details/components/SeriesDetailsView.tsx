@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import { MediaItem } from "../../../types/media";
 import {
   getBackdropUrl,
@@ -115,9 +116,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
               size={40}
               backgroundColor="rgba(10, 10, 12, 0.6)"
             >
-              <FinoraText variant="title" style={styles.backIcon}>
-                ‹
-              </FinoraText>
+              <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
             </FinoraIconButton>
           </View>
 
@@ -155,8 +154,9 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
 
           {series.communityRating ? (
             <View style={styles.ratingBadge}>
+              <Ionicons name="star" size={11} color={colors.accent} style={{ marginRight: 3 }} />
               <FinoraText variant="caption" color={colors.accent} style={styles.ratingText}>
-                {`★ ${series.communityRating}`}
+                {series.communityRating}
               </FinoraText>
             </View>
           ) : null}
@@ -189,11 +189,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
               }
             }}
             disabled={!nextEpisodeToPlay}
-            leftIcon={
-              <FinoraText variant="body" color="#FFFFFF" style={styles.playIcon}>
-                ▶
-              </FinoraText>
-            }
+            leftIcon={<Ionicons name="play" size={20} color="#FFFFFF" />}
           />
 
           {onToggleFavorite ? (
@@ -205,9 +201,11 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
                 series.isFavorite ? colors.primary : colors.surface
               }
             >
-              <FinoraText variant="body" color="#FFFFFF">
-                {series.isFavorite ? "★" : "+"}
-              </FinoraText>
+              <Ionicons
+                name={series.isFavorite ? "bookmark" : "bookmark-outline"}
+                size={22}
+                color="#FFFFFF"
+              />
             </FinoraIconButton>
           ) : null}
         </View>

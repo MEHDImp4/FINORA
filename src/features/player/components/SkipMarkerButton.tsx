@@ -1,6 +1,7 @@
 import React from "react";
 import { StyleSheet, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { ChapterMarker } from "../../../types/media";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
@@ -65,8 +66,9 @@ export function SkipMarkerButton({
         testID="skip-intro-button"
       >
         <FinoraText variant="body" style={styles.buttonText}>
-          Skip Intro ⇥
+          Skip Intro
         </FinoraText>
+        <Ionicons name="play-skip-forward" size={15} color="#FFFFFF" style={{ marginLeft: 6 }} />
       </Pressable>
     );
   }
@@ -98,8 +100,9 @@ export function SkipMarkerButton({
         testID="skip-credits-button"
       >
         <FinoraText variant="body" style={styles.buttonText}>
-          Skip Credits ⇥
+          Skip Credits
         </FinoraText>
+        <Ionicons name="play-skip-forward" size={15} color="#FFFFFF" style={{ marginLeft: 6 }} />
       </Pressable>
     );
   }
@@ -118,6 +121,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,

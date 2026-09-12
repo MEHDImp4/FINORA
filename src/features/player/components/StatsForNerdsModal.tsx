@@ -11,6 +11,7 @@ import { PlaybackPlan, getSanitizedPlaybackUrl } from "../playbackPlanner";
 import { FinoraPlayerSnapshot } from "../types";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { FinoraIconButton } from "../../../design-system/components/FinoraIconButton";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../../../design-system/tokens";
 
 export interface StatsForNerdsModalProps {
@@ -85,9 +86,7 @@ export function StatsForNerdsModal({
               backgroundColor={colors.surface}
               testID="close-stats-button"
             >
-              <FinoraText variant="caption" style={styles.closeGlyph}>
-                ✕
-              </FinoraText>
+              <Ionicons name="close" size={18} color="#FFFFFF" />
             </FinoraIconButton>
           </View>
 

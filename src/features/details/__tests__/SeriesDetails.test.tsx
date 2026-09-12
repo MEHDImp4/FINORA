@@ -114,7 +114,7 @@ describe("SeriesDetailsView", () => {
     const instance = root!.root;
     expect(instance.findByProps({ children: 2008 })).toBeTruthy();
     expect(instance.findByProps({ children: "2 Seasons" })).toBeTruthy();
-    expect(instance.findByProps({ children: "★ 9.5" })).toBeTruthy();
+    expect(instance.findByProps({ children: 9.5 })).toBeTruthy();
     expect(instance.findByProps({ children: "Season 1" })).toBeTruthy();
     expect(instance.findByProps({ children: "Season 2" })).toBeTruthy();
     expect(instance.findByProps({ children: "E1 · Pilot" })).toBeTruthy();

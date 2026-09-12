@@ -132,9 +132,12 @@ export const MediaCard = React.memo(
             ) : null}
 
             {item.communityRating ? (
-              <FinoraText variant="caption" color="accent" weight="700">
-                ★ {item.communityRating}
-              </FinoraText>
+              <View style={styles.ratingRow}>
+                <Ionicons name="star" size={10} color={colors.accent} style={styles.starIcon} />
+                <FinoraText variant="caption" color="accent" weight="700">
+                  {item.communityRating}
+                </FinoraText>
+              </View>
             ) : null}
           </View>
         </View>
@@ -209,5 +212,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: 2
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  starIcon: {
+    marginRight: 2
   }
 });
