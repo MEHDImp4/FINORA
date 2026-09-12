@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { View, StyleSheet, Dimensions, Pressable } from "react-native";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { View, StyleSheet, Dimensions, Pressable, Animated } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -33,6 +33,18 @@ export const HeroBanner = React.memo(function HeroBanner({
   );
   const candidateKey = candidateUrls.join("|");
   const [candidateIndex, setCandidateIndex] = useState(0);
+
+  // Netflix-style smooth fade transition when the featured item changes
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    fadeAnim.setValue(0);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true
+    }).start();
+  }, [item?.id]);
 
   useEffect(() => {
     setCandidateIndex(0);
@@ -75,6 +87,21 @@ export const HeroBanner = React.memo(function HeroBanner({
   const runtimeString = formatRuntime(item.runtimeMinutes);
   const primaryGenre = item.genres && item.genres.length > 0 ? item.genres[0] : null;
 
+  // Fallback badge labels if ratings/genres are missing on Jellyfin items
+  const typeLabel =
+    item.type === "Movie"
+      ? "Film"
+      : item.type === "Series"
+      ? "Série"
+      : item.type === "Episode"
+      ? "Épisode"
+      : null;
+
+  const hasRating = Boolean(item.communityRating);
+  const hasGenre = Boolean(primaryGenre);
+  const hasRuntime = Boolean(runtimeString);
+  const isHD = Boolean(item.mediaStreams?.some((s) => s.type === "Video" && (s.height || 0) >= 720));
+
   return (
     <Pressable
       style={styles.container}
@@ -82,7 +109,7 @@ export const HeroBanner = React.memo(function HeroBanner({
       accessibilityRole="imagebutton"
       accessibilityLabel={`Featured: ${displayTitle}`}
     >
-      {/* Dynamic Backdrop */}
+      {/* Dynamic Backdrop with smooth crossfade */}
       {currentUri && candidateIndex < candidateUrls.length ? (
         <Image
           key={currentUri}
@@ -90,7 +117,7 @@ export const HeroBanner = React.memo(function HeroBanner({
           placeholder={item.blurhash ? { blurhash: item.blurhash } : undefined}
           style={styles.backdropImage}
           contentFit="cover"
-          transition={300}
+          transition={500}
           cachePolicy="memory-disk"
           onError={handleImageError}
         />
@@ -110,8 +137,8 @@ export const HeroBanner = React.memo(function HeroBanner({
         style={styles.gradientOverlay}
       />
 
-      {/* Content Container */}
-      <View style={styles.contentContainer}>
+      {/* Content Container with Netflix-style smooth fade animation */}
+      <Animated.View style={[styles.contentContainer, { opacity: fadeAnim }]}>
         {/* Title or Logo */}
         {logoUri ? (
           <Image
@@ -128,26 +155,10 @@ export const HeroBanner = React.memo(function HeroBanner({
 
         {/* Metadata Badges */}
         <View style={styles.badgeRow}>
-          {item.year ? (
-            <View style={styles.badge}>
-              <FinoraText variant="caption" color="textPrimary" weight="700">
-                {item.year}
-              </FinoraText>
-            </View>
-          ) : null}
-
-          {runtimeString ? (
-            <View style={styles.badge}>
-              <FinoraText variant="caption" color="textPrimary" weight="700">
-                {runtimeString}
-              </FinoraText>
-            </View>
-          ) : null}
-
           {item.communityRating ? (
             <View style={[styles.badge, styles.ratingBadge]}>
-              <Ionicons name="star" size={12} color="#FFD700" style={styles.starIcon} />
-              <FinoraText variant="caption" color="textPrimary" weight="700">
+              <Ionicons name="star" size={14} color="#FFD700" style={styles.starIcon} />
+              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
                 {typeof item.communityRating === "number"
                   ? item.communityRating.toFixed(1)
                   : item.communityRating}
@@ -155,10 +166,51 @@ export const HeroBanner = React.memo(function HeroBanner({
             </View>
           ) : null}
 
+          {item.officialRating ? (
+            <View style={styles.badge}>
+              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                {item.officialRating}
+              </FinoraText>
+            </View>
+          ) : null}
+
+          {item.year ? (
+            <View style={styles.badge}>
+              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                {item.year}
+              </FinoraText>
+            </View>
+          ) : null}
+
+          {runtimeString ? (
+            <View style={styles.badge}>
+              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                {runtimeString}
+              </FinoraText>
+            </View>
+          ) : null}
+
           {primaryGenre ? (
             <View style={styles.badge}>
-              <FinoraText variant="caption" color="textPrimary" weight="700">
+              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
                 {primaryGenre}
+              </FinoraText>
+            </View>
+          ) : null}
+
+          {/* Guaranteed fallback badges when rating or genre is missing */}
+          {(!hasRating || !hasGenre) && typeLabel ? (
+            <View style={styles.badge}>
+              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                {typeLabel}
+              </FinoraText>
+            </View>
+          ) : null}
+
+          {(!hasRating || !hasRuntime) && isHD ? (
+            <View style={styles.badge}>
+              <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                HD
               </FinoraText>
             </View>
           ) : null}
@@ -190,7 +242,7 @@ export const HeroBanner = React.memo(function HeroBanner({
             onPress={() => onToggleFavorite && onToggleFavorite(item)}
           />
         </View>
-      </View>
+      </Animated.View>
     </Pressable>
   );
 });
@@ -246,20 +298,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.38)",
-    borderColor: "rgba(255, 255, 255, 0.30)",
+    backgroundColor: "rgba(22, 22, 30, 0.88)",
+    borderColor: "rgba(255, 255, 255, 0.28)",
     borderWidth: 1,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 6
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+    borderRadius: 8
   },
   ratingBadge: {
-    backgroundColor: "rgba(255, 184, 0, 0.45)",
-    borderColor: "rgba(255, 215, 0, 0.70)",
-    borderWidth: 1
+    backgroundColor: "rgba(45, 35, 10, 0.92)",
+    borderColor: "rgba(255, 184, 0, 0.85)",
+    borderWidth: 1.2
   },
   starIcon: {
-    marginRight: 4
+    marginRight: 5
+  },
+  badgeText: {
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "700"
   },
   actionsRow: {
     flexDirection: "row",

@@ -87,14 +87,20 @@ export default function HomeScreen() {
     }
   }, [queryClient]);
 
+  const isFocusedRef = React.useRef(true);
+
   useFocusEffect(
     useCallback(() => {
+      isFocusedRef.current = true;
       const now = Date.now();
       // Throttle focus refetch to at most once every 15 seconds
       if (now - lastFocusRef.current > 15000) {
         lastFocusRef.current = now;
         queryClient.invalidateQueries({ queryKey: mediaKeys.all, refetchType: "active" });
       }
+      return () => {
+        isFocusedRef.current = false;
+      };
     }, [queryClient])
   );
 
@@ -124,6 +130,21 @@ export default function HomeScreen() {
 
     return list;
   }, [recentItems, resumeItems]);
+
+  // Netflix-style automatic rotation every 5 seconds when screen is focused
+  React.useEffect(() => {
+    if (isPullRefreshing || heroPool.length <= 1) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      if (isFocusedRef.current) {
+        setHeroIndex((prev) => prev + 1);
+      }
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [isPullRefreshing, heroPool.length]);
 
   // Dynamically select featured item using circular rotation index
   const featuredItem = useMemo(() => {

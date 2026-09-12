@@ -90,6 +90,10 @@ describe("HomeScreen", () => {
     // Check that sections render
     expect(root.findByProps({ title: "Continue Watching" })).toBeDefined();
     expect(root.findByProps({ title: "Recently Added" })).toBeDefined();
+
+    ReactTestRenderer.act(() => {
+      component.unmount();
+    });
   });
 
   it("rotates HeroBanner item dynamically on pull-to-refresh", async () => {
@@ -143,5 +147,9 @@ describe("HomeScreen", () => {
 
     // Hero banner should cycle back to Oppenheimer
     expect(root.findByProps({ accessibilityLabel: "Featured: Oppenheimer" })).toBeDefined();
+
+    ReactTestRenderer.act(() => {
+      component.unmount();
+    });
   });
 });
