@@ -18,7 +18,7 @@ export class HapticService {
     if (!this.enabled) return;
     try {
       if (Platform.OS === "android") {
-        Vibration.vibrate(10);
+        Vibration.vibrate(25);
       } else if (Platform.OS === "ios") {
         Vibration.vibrate();
       }
@@ -34,7 +34,7 @@ export class HapticService {
     if (!this.enabled) return;
     try {
       if (Platform.OS === "android") {
-        Vibration.vibrate(25);
+        Vibration.vibrate(50);
       } else {
         Vibration.vibrate();
       }
