@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl, Pressable } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -69,11 +69,14 @@ export default function HomeScreen() {
 
   const toggleFavorite = useToggleFavorite(userId || "");
 
-  const [isPullRefreshing, setIsPullRefreshing] = React.useState(false);
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+  const [heroIndex, setHeroIndex] = useState(0);
   const lastFocusRef = React.useRef(0);
 
   const onRefresh = useCallback(async () => {
     setIsPullRefreshing(true);
+    // Dynamically cycle hero banner to next eligible media item
+    setHeroIndex((prev) => prev + 1);
     try {
       // 1. Ask Jellyfin to check disk changes / scan (throttled to 1/30s)
       await mediaRepository.refreshLibrary().catch(() => {});
@@ -95,15 +98,38 @@ export default function HomeScreen() {
     }, [queryClient])
   );
 
-  // Derive featured hero item (prefer first recently added with backdrop or primary image, then resume item)
-  const featuredItem =
-    recentItems?.find((i) => i.backdropImageTag && !i.isMissing && i.locationType !== "Virtual") ||
-    recentItems?.find((i) => i.primaryImageTag && !i.isMissing && i.locationType !== "Virtual") ||
-    resumeItems?.find((i) => i.backdropImageTag && !i.isMissing && i.locationType !== "Virtual") ||
-    resumeItems?.find((i) => i.primaryImageTag && !i.isMissing && i.locationType !== "Virtual") ||
-    recentItems?.[0] ||
-    resumeItems?.[0] ||
-    null;
+  // Build candidate pool for the featured hero banner
+  const heroPool = useMemo(() => {
+    const list: MediaItem[] = [];
+    const seen = new Set<string>();
+
+    const addIfValid = (items?: MediaItem[]) => {
+      if (!items) return;
+      for (const item of items) {
+        if (!item || !item.id || seen.has(item.id)) continue;
+        if (item.isMissing || item.locationType === "Virtual") continue;
+        if (item.backdropImageTag || item.primaryImageTag) {
+          seen.add(item.id);
+          list.push(item);
+        }
+      }
+    };
+
+    // Priority 1: Recently added with backdrops (cinematic widescreen)
+    addIfValid(recentItems?.filter((i) => Boolean(i.backdropImageTag)));
+    // Priority 2: Other recently added with primary tags
+    addIfValid(recentItems);
+    // Priority 3: In-progress resume items with visuals
+    addIfValid(resumeItems);
+
+    return list;
+  }, [recentItems, resumeItems]);
+
+  // Dynamically select featured item using circular rotation index
+  const featuredItem = useMemo(() => {
+    if (heroPool.length === 0) return null;
+    return heroPool[heroIndex % heroPool.length];
+  }, [heroPool, heroIndex]);
 
   const handlePlay = (item: MediaItem) => {
     if (item.type === "Series" || item.type === "Season") {

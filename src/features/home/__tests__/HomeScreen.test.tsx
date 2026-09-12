@@ -91,4 +91,57 @@ describe("HomeScreen", () => {
     expect(root.findByProps({ title: "Continue Watching" })).toBeDefined();
     expect(root.findByProps({ title: "Recently Added" })).toBeDefined();
   });
+
+  it("rotates HeroBanner item dynamically on pull-to-refresh", async () => {
+    (useRecentlyAdded as jest.Mock).mockReturnValue({
+      data: [
+        {
+          id: "recent-1",
+          name: "Oppenheimer",
+          type: "Movie",
+          backdropImageTag: "backdrop-tag-opp"
+        },
+        {
+          id: "recent-2",
+          name: "Interstellar",
+          type: "Movie",
+          backdropImageTag: "backdrop-tag-inter"
+        }
+      ],
+      isLoading: false,
+      refetch: jest.fn()
+    });
+
+    let component: any;
+    ReactTestRenderer.act(() => {
+      component = ReactTestRenderer.create(
+        <QueryClientProvider client={queryClient}>
+          <HomeScreen />
+        </QueryClientProvider>
+      );
+    });
+
+    const root = component.root;
+    // Initial hero item should be Oppenheimer
+    expect(root.findByProps({ accessibilityLabel: "Featured: Oppenheimer" })).toBeDefined();
+
+    // Find ScrollView and trigger onRefresh from refreshControl prop
+    const scrollView = root.findByType("ScrollView" as any);
+    expect(scrollView.props.refreshControl).toBeDefined();
+
+    await ReactTestRenderer.act(async () => {
+      await scrollView.props.refreshControl.props.onRefresh();
+    });
+
+    // Hero banner should now have rotated to Interstellar
+    expect(root.findByProps({ accessibilityLabel: "Featured: Interstellar" })).toBeDefined();
+
+    // Trigger onRefresh again to verify circular rotation
+    await ReactTestRenderer.act(async () => {
+      await scrollView.props.refreshControl.props.onRefresh();
+    });
+
+    // Hero banner should cycle back to Oppenheimer
+    expect(root.findByProps({ accessibilityLabel: "Featured: Oppenheimer" })).toBeDefined();
+  });
 });
