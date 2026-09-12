@@ -86,14 +86,12 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   // Normalize codecs (e.g. h265 -> hevc, dca -> dts)
   const normVideoCodec = videoCodec === "h265" ? "hevc" : videoCodec;
   const normAudioCodec = audioCodec;
-  const isMultichannel = Boolean(audioStream?.channels && audioStream.channels > 2);
 
   const isContainerSupported = deviceProfile.supportedContainers.includes(mediaContainer);
   const isVideoSupported =
     !normVideoCodec || deviceProfile.supportedVideoCodecs.includes(normVideoCodec);
   const isAudioSupported =
-    !normAudioCodec ||
-    (deviceProfile.supportedAudioCodecs.includes(normAudioCodec) && !isMultichannel);
+    !normAudioCodec || deviceProfile.supportedAudioCodecs.includes(normAudioCodec);
 
   // If user selected a non-default audio track and video is supported:
   // Use Direct Stream with copy video and copy/transcode audio with AudioStreamIndex
@@ -158,8 +156,6 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   }
   if (!isAudioSupported && normAudioCodec) {
     unsupportedReasons.push(`audio codec '${normAudioCodec}'`);
-  } else if (isMultichannel) {
-    unsupportedReasons.push("multichannel audio downmix");
   }
   if (!isContainerSupported) {
     unsupportedReasons.push(`container '${mediaContainer}'`);

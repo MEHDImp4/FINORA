@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import { useVideoPlayer, VideoPlayer } from "expo-video";
 import { FinoraPlayerEngine } from "./FinoraPlayerEngine";
 import { FinoraPlayerControls, FinoraPlayerSnapshot, IFinoraPlayerEngine } from "./types";
+import { logger } from "../../core/network/logger";
 
 export interface UseFinoraPlayerOptions {
   sourceUrl?: string;
@@ -73,7 +74,30 @@ export function useFinoraPlayer({
         pendingPlayRef.current = wasPlaying;
       }
 
-      player.replace(videoSource);
+      if (typeof player.replaceAsync === "function") {
+        player
+          .replaceAsync(videoSource)
+          .then(() => {
+            if (pendingSeekPositionRef.current !== null) {
+              const targetPos = pendingSeekPositionRef.current;
+              const shouldPlay = pendingPlayRef.current;
+              pendingSeekPositionRef.current = null;
+              try {
+                player.currentTime = targetPos;
+                if (shouldPlay) {
+                  player.play();
+                }
+              } catch {
+                // Ignore
+              }
+            }
+          })
+          .catch((err) => {
+            logger.warn("[useFinoraPlayer] replaceAsync error:", err);
+          });
+      } else if (typeof (player as any).replace === "function") {
+        (player as any).replace(videoSource, true);
+      }
     }
     prevSourceUrlRef.current = sourceUrl;
   }, [videoSource, sourceUrl, player, engine]);

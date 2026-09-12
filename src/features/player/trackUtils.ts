@@ -68,6 +68,11 @@ export function findMatchingAudioTrack(
     return undefined;
   }
 
+  // When metadata audioStreams is empty, targetStreamIndex directly refers to the native track index
+  if (audioStreams.length === 0 && targetStreamIndex >= 0 && targetStreamIndex < availableTracks.length) {
+    return availableTracks[targetStreamIndex];
+  }
+
   const targetOrdinal = audioStreams.findIndex((s) => s.index === targetStreamIndex);
   const targetStream = targetOrdinal >= 0 ? audioStreams[targetOrdinal] : undefined;
 
@@ -130,6 +135,11 @@ export function findMatchingSubtitleTrack(
 ): any | undefined {
   if (!availableTracks || availableTracks.length === 0 || targetStreamIndex === undefined || targetStreamIndex === null) {
     return undefined;
+  }
+
+  // When metadata subtitleStreams is empty, targetStreamIndex directly refers to the native track index
+  if (subtitleStreams.length === 0 && targetStreamIndex >= 0 && targetStreamIndex < availableTracks.length) {
+    return availableTracks[targetStreamIndex];
   }
 
   const targetOrdinal = subtitleStreams.findIndex((s) => s.index === targetStreamIndex);
