@@ -72,6 +72,8 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   const mediaContainer = (container || item.container || "mp4").toLowerCase();
   const mediaSourceId = item.mediaSourceId;
   const mediaSourceParam = mediaSourceId ? `&mediaSourceId=${encodeURIComponent(mediaSourceId)}` : "";
+  const hlsMediaSourceId = item.mediaSourceId || item.id;
+  const hlsMediaSourceParam = `&mediaSourceId=${encodeURIComponent(hlsMediaSourceId)}&MediaSourceId=${encodeURIComponent(hlsMediaSourceId)}`;
   const audioIndexParam =
     audioStreamIndex !== undefined
       ? `&audioStreamIndex=${audioStreamIndex}&AudioStreamIndex=${audioStreamIndex}`
@@ -100,7 +102,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     const audioChannelsParam = !isAudioSupported ? "&audioChannels=2" : "";
     const directStreamUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=copy&audioCodec=${targetAudioCodec}${audioChannelsParam}${
       token ? `&api_key=${encodeURIComponent(token)}` : ""
-    }${mediaSourceParam}${audioIndexParam}${subtitleIndexParam}&transcodingProtocol=hls`;
+    }${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`;
 
     return {
       mode: "direct-stream",
@@ -166,7 +168,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   const targetVideoCodec = isVideoSupported ? "copy" : "h264";
   const transcodeUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=${targetVideoCodec}&audioCodec=aac&audioChannels=2${
     token ? `&api_key=${encodeURIComponent(token)}` : ""
-  }${mediaSourceParam}${audioIndexParam}${subtitleIndexParam}&transcodingProtocol=hls`;
+  }${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`;
 
   return {
     mode: "transcode",

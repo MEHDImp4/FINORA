@@ -20,6 +20,8 @@ export interface TrackSelectionModalProps {
   selectedAudioIndex?: number;
   selectedSubtitleIndex?: number | null;
   selectedQuality?: string;
+  availableAudioTracks?: any[];
+  availableSubtitleTracks?: any[];
   onSelectAudio: (index: number) => void;
   onSelectSubtitle: (index: number | null) => void;
   onSelectQuality: (quality: string) => void;
@@ -41,6 +43,8 @@ export function TrackSelectionModal({
   selectedAudioIndex,
   selectedSubtitleIndex = null,
   selectedQuality = "auto",
+  availableAudioTracks = [],
+  availableSubtitleTracks = [],
   onSelectAudio,
   onSelectSubtitle,
   onSelectQuality
@@ -111,7 +115,7 @@ export function TrackSelectionModal({
                 variant="caption"
                 style={[styles.tabText, activeTab === "audio" && styles.tabTextActive]}
               >
-                Audio ({audioStreams.length})
+                Audio ({audioStreams.length || availableAudioTracks.length})
               </FinoraText>
             </Pressable>
 
@@ -124,7 +128,7 @@ export function TrackSelectionModal({
                 variant="caption"
                 style={[styles.tabText, activeTab === "subtitles" && styles.tabTextActive]}
               >
-                Subtitles ({subtitleStreams.length})
+                Subtitles ({subtitleStreams.length || availableSubtitleTracks.length})
               </FinoraText>
             </Pressable>
 
@@ -147,11 +151,11 @@ export function TrackSelectionModal({
             {/* Audio Tab */}
             {activeTab === "audio" && (
               <View testID="audio-list">
-                {audioStreams.length === 0 ? (
+                {audioStreams.length === 0 && availableAudioTracks.length === 0 ? (
                   <FinoraText variant="caption" style={styles.emptyText}>
                     No audio tracks available
                   </FinoraText>
-                ) : (
+                ) : audioStreams.length > 0 ? (
                   audioStreams.map((stream, idx) => {
                     const streamIdx = stream.index !== undefined ? stream.index : idx;
                     const isSelected = selectedAudioIndex === streamIdx;
@@ -168,6 +172,31 @@ export function TrackSelectionModal({
                           style={[styles.optionText, isSelected && styles.optionTextSelected]}
                         >
                           {formatAudioTitle(stream, idx)}
+                        </FinoraText>
+                        {isSelected && (
+                          <Ionicons name="checkmark" size={18} color={colors.primary} />
+                        )}
+                      </Pressable>
+                    );
+                  })
+                ) : (
+                  availableAudioTracks.map((track, idx) => {
+                    const isSelected = selectedAudioIndex === idx;
+                    const trackLabel =
+                      track.label || track.name || (track.language ? track.language.toUpperCase() : `Audio ${idx + 1}`);
+
+                    return (
+                      <Pressable
+                        key={`native-audio-${track.id || idx}`}
+                        style={[styles.optionRow, isSelected && styles.optionRowSelected]}
+                        onPress={() => onSelectAudio(idx)}
+                        testID={`audio-option-${idx}`}
+                      >
+                        <FinoraText
+                          variant="body"
+                          style={[styles.optionText, isSelected && styles.optionTextSelected]}
+                        >
+                          {trackLabel}
                         </FinoraText>
                         {isSelected && (
                           <Ionicons name="checkmark" size={18} color={colors.primary} />
@@ -205,29 +234,54 @@ export function TrackSelectionModal({
                   )}
                 </Pressable>
 
-                {subtitleStreams.map((stream, idx) => {
-                  const streamIdx = stream.index !== undefined ? stream.index : idx;
-                  const isSelected = selectedSubtitleIndex === streamIdx;
+                {subtitleStreams.length > 0
+                  ? subtitleStreams.map((stream, idx) => {
+                      const streamIdx = stream.index !== undefined ? stream.index : idx;
+                      const isSelected = selectedSubtitleIndex === streamIdx;
 
-                  return (
-                    <Pressable
-                      key={`sub-${streamIdx}`}
-                      style={[styles.optionRow, isSelected && styles.optionRowSelected]}
-                      onPress={() => onSelectSubtitle(streamIdx)}
-                      testID={`subtitle-option-${streamIdx}`}
-                    >
-                      <FinoraText
-                        variant="body"
-                        style={[styles.optionText, isSelected && styles.optionTextSelected]}
-                      >
-                        {formatSubtitleTitle(stream, idx)}
-                      </FinoraText>
-                      {isSelected && (
-                        <Ionicons name="checkmark" size={18} color={colors.primary} />
-                      )}
-                    </Pressable>
-                  );
-                })}
+                      return (
+                        <Pressable
+                          key={`sub-${streamIdx}`}
+                          style={[styles.optionRow, isSelected && styles.optionRowSelected]}
+                          onPress={() => onSelectSubtitle(streamIdx)}
+                          testID={`subtitle-option-${streamIdx}`}
+                        >
+                          <FinoraText
+                            variant="body"
+                            style={[styles.optionText, isSelected && styles.optionTextSelected]}
+                          >
+                            {formatSubtitleTitle(stream, idx)}
+                          </FinoraText>
+                          {isSelected && (
+                            <Ionicons name="checkmark" size={18} color={colors.primary} />
+                          )}
+                        </Pressable>
+                      );
+                    })
+                  : availableSubtitleTracks.map((track, idx) => {
+                      const isSelected = selectedSubtitleIndex === idx;
+                      const trackLabel =
+                        track.label || (track.language ? track.language.toUpperCase() : `Subtitle ${idx + 1}`);
+
+                      return (
+                        <Pressable
+                          key={`native-sub-${track.id || idx}`}
+                          style={[styles.optionRow, isSelected && styles.optionRowSelected]}
+                          onPress={() => onSelectSubtitle(idx)}
+                          testID={`subtitle-option-${idx}`}
+                        >
+                          <FinoraText
+                            variant="body"
+                            style={[styles.optionText, isSelected && styles.optionTextSelected]}
+                          >
+                            {trackLabel}
+                          </FinoraText>
+                          {isSelected && (
+                            <Ionicons name="checkmark" size={18} color={colors.primary} />
+                          )}
+                        </Pressable>
+                      );
+                    })}
               </View>
             )}
 

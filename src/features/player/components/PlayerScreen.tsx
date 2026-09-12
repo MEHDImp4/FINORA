@@ -20,6 +20,8 @@ import { StatsForNerdsModal } from "./StatsForNerdsModal";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
 import { formatAuthorizationHeader } from "../../../core/jellyfin/clientInfo";
+import { findMatchingAudioTrack, findMatchingSubtitleTrack } from "../trackUtils";
+import { logger } from "../../../core/network/logger";
 
 export interface PlayerScreenProps {
   item: MediaItem;
@@ -54,10 +56,19 @@ export function PlayerScreen({
     return undefined;
   }, [item.mediaStreams]);
 
+  // UI Selection states (controls checkmarks in TrackSelectionModal)
   const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | undefined>(defaultAudioIndex);
   const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState<number | null>(null);
   const [selectedQuality, setSelectedQuality] = useState<string>("auto");
   const [isLandscape, setIsLandscape] = useState(false);
+
+  // Server stream states (ONLY updated when native track switching cannot be performed and server stream must be replaced)
+  const [serverAudioIndex, setServerAudioIndex] = useState<number | undefined>(undefined);
+  const [serverSubtitleIndex, setServerSubtitleIndex] = useState<number | null>(null);
+
+  // Live native tracks from expo-video
+  const [availableAudioTracks, setAvailableAudioTracks] = useState<any[]>([]);
+  const [availableSubtitleTracks, setAvailableSubtitleTracks] = useState<any[]>([]);
 
   useEffect(() => {
     if (selectedAudioIndex === undefined && defaultAudioIndex !== undefined) {
@@ -117,10 +128,10 @@ export function PlayerScreen({
       serverUrl,
       token,
       localPath,
-      audioStreamIndex: selectedAudioIndex,
-      subtitleStreamIndex: selectedSubtitleIndex
+      audioStreamIndex: serverAudioIndex,
+      subtitleStreamIndex: serverSubtitleIndex
     });
-  }, [item, serverUrl, token, localPath, selectedAudioIndex, selectedSubtitleIndex]);
+  }, [item, serverUrl, token, localPath, serverAudioIndex, serverSubtitleIndex]);
 
   // Initial resume position in seconds
   const initialPositionSeconds = useMemo(() => {
@@ -157,6 +168,83 @@ export function PlayerScreen({
     snapshot,
     repository: customPlaybackRepo
   });
+
+  // Track and synchronize native audio tracks from expo-video
+  useEffect(() => {
+    if (!player) return;
+
+    const syncAudioTrack = (tracks: any[]) => {
+      if (!tracks || tracks.length <= 1 || selectedAudioIndex === undefined) return;
+      const audioStreams = item.mediaStreams?.filter((s) => s.type === "Audio") || [];
+      const match = findMatchingAudioTrack(tracks, audioStreams, selectedAudioIndex);
+      if (match && player.audioTrack?.id !== match.id) {
+        try {
+          player.audioTrack = match;
+          logger.info(`[PlayerScreen] Synced native audio track to id=${match.id} (${match.label || match.language})`);
+        } catch (e) {
+          logger.warn("[PlayerScreen] Could not sync native audio track:", e);
+        }
+      }
+    };
+
+    if (player.availableAudioTracks && player.availableAudioTracks.length > 0) {
+      setAvailableAudioTracks(player.availableAudioTracks);
+      syncAudioTrack(player.availableAudioTracks);
+    }
+
+    const audioSub = player.addListener?.("availableAudioTracksChange", (payload: any) => {
+      const tracks = payload?.availableAudioTracks || player.availableAudioTracks || [];
+      setAvailableAudioTracks(tracks);
+      syncAudioTrack(tracks);
+    });
+
+    return () => {
+      audioSub?.remove?.();
+    };
+  }, [player, selectedAudioIndex, item.mediaStreams]);
+
+  // Track and synchronize native subtitle tracks from expo-video
+  useEffect(() => {
+    if (!player) return;
+
+    const syncSubtitleTrack = (tracks: any[]) => {
+      if (selectedSubtitleIndex === null) {
+        if (player.subtitleTrack !== null) {
+          try {
+            player.subtitleTrack = null;
+          } catch {
+            // Ignored
+          }
+        }
+        return;
+      }
+      if (!tracks || tracks.length === 0) return;
+      const subStreams = item.mediaStreams?.filter((s) => s.type === "Subtitle") || [];
+      const match = findMatchingSubtitleTrack(tracks, subStreams, selectedSubtitleIndex);
+      if (match && player.subtitleTrack?.id !== match.id) {
+        try {
+          player.subtitleTrack = match;
+        } catch {
+          // Ignored
+        }
+      }
+    };
+
+    if (player.availableSubtitleTracks && player.availableSubtitleTracks.length > 0) {
+      setAvailableSubtitleTracks(player.availableSubtitleTracks);
+      syncSubtitleTrack(player.availableSubtitleTracks);
+    }
+
+    const subTrackSub = player.addListener?.("availableSubtitleTracksChange", (payload: any) => {
+      const tracks = payload?.availableSubtitleTracks || player.availableSubtitleTracks || [];
+      setAvailableSubtitleTracks(tracks);
+      syncSubtitleTrack(tracks);
+    });
+
+    return () => {
+      subTrackSub?.remove?.();
+    };
+  }, [player, selectedSubtitleIndex, item.mediaStreams]);
 
   const handleBack = () => {
     controls.pause();
@@ -252,6 +340,8 @@ export function PlayerScreen({
         visible={tracksModalVisible}
         onClose={() => setTracksModalVisible(false)}
         streams={item.mediaStreams}
+        availableAudioTracks={availableAudioTracks}
+        availableSubtitleTracks={availableSubtitleTracks}
         selectedAudioIndex={selectedAudioIndex}
         selectedSubtitleIndex={selectedSubtitleIndex}
         selectedQuality={selectedQuality}
@@ -259,54 +349,65 @@ export function PlayerScreen({
           setSelectedAudioIndex(idx);
           setTracksModalVisible(false);
 
-          // Native player track switch (for offline or local container tracks)
-          try {
-            const selectedStream = item.mediaStreams?.find((s) => s.index === idx && s.type === "Audio");
-            if (selectedStream && player.availableAudioTracks && player.availableAudioTracks.length > 1) {
-              const nativeTrack = player.availableAudioTracks.find((t) => {
-                if (!selectedStream.language) return false;
-                const lang = selectedStream.language.toLowerCase();
-                return (
-                  t.language.toLowerCase() === lang ||
-                  t.label.toLowerCase().includes(lang) ||
-                  (selectedStream.displayTitle && t.label.toLowerCase().includes(selectedStream.displayTitle.toLowerCase()))
+          const audioStreams = item.mediaStreams?.filter((s) => s.type === "Audio") || [];
+          const currentTracks =
+            player.availableAudioTracks && player.availableAudioTracks.length > 0
+              ? player.availableAudioTracks
+              : availableAudioTracks;
+
+          // Tier 1: Instant native track switch without interrupting or reloading playback
+          if (currentTracks && currentTracks.length > 0) {
+            const matchingTrack = findMatchingAudioTrack(currentTracks, audioStreams, idx);
+            if (matchingTrack) {
+              try {
+                player.audioTrack = matchingTrack;
+                logger.info(
+                  `[PlayerScreen] Native audio track switched successfully to id=${matchingTrack.id} (${matchingTrack.label || matchingTrack.language})`
                 );
-              });
-              if (nativeTrack) {
-                player.audioTrack = nativeTrack;
+                return;
+              } catch (err) {
+                logger.warn("[PlayerScreen] Native audio track switch failed, falling back to server:", err);
               }
             }
-          } catch {
-            // Ignored
           }
+
+          // Tier 2: Server transcode/remux stream replacement fallback
+          logger.info(`[PlayerScreen] Requesting server-side audio switch for stream index ${idx}`);
+          setServerAudioIndex(idx);
         }}
         onSelectSubtitle={(idx) => {
           setSelectedSubtitleIndex(idx);
           setTracksModalVisible(false);
 
-          try {
-            if (idx === null) {
+          if (idx === null) {
+            try {
               player.subtitleTrack = null;
-            } else if (player.availableSubtitleTracks && player.availableSubtitleTracks.length > 0) {
-              const selectedStream = item.mediaStreams?.find((s) => s.index === idx && s.type === "Subtitle");
-              if (selectedStream) {
-                const nativeTrack = player.availableSubtitleTracks.find((t) => {
-                  if (!selectedStream.language) return false;
-                  const lang = selectedStream.language.toLowerCase();
-                  return (
-                    t.language.toLowerCase() === lang ||
-                    t.label.toLowerCase().includes(lang) ||
-                    (selectedStream.displayTitle && t.label.toLowerCase().includes(selectedStream.displayTitle.toLowerCase()))
-                  );
-                });
-                if (nativeTrack) {
-                  player.subtitleTrack = nativeTrack;
-                }
+            } catch {
+              // Ignored
+            }
+            setServerSubtitleIndex(null);
+            return;
+          }
+
+          const subStreams = item.mediaStreams?.filter((s) => s.type === "Subtitle") || [];
+          const currentTracks =
+            player.availableSubtitleTracks && player.availableSubtitleTracks.length > 0
+              ? player.availableSubtitleTracks
+              : availableSubtitleTracks;
+
+          if (currentTracks && currentTracks.length > 0) {
+            const matchingTrack = findMatchingSubtitleTrack(currentTracks, subStreams, idx);
+            if (matchingTrack) {
+              try {
+                player.subtitleTrack = matchingTrack;
+                return;
+              } catch {
+                // Fallback to server
               }
             }
-          } catch {
-            // Ignored
           }
+
+          setServerSubtitleIndex(idx);
         }}
         onSelectQuality={(q) => {
           setSelectedQuality(q);
