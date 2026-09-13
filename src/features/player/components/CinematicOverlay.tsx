@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   },
   overlayBackdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0, 0, 0, 0.55)"
+    backgroundColor: "rgba(0, 0, 0, 0.02)"
   },
   topBar: {
     flexDirection: "row",
