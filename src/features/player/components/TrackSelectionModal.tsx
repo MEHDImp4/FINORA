@@ -30,12 +30,8 @@ export interface TrackSelectionModalProps {
 
 export type TabKey = "audio" | "subtitles" | "quality";
 
-export const QUALITY_OPTIONS = [
-  { id: "auto", label: "Auto (Direct Play)", bitrate: 0 },
-  { id: "1080p", label: "1080p - 10 Mbps", bitrate: 10000000 },
-  { id: "720p", label: "720p - 4 Mbps", bitrate: 4000000 },
-  { id: "480p", label: "480p - 1.5 Mbps", bitrate: 1500000 }
-];
+import { QUALITY_OPTIONS, QualityPreset } from "../qualityPresets";
+export { QUALITY_OPTIONS, QualityPreset };
 
 export function TrackSelectionModal({
   visible,

@@ -24,6 +24,7 @@ export interface MediaStreamInfo {
   isExternal?: boolean;
   width?: number;
   height?: number;
+  bitRate?: number;
   channels?: number;
   isDefault?: boolean;
   deliveryUrl?: string;
@@ -73,6 +74,7 @@ export interface MediaItem {
   mediaStreams?: MediaStreamInfo[];
   chapters?: ChapterMarker[];
   container?: string;
+  bitRate?: number;
   mediaSourceId?: string;
   locationType?: string;
   isMissing?: boolean;

@@ -131,6 +131,8 @@ describe("TrackSelectionModal", () => {
     });
 
     const qualityOption = root.root.findByProps({ testID: "quality-option-1080p" });
+    expect(root.root.findByProps({ testID: "quality-option-original" })).toBeTruthy();
+    expect(root.root.findByProps({ testID: "quality-option-4k" })).toBeTruthy();
     act(() => {
       qualityOption.props.onPress();
     });

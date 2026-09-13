@@ -158,11 +158,12 @@ export function PlayerScreen({
       serverUrl,
       token,
       platform: Platform.OS,
+      quality: selectedQuality,
       localPath,
       audioStreamIndex: serverAudioIndex,
       subtitleStreamIndex: serverSubtitleIndex
     });
-  }, [item, serverUrl, token, localPath, serverAudioIndex, serverSubtitleIndex]);
+  }, [item, serverUrl, token, selectedQuality, localPath, serverAudioIndex, serverSubtitleIndex]);
 
   // Initial resume position in seconds
   const initialPositionSeconds = useMemo(() => {

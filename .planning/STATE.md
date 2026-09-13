@@ -106,6 +106,7 @@ Items acknowledged and carried forward from previous milestone close:
 | Slug | Date | Description | Status |
 |------|------|-------------|--------|
 | device-profile-platform-fix | 2026-09-14 | Resolve device profile platform via Platform.OS for iOS & Android | Complete ✓ |
+| player-quality-selector-fix | 2026-09-14 | Implement dynamic player quality selector with real Jellyfin transcoding | Complete ✓ |
 
 ## Session Continuity
  

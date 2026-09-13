@@ -214,4 +214,104 @@ describe("PlaybackPlanner", () => {
     expect(sanitized).not.toContain("super_secret_token");
     expect(sanitized).toContain("api_key=[REDACTED]");
   });
+
+  describe("Quality Selection & Transcoding", () => {
+    const fullHdItem: MediaItem = {
+      ...baseItem,
+      mediaStreams: [
+        { type: "Video", codec: "h264", width: 1920, height: 1080 },
+        { type: "Audio", codec: "aac", channels: 2 }
+      ]
+    };
+
+    it("injects 720p quality parameters and transcodes when 720p is selected", () => {
+      const plan = createPlaybackPlan({
+        item: fullHdItem,
+        serverUrl,
+        token,
+        container: "mp4",
+        quality: "720p"
+      });
+
+      expect(plan.mode).toBe("transcode");
+      expect(plan.quality).toBe("720p");
+      expect(plan.maxWidth).toBe(1280);
+      expect(plan.maxHeight).toBe(720);
+      expect(plan.bitrate).toBe(4000000);
+      expect(plan.url).toContain("maxWidth=1280&maxHeight=720&videoBitRate=4000000&maxVideoBitRate=4000000");
+      expect(plan.url).toContain("videoCodec=h264");
+      expect(plan.reason).toContain("Transcoding to requested quality: 720p HD - 4 Mbps");
+    });
+
+    it("injects 480p quality parameters when 480p is selected", () => {
+      const plan = createPlaybackPlan({
+        item: fullHdItem,
+        serverUrl,
+        token,
+        container: "mp4",
+        quality: "480p"
+      });
+
+      expect(plan.mode).toBe("transcode");
+      expect(plan.quality).toBe("480p");
+      expect(plan.maxWidth).toBe(854);
+      expect(plan.maxHeight).toBe(480);
+      expect(plan.bitrate).toBe(1500000);
+      expect(plan.url).toContain("maxWidth=854&maxHeight=480&videoBitRate=1500000&maxVideoBitRate=1500000");
+    });
+
+    it("injects 1080p quality constraints for 4K media", () => {
+      const fourKItem: MediaItem = {
+        ...baseItem,
+        mediaStreams: [
+          { type: "Video", codec: "hevc", width: 3840, height: 2160 },
+          { type: "Audio", codec: "aac", channels: 2 }
+        ]
+      };
+
+      const plan = createPlaybackPlan({
+        item: fourKItem,
+        serverUrl,
+        token,
+        container: "mp4",
+        quality: "1080p"
+      });
+
+      expect(plan.mode).toBe("transcode");
+      expect(plan.quality).toBe("1080p");
+      expect(plan.maxWidth).toBe(1920);
+      expect(plan.maxHeight).toBe(1080);
+      expect(plan.bitrate).toBe(10000000);
+      expect(plan.url).toContain("maxWidth=1920&maxHeight=1080&videoBitRate=10000000");
+      expect(plan.url).toContain("videoCodec=h264");
+    });
+
+    it("direct plays when quality is 'original' on supported media", () => {
+      const plan = createPlaybackPlan({
+        item: fullHdItem,
+        serverUrl,
+        token,
+        container: "mp4",
+        quality: "original"
+      });
+
+      expect(plan.mode).toBe("direct-play");
+      expect(plan.quality).toBe("original");
+      expect(plan.url).not.toContain("videoBitRate=");
+    });
+
+    it("always uses direct play for offline local files regardless of quality setting", () => {
+      const plan = createPlaybackPlan({
+        item: fullHdItem,
+        serverUrl,
+        token,
+        localPath: "file:///data/user/0/finora/video.mp4",
+        quality: "480p"
+      });
+
+      expect(plan.mode).toBe("direct-play");
+      expect(plan.url).toBe("file:///data/user/0/finora/video.mp4");
+      expect(plan.reason).toContain("Offline local file playback");
+    });
+  });
 });

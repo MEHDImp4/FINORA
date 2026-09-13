@@ -1,6 +1,7 @@
 import { MediaItem } from "../../types/media";
 import { DeviceProfile, getDefaultDeviceProfile } from "./deviceProfile";
 import { sanitizeData } from "../../core/network/logger";
+import { QUALITY_PRESETS, PlaybackQuality } from "./qualityPresets";
 
 export type PlaybackMode = "direct-play" | "direct-stream" | "transcode";
 
@@ -11,6 +12,10 @@ export interface PlaybackPlan {
   videoCodec?: string;
   audioCodec?: string;
   container?: string;
+  quality?: string;
+  bitrate?: number;
+  maxWidth?: number;
+  maxHeight?: number;
   reason: string;
 }
 
@@ -20,6 +25,7 @@ export interface PlaybackPlanOptions {
   token?: string;
   deviceProfile?: DeviceProfile;
   platform?: string;
+  quality?: string;
   container?: string;
   localPath?: string;
   audioStreamIndex?: number;
@@ -37,6 +43,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     token = "",
     platform,
     deviceProfile = getDefaultDeviceProfile(platform),
+    quality = "auto",
     container,
     localPath,
     audioStreamIndex,
@@ -95,6 +102,53 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   const isAudioSupported =
     !normAudioCodec || deviceProfile.supportedAudioCodecs.includes(normAudioCodec);
 
+  // Quality evaluation
+  const qualityPreset = QUALITY_PRESETS[quality] || QUALITY_PRESETS.auto;
+  const isConstrainedQuality =
+    quality !== "auto" &&
+    quality !== "original" &&
+    Boolean(qualityPreset.maxBitrate && qualityPreset.maxWidth && qualityPreset.maxHeight);
+
+  // If user explicitly picked a constrained quality profile (4k, 1080p, 720p, 480p):
+  if (isConstrainedQuality && qualityPreset.maxBitrate && qualityPreset.maxWidth && qualityPreset.maxHeight) {
+    const qualityParams = `&maxWidth=${qualityPreset.maxWidth}&maxHeight=${qualityPreset.maxHeight}&videoBitRate=${qualityPreset.maxBitrate}&maxVideoBitRate=${qualityPreset.maxBitrate}&audioBitRate=192000`;
+
+    // If video is natively supported and its resolution/bitrate are already <= requested target, we can copy video
+    const sourceWidth = videoStream?.width || 0;
+    const sourceHeight = videoStream?.height || 0;
+    const sourceBitrate = videoStream?.bitRate || item.bitRate || 0;
+
+    const canCopyVideo =
+      isVideoSupported &&
+      sourceWidth > 0 &&
+      sourceWidth <= qualityPreset.maxWidth &&
+      sourceHeight > 0 &&
+      sourceHeight <= qualityPreset.maxHeight &&
+      (!sourceBitrate || sourceBitrate <= qualityPreset.maxBitrate);
+
+    const targetVideoCodec = canCopyVideo ? "copy" : "h264";
+    const targetAudioCodec = isAudioSupported && normAudioCodec === "aac" ? "copy" : "aac";
+    const audioChannelsParam = targetAudioCodec === "aac" ? "&audioChannels=2" : "";
+
+    const qualityStreamUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=${targetVideoCodec}&audioCodec=${targetAudioCodec}${audioChannelsParam}${qualityParams}${
+      token ? `&api_key=${encodeURIComponent(token)}` : ""
+    }${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`;
+
+    return {
+      mode: "transcode",
+      url: qualityStreamUrl,
+      mediaSourceId,
+      videoCodec: targetVideoCodec,
+      audioCodec: targetAudioCodec,
+      container: "m3u8",
+      quality: qualityPreset.id,
+      bitrate: qualityPreset.maxBitrate,
+      maxWidth: qualityPreset.maxWidth,
+      maxHeight: qualityPreset.maxHeight,
+      reason: `Transcoding to requested quality: ${qualityPreset.label}.`
+    };
+  }
+
   // If user selected a non-default audio track and video is supported:
   // Use Direct Stream with copy video and copy/transcode audio with AudioStreamIndex
   if (!isDefaultAudioSelected && isVideoSupported) {
@@ -112,6 +166,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
       videoCodec: normVideoCodec,
       audioCodec: targetAudioCodec,
       container: "m3u8",
+      quality: quality === "original" ? "original" : "auto",
       reason: `Selected audio track index ${audioStreamIndex}; streaming with video copy.`
     };
   }
@@ -129,6 +184,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
       videoCodec: normVideoCodec,
       audioCodec: normAudioCodec,
       container: mediaContainer,
+      quality: quality === "original" ? "original" : "auto",
       reason: "Container and all codecs are natively supported by client profile."
     };
   }
@@ -146,6 +202,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
       videoCodec: normVideoCodec,
       audioCodec: normAudioCodec,
       container: mediaContainer,
+      quality: quality === "original" ? "original" : "auto",
       reason: `Container '${mediaContainer}' unsupported; remuxing codecs directly.`
     };
   }
@@ -176,6 +233,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     videoCodec: targetVideoCodec,
     audioCodec: "aac",
     container: "m3u8",
+    quality: quality === "original" ? "original" : "auto",
     reason: `Transcoding required: unsupported ${unsupportedReasons.join(", ") || "format"}.`
   };
 }
