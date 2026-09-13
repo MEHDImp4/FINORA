@@ -124,4 +124,21 @@ describe("MediaCard", () => {
     image = root.findByProps({ contentFit: "cover" });
     expect(image.props.source.uri).toBeTruthy();
   });
+
+  it("triggers onLongPress when card is long-pressed", () => {
+    const onLongPressMock = jest.fn();
+    let component: ReactTestRenderer.ReactTestRenderer;
+    ReactTestRenderer.act(() => {
+      component = ReactTestRenderer.create(
+        <MediaCard item={sampleItem} serverUrl={serverUrl} onLongPress={onLongPressMock} />
+      );
+    });
+
+    const pressable = component!.root.findByType("Pressable" as any);
+    ReactTestRenderer.act(() => {
+      pressable.props.onLongPress();
+    });
+
+    expect(onLongPressMock).toHaveBeenCalledWith(sampleItem);
+  });
 });

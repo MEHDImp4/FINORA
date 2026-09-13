@@ -53,6 +53,12 @@ jest.mock("../../../hooks/useMediaQueries", () => ({
   useWatchlistItems: () => ({ data: [], isLoading: false })
 }));
 
+jest.mock("../../../hooks/useUserDataMutations", () => ({
+  useToggleFavorite: () => ({ mutate: jest.fn() }),
+  useMarkPlayed: () => ({ mutate: jest.fn() }),
+  useRemoveFromResume: () => ({ mutate: jest.fn() })
+}));
+
 describe("LibraryScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();

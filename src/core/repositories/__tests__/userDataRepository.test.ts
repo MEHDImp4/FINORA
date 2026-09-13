@@ -83,4 +83,25 @@ describe("UserDataRepository", () => {
       );
     });
   });
+
+  describe("removeFromResume", () => {
+    it("sends DELETE to PlayingItems and PlayedItems", async () => {
+      await repository.removeFromResume("user-1", "item-100", mockHttpClient);
+
+      expect(mockHttpClient.request).toHaveBeenCalledWith(
+        "/PlayingItems/item-100",
+        { method: "DELETE" }
+      );
+      expect(mockHttpClient.request).toHaveBeenCalledWith(
+        "/Users/user-1/PlayedItems/item-100",
+        { method: "DELETE" }
+      );
+    });
+
+    it("throws FinoraError when userId or itemId is missing", async () => {
+      await expect(repository.removeFromResume("", "item-100", mockHttpClient)).rejects.toThrow(
+        FinoraError
+      );
+    });
+  });
 });

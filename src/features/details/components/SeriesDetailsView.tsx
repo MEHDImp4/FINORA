@@ -30,6 +30,7 @@ import { DownloadQuality } from "../../offline/downloadQuality";
 import { hapticService } from "../../../core/feedback/hapticService";
 import { MediaCarousel } from "../../home/components/MediaCarousel";
 import { useSimilarItems } from "../../../hooks/useMediaQueries";
+import { MediaQuickActionsModal } from "../../home/components/MediaQuickActionsModal";
 
 export interface SeriesDetailsViewProps {
   series: MediaItem;
@@ -39,6 +40,8 @@ export interface SeriesDetailsViewProps {
   onBack: () => void;
   onSelectSimilar?: (item: MediaItem) => void;
   onToggleFavorite?: (item: MediaItem) => void;
+  onTogglePlayed?: (item: MediaItem, played: boolean) => void;
+  onRemoveFromResume?: (item: MediaItem) => void;
   onDownloadEpisodes?: (episodes: MediaItem[], quality: DownloadQuality) => void;
 }
 
@@ -54,6 +57,8 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
     onBack,
     onSelectSimilar,
     onToggleFavorite,
+    onTogglePlayed,
+    onRemoveFromResume,
     onDownloadEpisodes
   }) => {
     const insets = useSafeAreaInsets();
@@ -62,6 +67,25 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
     const [selectedEpisodeForDownload, setSelectedEpisodeForDownload] =
       useState<MediaItem | null>(null);
+    const [actionItem, setActionItem] = useState<MediaItem | null>(null);
+
+    const handleTogglePlayedAction = React.useCallback(
+      (item: MediaItem, played: boolean) => {
+        if (onTogglePlayed) {
+          onTogglePlayed(item, played);
+        }
+      },
+      [onTogglePlayed]
+    );
+
+    const handleRemoveFromResumeAction = React.useCallback(
+      (item: MediaItem) => {
+        if (onRemoveFromResume) {
+          onRemoveFromResume(item);
+        }
+      },
+      [onRemoveFromResume]
+    );
 
     const { data: similarItems = [] } = useSimilarItems(userId, series.id, 12);
 
@@ -292,7 +316,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
                 onPlay={onPlayEpisode}
                 onLongPress={(episode) => {
                   hapticService.impactMedium();
-                  setSelectedEpisodeForDownload(episode);
+                  setActionItem(episode);
                 }}
                 onDownload={(episode) => {
                   hapticService.impactMedium();
@@ -321,6 +345,9 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
               serverUrl={serverUrl}
               variant="poster"
               onItemPress={onSelectSimilar}
+              onItemLongPress={(item) => {
+                setActionItem(item);
+              }}
             />
           </View>
         ) : null}
@@ -351,6 +378,28 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
             }}
           />
         )}
+
+        <MediaQuickActionsModal
+          visible={!!actionItem}
+          item={actionItem}
+          serverUrl={serverUrl}
+          onClose={() => setActionItem(null)}
+          onPlay={(item) => {
+            if (item.type === "Episode") {
+              onPlayEpisode(item);
+            } else if (onSelectSimilar) {
+              onSelectSimilar(item);
+            }
+          }}
+          onViewDetails={(item) => {
+            if (onSelectSimilar) {
+              onSelectSimilar(item);
+            }
+          }}
+          onTogglePlayed={handleTogglePlayedAction}
+          onRemoveFromResume={handleRemoveFromResumeAction}
+          onToggleFavorite={onToggleFavorite}
+        />
       </ScrollView>
     );
   }

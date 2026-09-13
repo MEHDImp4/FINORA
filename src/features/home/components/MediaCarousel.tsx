@@ -11,6 +11,7 @@ interface MediaCarouselProps {
   serverUrl: string;
   variant?: CardVariant;
   onItemPress?: (item: MediaItem) => void;
+  onItemLongPress?: (item: MediaItem) => void;
 }
 
 export const MediaCarousel = React.memo(
@@ -19,7 +20,8 @@ export const MediaCarousel = React.memo(
     items,
     serverUrl,
     variant = "poster",
-    onItemPress
+    onItemPress,
+    onItemLongPress
   }: MediaCarouselProps) {
     const validItems = React.useMemo(() => {
       return (items || []).filter((item) => !item.isMissing && item.locationType !== "Virtual");
@@ -62,6 +64,7 @@ export const MediaCarousel = React.memo(
               serverUrl={serverUrl}
               variant={variant}
               onPress={onItemPress}
+              onLongPress={onItemLongPress}
             />
           )}
         />

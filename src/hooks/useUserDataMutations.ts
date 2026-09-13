@@ -92,6 +92,112 @@ export function useMarkPlayed(userId: string) {
         ? userDataRepository.markPlayed(userId, itemId)
         : userDataRepository.markUnplayed(userId, itemId),
 
+    onMutate: async ({ itemId, played }) => {
+      const detailKey = mediaKeys.detail(userId, itemId);
+      const resumeKey = mediaKeys.resume(userId);
+
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      await queryClient.cancelQueries({ queryKey: resumeKey });
+
+      const previousDetail = queryClient.getQueryData<MediaItem>(detailKey);
+      const previousResume = queryClient.getQueryData<MediaItem[]>(resumeKey);
+
+      if (previousDetail) {
+        queryClient.setQueryData<MediaItem>(detailKey, {
+          ...previousDetail,
+          isPlayed: played,
+          playedPercentage: played ? 100 : 0,
+          playbackPositionTicks: 0
+        });
+      }
+
+      if (previousResume) {
+        queryClient.setQueryData<MediaItem[]>(
+          resumeKey,
+          previousResume.filter((i) => i.id !== itemId)
+        );
+      }
+
+      queryClient.setQueriesData<MediaItem[]>({ queryKey: mediaKeys.all }, (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((i) =>
+          i.id === itemId
+            ? { ...i, isPlayed: played, playedPercentage: played ? 100 : 0, playbackPositionTicks: 0 }
+            : i
+        );
+      });
+
+      return { previousDetail, previousResume };
+    },
+
+    onError: (_err, { itemId }, context) => {
+      if (context?.previousDetail) {
+        queryClient.setQueryData(mediaKeys.detail(userId, itemId), context.previousDetail);
+      }
+      if (context?.previousResume) {
+        queryClient.setQueryData(mediaKeys.resume(userId), context.previousResume);
+      }
+    },
+
+    onSettled: (_data, _err, { itemId }) => {
+      queryClient.invalidateQueries({ queryKey: mediaKeys.detail(userId, itemId) });
+      queryClient.invalidateQueries({ queryKey: mediaKeys.resume(userId) });
+      queryClient.invalidateQueries({ queryKey: mediaKeys.all });
+    }
+  });
+}
+
+export function useRemoveFromResume(userId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ itemId }: { itemId: string }) =>
+      userDataRepository.removeFromResume(userId, itemId),
+
+    onMutate: async ({ itemId }) => {
+      const detailKey = mediaKeys.detail(userId, itemId);
+      const resumeKey = mediaKeys.resume(userId);
+
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      await queryClient.cancelQueries({ queryKey: resumeKey });
+
+      const previousDetail = queryClient.getQueryData<MediaItem>(detailKey);
+      const previousResume = queryClient.getQueryData<MediaItem[]>(resumeKey);
+
+      if (previousDetail) {
+        queryClient.setQueryData<MediaItem>(detailKey, {
+          ...previousDetail,
+          playedPercentage: 0,
+          playbackPositionTicks: 0
+        });
+      }
+
+      if (previousResume) {
+        queryClient.setQueryData<MediaItem[]>(
+          resumeKey,
+          previousResume.filter((i) => i.id !== itemId)
+        );
+      }
+
+      queryClient.setQueriesData<MediaItem[]>({ queryKey: mediaKeys.all }, (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((i) =>
+          i.id === itemId ? { ...i, playedPercentage: 0, playbackPositionTicks: 0 } : i
+        );
+      });
+
+      return { previousDetail, previousResume };
+    },
+
+    onError: (_err, { itemId }, context) => {
+      if (context?.previousDetail) {
+        queryClient.setQueryData(mediaKeys.detail(userId, itemId), context.previousDetail);
+      }
+      if (context?.previousResume) {
+        queryClient.setQueryData(mediaKeys.resume(userId), context.previousResume);
+      }
+    },
+
     onSettled: (_data, _err, { itemId }) => {
       queryClient.invalidateQueries({ queryKey: mediaKeys.detail(userId, itemId) });
       queryClient.invalidateQueries({ queryKey: mediaKeys.resume(userId) });

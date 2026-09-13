@@ -21,6 +21,7 @@ interface MediaCardProps {
   cardHeight?: number;
   style?: StyleProp<ViewStyle>;
   onPress?: (item: MediaItem) => void;
+  onLongPress?: (item: MediaItem) => void;
 }
 
 export const POSTER_WIDTH = 130;
@@ -37,7 +38,8 @@ export const MediaCard = React.memo(
     cardWidth,
     cardHeight,
     style,
-    onPress
+    onPress,
+    onLongPress
   }: MediaCardProps) {
     const isThumbnail = variant === "thumbnail";
     const width = cardWidth ?? (isThumbnail ? THUMBNAIL_WIDTH : POSTER_WIDTH);
@@ -98,6 +100,13 @@ export const MediaCard = React.memo(
       }
     };
 
+    const handleLongPress = () => {
+      hapticService.impactMedium();
+      if (onLongPress) {
+        onLongPress(item);
+      }
+    };
+
     return (
       <Pressable
         style={({ pressed }) => [
@@ -125,6 +134,8 @@ export const MediaCard = React.memo(
           }).start();
         }}
         onPress={handlePress}
+        onLongPress={handleLongPress}
+        delayLongPress={350}
         accessibilityRole="button"
         accessibilityLabel={`${mainTitle}${subTitle ? `, ${subTitle}` : ""}${progressLabel}`}
         accessibilityHint="Double tap to open media details"

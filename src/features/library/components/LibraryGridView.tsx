@@ -10,6 +10,7 @@ interface LibraryGridViewProps {
   serverUrl: string;
   isLoading: boolean;
   onItemPress: (item: MediaItem) => void;
+  onItemLongPress?: (item: MediaItem) => void;
   emptyTitle?: string;
   emptyMessage?: string;
   loadingMessage?: string;
@@ -23,6 +24,7 @@ export const LibraryGridView = React.memo(function LibraryGridView({
   serverUrl,
   isLoading,
   onItemPress,
+  onItemLongPress,
   emptyTitle = "No Items",
   emptyMessage = "No media found in this library",
   loadingMessage = "Loading library items..."
@@ -41,10 +43,11 @@ export const LibraryGridView = React.memo(function LibraryGridView({
           cardWidth={cardWidth}
           cardHeight={cardHeight}
           onPress={onItemPress}
+          onLongPress={onItemLongPress}
         />
       </View>
     ),
-    [serverUrl, cardWidth, cardHeight, onItemPress]
+    [serverUrl, cardWidth, cardHeight, onItemPress, onItemLongPress]
   );
 
   const keyExtractor = useCallback((item: MediaItem) => item.id, []);

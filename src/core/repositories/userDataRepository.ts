@@ -77,6 +77,28 @@ export class UserDataRepository {
       })
     });
   }
+
+  public async removeFromResume(
+    userId: string,
+    itemId: string,
+    customClient?: HttpClient
+  ): Promise<void> {
+    if (!userId || !itemId) {
+      throw new FinoraError("Both userId and itemId are required", "INVALID_PARAMS");
+    }
+
+    const http = this.getHttp(customClient);
+    try {
+      await http.request(`/PlayingItems/${itemId}`, { method: "DELETE" });
+    } catch {
+      // Best effort cleanup
+    }
+    try {
+      await http.request(`/Users/${userId}/PlayedItems/${itemId}`, { method: "DELETE" });
+    } catch {
+      // Best effort cleanup
+    }
+  }
 }
 
 export const userDataRepository = new UserDataRepository();

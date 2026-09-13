@@ -36,7 +36,8 @@ jest.mock("../../../hooks/useMediaQueries", () => ({
 
 jest.mock("../../../hooks/useUserDataMutations", () => ({
   useToggleFavorite: jest.fn(() => ({ mutate: jest.fn() })),
-  useMarkPlayed: jest.fn(() => ({ mutate: jest.fn() }))
+  useMarkPlayed: jest.fn(() => ({ mutate: jest.fn() })),
+  useRemoveFromResume: jest.fn(() => ({ mutate: jest.fn() }))
 }));
 
 jest.mock("../../../core/network/networkStatusService", () => ({

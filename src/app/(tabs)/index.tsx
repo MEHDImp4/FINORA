@@ -17,7 +17,11 @@ import {
   useWatchlistItems,
   mediaKeys
 } from "../../hooks/useMediaQueries";
-import { useToggleFavorite } from "../../hooks/useUserDataMutations";
+import {
+  useToggleFavorite,
+  useMarkPlayed,
+  useRemoveFromResume
+} from "../../hooks/useUserDataMutations";
 import { colors, spacing } from "../../design-system/tokens";
 import { MediaItem, MediaLibrary } from "../../types/media";
 import { mediaRepository } from "../../core/repositories/mediaRepository";
@@ -33,6 +37,7 @@ import {
 import { useNotificationStore } from "../../stores/notificationStore";
 import { useNotificationSync } from "../../features/notifications/useNotificationSync";
 import { NotificationsModal } from "../../features/notifications/components/NotificationsModal";
+import { MediaQuickActionsModal } from "../../features/home/components/MediaQuickActionsModal";
 
 function CategoryPillItem({
   label,
@@ -90,12 +95,14 @@ function HomeLibraryRow({
   library,
   userId,
   serverUrl,
-  onItemPress
+  onItemPress,
+  onItemLongPress
 }: {
   library: MediaLibrary;
   userId?: string;
   serverUrl: string;
   onItemPress: (item: MediaItem) => void;
+  onItemLongPress?: (item: MediaItem) => void;
 }) {
   const { data: items = [] } = useRecentlyAdded(userId, library.id, 16);
 
@@ -110,6 +117,7 @@ function HomeLibraryRow({
       serverUrl={serverUrl}
       variant="poster"
       onItemPress={onItemPress}
+      onItemLongPress={onItemLongPress}
     />
   );
 }
@@ -166,6 +174,28 @@ export default function HomeScreen() {
   );
 
   const toggleFavorite = useToggleFavorite(userId || "");
+  const markPlayed = useMarkPlayed(userId || "");
+  const removeFromResume = useRemoveFromResume(userId || "");
+
+  const [actionItem, setActionItem] = useState<MediaItem | null>(null);
+
+  const handleItemLongPress = useCallback((item: MediaItem) => {
+    setActionItem(item);
+  }, []);
+
+  const handleTogglePlayed = useCallback(
+    (item: MediaItem, played: boolean) => {
+      markPlayed.mutate({ itemId: item.id, played });
+    },
+    [markPlayed]
+  );
+
+  const handleRemoveFromResume = useCallback(
+    (item: MediaItem) => {
+      removeFromResume.mutate({ itemId: item.id });
+    },
+    [removeFromResume]
+  );
 
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const [heroIndex, setHeroIndex] = useState(0);
@@ -514,6 +544,7 @@ export default function HomeScreen() {
             serverUrl={serverUrl}
             variant="poster"
             onItemPress={handleItemPress}
+            onItemLongPress={handleItemLongPress}
           />
         ) : null}
 
@@ -525,6 +556,7 @@ export default function HomeScreen() {
             serverUrl={serverUrl}
             variant="poster"
             onItemPress={handleItemPress}
+            onItemLongPress={handleItemLongPress}
           />
         ) : null}
 
@@ -536,6 +568,7 @@ export default function HomeScreen() {
             serverUrl={serverUrl}
             variant="poster"
             onItemPress={handleItemPress}
+            onItemLongPress={handleItemLongPress}
           />
         ) : null}
 
@@ -547,6 +580,7 @@ export default function HomeScreen() {
             serverUrl={serverUrl}
             variant="poster"
             onItemPress={handleItemPress}
+            onItemLongPress={handleItemLongPress}
           />
         ) : null}
 
@@ -558,6 +592,7 @@ export default function HomeScreen() {
             serverUrl={serverUrl}
             variant="poster"
             onItemPress={handleItemPress}
+            onItemLongPress={handleItemLongPress}
           />
         ) : null}
 
@@ -569,6 +604,7 @@ export default function HomeScreen() {
             userId={userId}
             serverUrl={serverUrl}
             onItemPress={handleItemPress}
+            onItemLongPress={handleItemLongPress}
           />
         ))}
       </ScrollView>
@@ -579,6 +615,18 @@ export default function HomeScreen() {
         onSelectMedia={(mediaId) =>
           router.push({ pathname: "/details/[id]", params: { id: mediaId } })
         }
+      />
+
+      <MediaQuickActionsModal
+        visible={!!actionItem}
+        item={actionItem}
+        serverUrl={serverUrl}
+        onClose={() => setActionItem(null)}
+        onPlay={handlePlay}
+        onViewDetails={handleItemPress}
+        onTogglePlayed={handleTogglePlayed}
+        onRemoveFromResume={handleRemoveFromResume}
+        onToggleFavorite={handleToggleFavorite}
       />
     </FinoraScreen>
   );

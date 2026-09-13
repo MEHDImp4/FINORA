@@ -24,6 +24,12 @@ import { useNetworkDiagnostic } from "../../core/network/networkStatusService";
 import { NetworkFailureStateView } from "../../design-system/components/NetworkFailureStateView";
 import { SearchBar } from "../../features/search/components/SearchBar";
 import { hapticService } from "../../core/feedback/hapticService";
+import {
+  useToggleFavorite,
+  useMarkPlayed,
+  useRemoveFromResume
+} from "../../hooks/useUserDataMutations";
+import { MediaQuickActionsModal } from "../../features/home/components/MediaQuickActionsModal";
 
 const WATCHLIST_ID = "watchlist";
 
@@ -218,6 +224,48 @@ export default function LibraryScreen() {
     setSelectedLibraryId(libraryId);
     setSelectedGenre(null); // reset genre when switching library
   }, []);
+
+  const toggleFavorite = useToggleFavorite(currentUserId || "");
+  const markPlayed = useMarkPlayed(currentUserId || "");
+  const removeFromResume = useRemoveFromResume(currentUserId || "");
+
+  const [actionItem, setActionItem] = useState<MediaItem | null>(null);
+
+  const handleItemLongPress = useCallback((item: MediaItem) => {
+    setActionItem(item);
+  }, []);
+
+  const handleTogglePlayed = useCallback(
+    (item: MediaItem, played: boolean) => {
+      markPlayed.mutate({ itemId: item.id, played });
+    },
+    [markPlayed]
+  );
+
+  const handleRemoveFromResume = useCallback(
+    (item: MediaItem) => {
+      removeFromResume.mutate({ itemId: item.id });
+    },
+    [removeFromResume]
+  );
+
+  const handleToggleFavorite = useCallback(
+    (item: MediaItem) => {
+      toggleFavorite.mutate({ itemId: item.id, isFavorite: !item.isFavorite, item });
+    },
+    [toggleFavorite]
+  );
+
+  const handlePlayItem = useCallback(
+    (item: MediaItem) => {
+      if (item.type === "Series" || item.type === "Season") {
+        router.push(`/details/${item.id}`);
+        return;
+      }
+      router.push(`/player/${item.id}`);
+    },
+    [router]
+  );
 
   const handleItemPress = useCallback(
     (item: MediaItem) => {
@@ -439,6 +487,7 @@ export default function LibraryScreen() {
           serverUrl={serverUrl}
           isLoading={isLoading}
           onItemPress={handleItemPress}
+          onItemLongPress={handleItemLongPress}
           loadingMessage="Chargement de vos médias..."
           emptyTitle={
             isWatchlist
@@ -463,6 +512,18 @@ export default function LibraryScreen() {
         currentSort={currentSort}
         onSelectSort={setCurrentSort}
         onClose={() => setSortModalVisible(false)}
+      />
+
+      <MediaQuickActionsModal
+        visible={!!actionItem}
+        item={actionItem}
+        serverUrl={serverUrl}
+        onClose={() => setActionItem(null)}
+        onPlay={handlePlayItem}
+        onViewDetails={handleItemPress}
+        onTogglePlayed={handleTogglePlayed}
+        onRemoveFromResume={handleRemoveFromResume}
+        onToggleFavorite={handleToggleFavorite}
       />
     </SafeAreaView>
   );

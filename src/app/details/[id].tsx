@@ -4,7 +4,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAuthStore } from "../../stores/authStore";
 import { useItemDetails } from "../../hooks/useMediaQueries";
-import { useToggleFavorite, useMarkPlayed } from "../../hooks/useUserDataMutations";
+import {
+  useToggleFavorite,
+  useMarkPlayed,
+  useRemoveFromResume
+} from "../../hooks/useUserDataMutations";
 import { MovieDetailsView } from "../../features/details/components/MovieDetailsView";
 import { SeriesDetailsView } from "../../features/details/components/SeriesDetailsView";
 import { CollectionDetailsView } from "../../features/details/components/CollectionDetailsView";
@@ -36,6 +40,7 @@ export default function DetailsScreen() {
   const { data: item, isLoading, isError, refetch } = useItemDetails(userId, id);
   const toggleFavoriteMutation = useToggleFavorite(userId);
   const markPlayedMutation = useMarkPlayed(userId);
+  const removeFromResumeMutation = useRemoveFromResume(userId);
 
   const [offlineRecord, setOfflineRecord] = React.useState<OfflineMediaRecord | null>(null);
   const [activeDownload, setActiveDownload] = React.useState<DownloadItem | undefined>(undefined);
@@ -285,6 +290,12 @@ export default function DetailsScreen() {
             router.push({ pathname: "/details/[id]", params: { id: similarItem.id } });
           }}
           onToggleFavorite={handleToggleFavorite}
+          onTogglePlayed={(mediaItem, played) => {
+            markPlayedMutation.mutate({ itemId: mediaItem.id, played });
+          }}
+          onRemoveFromResume={(mediaItem) => {
+            removeFromResumeMutation.mutate({ itemId: mediaItem.id });
+          }}
           onDownloadEpisodes={handleDownloadSeriesEpisodes}
         />
       ) : item.type === "BoxSet" ? (
