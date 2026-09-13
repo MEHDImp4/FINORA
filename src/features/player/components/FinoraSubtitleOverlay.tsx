@@ -33,14 +33,6 @@ export function FinoraSubtitleOverlay({
     return getActiveCue(cues, currentTimeSeconds);
   }, [cues, currentTimeSeconds, visible]);
 
-  if (!activeCue || !activeCue.text) {
-    return null;
-  }
-
-  // Base font size & line height
-  const fontSize = SUBTITLE_SIZE_VALUES[settings.size] || 20;
-  const lineHeight = Math.round(fontSize * 1.35);
-
   // Background Box styling
   const boxStyle = useMemo(() => {
     switch (settings.background) {
@@ -68,6 +60,14 @@ export function FinoraSubtitleOverlay({
         return styles.shadowNone;
     }
   }, [settings.shadow]);
+
+  if (!activeCue || !activeCue.text) {
+    return null;
+  }
+
+  // Base font size & line height
+  const fontSize = SUBTITLE_SIZE_VALUES[settings.size] || 20;
+  const lineHeight = Math.round(fontSize * 1.35);
 
   // Vertical position
   const baseBottom = settings.position === "elevated" ? 82 : 42;

@@ -86,6 +86,27 @@ First cue
       expect(cues[0].start).toBe(2);
       expect(cues[1].start).toBe(10);
     });
+
+    it("parses ASS / SSA subtitles format and strips style tags and handles \\N", () => {
+      const ass = `[Script Info]
+Title: Anime Episode 1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.50,0:00:04.20,Default,,0,0,0,,{\\pos(192,240)}Konnichiwa, FINORA!
+Dialogue: 0,0:00:05.10,0:00:08.75,Default,,0,0,0,,Watch out, he said,\\Nrun away!
+`;
+
+      const cues = parseSubtitleContent(ass);
+      expect(cues).toHaveLength(2);
+      expect(cues[0].start).toBeCloseTo(1.5);
+      expect(cues[0].end).toBeCloseTo(4.2);
+      expect(cues[0].text).toBe("Konnichiwa, FINORA!");
+
+      expect(cues[1].start).toBeCloseTo(5.1);
+      expect(cues[1].end).toBeCloseTo(8.75);
+      expect(cues[1].text).toBe("Watch out, he said,\nrun away!");
+    });
   });
 
   describe("getActiveCue", () => {

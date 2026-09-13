@@ -11,6 +11,7 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
   private eventSubscriptions: Array<{ remove: () => void }> = [];
   private isDestroyed: boolean = false;
   private snapshot: FinoraPlayerSnapshot;
+  private playheadTimer: any = null;
 
   constructor(
     player?: VideoPlayer | null,
@@ -37,6 +38,13 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
 
     this.detachPlayer();
     this.player = player;
+
+    try {
+      // Configure expo-video to emit timeUpdate every 250ms for smooth subtitle synchronization
+      this.player.timeUpdateEventInterval = 0.25;
+    } catch {
+      // Ignored if unsupported on specific platform
+    }
 
     if (initialPositionSeconds > 0) {
       this.player.currentTime = initialPositionSeconds;
@@ -79,6 +87,7 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
   }
 
   public detachPlayer(): void {
+    this.stopPlayheadTimer();
     for (const sub of this.eventSubscriptions) {
       if (typeof sub?.remove === "function") {
         sub.remove();
@@ -86,6 +95,25 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
     }
     this.eventSubscriptions = [];
     this.player = null;
+  }
+
+  private startPlayheadTimer(): void {
+    this.stopPlayheadTimer();
+    this.playheadTimer = setInterval(() => {
+      if (this.player && this.snapshot.state === "playing") {
+        const cur = this.player.currentTime;
+        if (typeof cur === "number" && !isNaN(cur)) {
+          this.handleTimeUpdate(cur, this.player.bufferedPosition);
+        }
+      }
+    }, 250);
+  }
+
+  private stopPlayheadTimer(): void {
+    if (this.playheadTimer) {
+      clearInterval(this.playheadTimer);
+      this.playheadTimer = null;
+    }
   }
 
   private updateSnapshotFromPlayer(): void {
@@ -103,6 +131,12 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
       state = "playing";
     } else if (status === "readyToPlay") {
       state = "paused";
+    }
+
+    if (state === "playing") {
+      this.startPlayheadTimer();
+    } else {
+      this.stopPlayheadTimer();
     }
 
     const effectiveDuration =
@@ -125,12 +159,20 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
     let state: PlayerPlaybackState = this.snapshot.state;
     if (status === "loading") {
       state = "loading";
+      this.stopPlayheadTimer();
     } else if (status === "error") {
       state = "error";
+      this.stopPlayheadTimer();
     } else if (status === "readyToPlay") {
       state = this.player?.playing ? "playing" : "paused";
+      if (state === "playing") {
+        this.startPlayheadTimer();
+      } else {
+        this.stopPlayheadTimer();
+      }
     } else if (status === "idle") {
       state = "idle";
+      this.stopPlayheadTimer();
     }
 
     const effectiveDuration =
@@ -147,9 +189,15 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
 
   private handlePlayingChange(isPlaying: boolean): void {
     if (this.snapshot.state === "error" || this.snapshot.state === "ended") {
+      this.stopPlayheadTimer();
       return;
     }
     const state: PlayerPlaybackState = isPlaying ? "playing" : "paused";
+    if (isPlaying) {
+      this.startPlayheadTimer();
+    } else {
+      this.stopPlayheadTimer();
+    }
     this.updateSnapshot({ state });
   }
 

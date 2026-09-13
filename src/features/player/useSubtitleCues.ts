@@ -116,6 +116,21 @@ export function useSubtitleCues({
           `${cleanServerUrl}/Videos/${itemId}/Subtitles/${subtitleStreamIndex}/Stream.srt`
         );
 
+        // Candidate 8: Standard Jellyfin ASS endpoint
+        rawCandidates.push(
+          `${cleanServerUrl}/Videos/${itemId}/${sid}/Subtitles/${subtitleStreamIndex}/Stream.ass`
+        );
+
+        // Candidate 9: Sub-index 0 ASS endpoint
+        rawCandidates.push(
+          `${cleanServerUrl}/Videos/${itemId}/${sid}/Subtitles/${subtitleStreamIndex}/0/Stream.ass`
+        );
+
+        // Candidate 10: Item direct ASS endpoint
+        rawCandidates.push(
+          `${cleanServerUrl}/Videos/${itemId}/Subtitles/${subtitleStreamIndex}/Stream.ass`
+        );
+
         // Deduplicate candidates and attach api_key query param if not already present
         const candidates = Array.from(new Set(rawCandidates)).map((url) => {
           if (!token) return url;
@@ -126,7 +141,7 @@ export function useSubtitleCues({
 
         // Prepare Jellyfin authentication headers
         const requestHeaders: Record<string, string> = {
-          Accept: "text/vtt, text/plain, application/x-subrip, */*"
+          Accept: "text/vtt, text/plain, application/x-subrip, text/x-ssa, text/x-ass, */*"
         };
         if (token) {
           requestHeaders["Authorization"] = formatAuthorizationHeader("finora-mobile", token);

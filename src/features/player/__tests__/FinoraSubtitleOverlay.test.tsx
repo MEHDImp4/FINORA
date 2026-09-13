@@ -98,4 +98,42 @@ describe("FinoraSubtitleOverlay", () => {
     // Standard base offset (42) + extra (40) = 82
     expect(flattenedContainerStyle.bottom).toBe(82);
   });
+
+  it("safely transitions across active, inactive, and active states without hook count errors", () => {
+    let root: any;
+
+    // 1. Initial render at 0.0s (inactive, no cue)
+    act(() => {
+      root = renderer.create(
+        <FinoraSubtitleOverlay cues={sampleCues} currentTimeSeconds={0.0} />
+      );
+    });
+    expect(root.toJSON()).toBeNull();
+
+    // 2. Playhead reaches 2.5s (active cue 1)
+    act(() => {
+      root.update(
+        <FinoraSubtitleOverlay cues={sampleCues} currentTimeSeconds={2.5} />
+      );
+    });
+    const textNode1 = root.root.findByProps({ testID: "finora-subtitle-overlay-text" });
+    expect(textNode1.props.children).toBe("Welcome to FINORA");
+
+    // 3. Playhead enters gap at 4.5s (inactive again)
+    act(() => {
+      root.update(
+        <FinoraSubtitleOverlay cues={sampleCues} currentTimeSeconds={4.5} />
+      );
+    });
+    expect(root.toJSON()).toBeNull();
+
+    // 4. Playhead reaches 6.0s (active cue 2)
+    act(() => {
+      root.update(
+        <FinoraSubtitleOverlay cues={sampleCues} currentTimeSeconds={6.0} />
+      );
+    });
+    const textNode2 = root.root.findByProps({ testID: "finora-subtitle-overlay-text" });
+    expect(textNode2.props.children).toBe("High fidelity subtitles");
+  });
 });

@@ -27,10 +27,13 @@ export function parseTimestamp(timeStr: string): number {
 }
 
 /**
- * Strips HTML formatting tags and unescapes basic HTML entities.
+ * Strips HTML formatting tags, ASS style tags, and unescapes basic HTML entities.
  */
 export function cleanSubtitleText(text: string): string {
   return text
+    .replace(/\\N/gi, "\n") // ASS/SSA hard line breaks
+    .replace(/\\n/gi, "\n")
+    .replace(/\{[^}]*\}/g, "") // Strip ASS/SSA style override tags like {\pos(100,200)} or {\b1}
     .replace(/<[^>]*>/g, "") // Strip HTML / VTT tags like <c.white>, <i>, <font>, etc.
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -42,7 +45,7 @@ export function cleanSubtitleText(text: string): string {
 }
 
 /**
- * Parses WebVTT or SRT formatted string into an array of SubtitleCue.
+ * Parses WebVTT, SRT, or ASS/SSA formatted string into an array of SubtitleCue.
  */
 export function parseSubtitleContent(rawContent: string): SubtitleCue[] {
   if (!rawContent || typeof rawContent !== "string") return [];
@@ -50,6 +53,61 @@ export function parseSubtitleContent(rawContent: string): SubtitleCue[] {
   const lines = rawContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
   const cues: SubtitleCue[] = [];
 
+  // Check if content is in ASS / SSA format (commonly used for anime and series)
+  const isAss = lines.some((l) => l.trim().toLowerCase().startsWith("dialogue:"));
+
+  if (isAss) {
+    let startIndex = 1;
+    let endIndex = 2;
+    let textIndex = 9;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      const lower = line.toLowerCase();
+
+      if (lower.startsWith("format:")) {
+        const parts = line.substring(7).split(",").map((p) => p.trim().toLowerCase());
+        const s = parts.indexOf("start");
+        const e = parts.indexOf("end");
+        const t = parts.indexOf("text");
+        if (s !== -1) startIndex = s;
+        if (e !== -1) endIndex = e;
+        if (t !== -1) textIndex = t;
+      } else if (lower.startsWith("dialogue:")) {
+        const colonIdx = line.indexOf(":");
+        const rest = line.substring(colonIdx + 1).trim();
+
+        // Split up to textIndex commas, preserving all commas inside the dialogue text itself
+        const fields: string[] = [];
+        let cursor = 0;
+        for (let f = 0; f < textIndex; f++) {
+          const nextComma = rest.indexOf(",", cursor);
+          if (nextComma === -1) break;
+          fields.push(rest.substring(cursor, nextComma).trim());
+          cursor = nextComma + 1;
+        }
+        const text = rest.substring(cursor);
+
+        if (fields.length >= Math.max(startIndex, endIndex)) {
+          const start = parseTimestamp(fields[startIndex] || "");
+          const end = parseTimestamp(fields[endIndex] || "");
+          const cleanedText = cleanSubtitleText(text);
+
+          if (cleanedText && end > start) {
+            cues.push({
+              start,
+              end,
+              text: cleanedText
+            });
+          }
+        }
+      }
+    }
+
+    return cues.sort((a, b) => a.start - b.start);
+  }
+
+  // WebVTT / SRT Parsing
   let i = 0;
   // Skip WEBVTT header and metadata
   while (i < lines.length) {

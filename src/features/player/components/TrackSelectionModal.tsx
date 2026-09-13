@@ -66,10 +66,19 @@ export function TrackSelectionModal({
   };
 
   const formatSubtitleTitle = (stream: MediaStreamInfo, idx: number): string => {
-    if (stream.displayTitle) return stream.displayTitle;
-    const lang = stream.language ? stream.language.toUpperCase() : `Subtitle ${idx + 1}`;
-    const ext = stream.isExternal ? " [External]" : "";
-    return `${lang}${ext}`;
+    let title = stream.displayTitle;
+    if (!title) {
+      const lang = stream.language ? stream.language.toUpperCase() : `Subtitle ${idx + 1}`;
+      const ext = stream.isExternal ? " [External]" : "";
+      title = `${lang}${ext}`;
+    }
+    const codec = (stream.codec || "").toLowerCase();
+    if (codec === "pgs" && !title.toLowerCase().includes("pgs")) {
+      title += " (PGS)";
+    } else if ((codec === "vobsub" || codec === "dvdsub") && !title.toLowerCase().includes("vobsub")) {
+      title += " (VOBSUB)";
+    }
+    return title;
   };
 
   return (
