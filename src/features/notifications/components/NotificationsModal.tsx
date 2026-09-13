@@ -221,7 +221,15 @@ export function NotificationsModal({
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        <View style={[styles.sheetContainer, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+        <View
+          style={[
+            styles.sheetContainer,
+            {
+              marginTop: Math.max(insets.top + 8, 16),
+              marginBottom: Math.max(insets.bottom, 24)
+            }
+          ]}
+        >
           {/* Top Apple Handle */}
           <View style={styles.handle} />
 
@@ -365,26 +373,27 @@ export function NotificationsModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.78)",
-    justifyContent: "flex-end"
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    justifyContent: "flex-start",
+    alignItems: "center"
   },
   sheetContainer: {
-    maxHeight: "86%",
+    width: "92%",
+    maxWidth: 440,
+    maxHeight: "82%",
     backgroundColor: "rgba(16, 16, 24, 0.94)",
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.28)",
-    borderLeftWidth: 1,
-    borderLeftColor: "rgba(255, 255, 255, 0.12)",
-    borderRightWidth: 1,
-    borderRightColor: "rgba(255, 255, 255, 0.12)",
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.16)",
+    borderTopColor: "rgba(255, 255, 255, 0.32)",
     paddingTop: 12,
+    paddingBottom: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 24,
-    elevation: 24
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.55,
+    shadowRadius: 20,
+    elevation: 20,
+    overflow: "hidden"
   },
   handle: {
     width: 36,
