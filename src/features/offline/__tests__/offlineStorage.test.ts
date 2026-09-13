@@ -182,6 +182,10 @@ describe("OfflineStorageService", () => {
     const deletedIds = await service.cleanupExpiredWatchedMedia(48);
     expect(deletedIds).toEqual(["expired-item"]);
 
+    const FileSystem = require("expo-file-system/legacy");
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(expiredRecord.localPath, { idempotent: true });
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalledWith(freshRecord.localPath, { idempotent: true });
+
     const remaining = await service.getAllOfflineMedia();
     expect(remaining).toHaveLength(2);
     expect(remaining.map((r) => r.itemId)).toEqual(
@@ -234,5 +238,37 @@ describe("OfflineStorageService", () => {
     const afterCleanup = await service.getAllOfflineMedia();
     expect(afterCleanup).toHaveLength(1);
     expect(afterCleanup[0].itemId).toBe("real-1");
+  });
+
+  it("cleans up unregistered/orphaned disk files that are not in the catalog", async () => {
+    const FileSystem = require("expo-file-system/legacy");
+    (FileSystem.getInfoAsync as jest.Mock).mockResolvedValueOnce({ exists: true, isDirectory: true });
+    (FileSystem.readDirectoryAsync as jest.Mock).mockResolvedValueOnce([
+      "item-active.mp4",
+      "orphan-ghost.mp4"
+    ]);
+
+    const activeRecord: OfflineMediaRecord = {
+      itemId: "item-active",
+      title: "Active Video",
+      type: "Movie",
+      localPath: "file:///mock-documents/finora_downloads/item-active.mp4",
+      fileSizeBytes: 500000000,
+      totalTicks: 1000,
+      playbackPositionTicks: 0,
+      savedAt: Date.now()
+    };
+    await service.saveOfflineMedia(activeRecord);
+
+    const deleted = await service.cleanupOrphanDiskFiles();
+    expect(deleted).toBe(1);
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+      "file:///mock-documents/finora_downloads/orphan-ghost.mp4",
+      { idempotent: true }
+    );
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalledWith(
+      "file:///mock-documents/finora_downloads/item-active.mp4",
+      { idempotent: true }
+    );
   });
 });

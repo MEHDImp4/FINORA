@@ -60,6 +60,13 @@ export class OfflineStorageService {
         // Safe deletion
       }
     }
+    if (item?.posterLocalPath && typeof FileSystem.deleteAsync === "function") {
+      try {
+        await FileSystem.deleteAsync(item.posterLocalPath, { idempotent: true });
+      } catch {
+        // Safe deletion
+      }
+    }
   }
 
   /**
@@ -82,6 +89,13 @@ export class OfflineStorageService {
       if (ep.localPath && typeof FileSystem.deleteAsync === "function") {
         try {
           await FileSystem.deleteAsync(ep.localPath, { idempotent: true });
+        } catch {
+          // Safe deletion
+        }
+      }
+      if (ep.posterLocalPath && typeof FileSystem.deleteAsync === "function") {
+        try {
+          await FileSystem.deleteAsync(ep.posterLocalPath, { idempotent: true });
         } catch {
           // Safe deletion
         }
@@ -124,6 +138,7 @@ export class OfflineStorageService {
 
   /**
    * Automatically cleans up watched downloads older than retentionHours (default: 48h / 2 days).
+   * Deletes the physical video file and local poster from storage, and removes the catalog entry.
    * Returns the list of deleted itemIds.
    */
   public async cleanupExpiredWatchedMedia(retentionHours: number = 48): Promise<string[]> {
@@ -136,6 +151,24 @@ export class OfflineStorageService {
     for (const item of all) {
       if (item.completedWatchedAt && now - item.completedWatchedAt >= retentionMs) {
         expiredIds.push(item.itemId);
+
+        // Clean up physical media file from storage
+        if (item.localPath && typeof FileSystem.deleteAsync === "function") {
+          try {
+            await FileSystem.deleteAsync(item.localPath, { idempotent: true });
+          } catch {
+            // Safe deletion
+          }
+        }
+
+        // Clean up cached poster if stored locally
+        if (item.posterLocalPath && typeof FileSystem.deleteAsync === "function") {
+          try {
+            await FileSystem.deleteAsync(item.posterLocalPath, { idempotent: true });
+          } catch {
+            // Safe deletion
+          }
+        }
       } else {
         remaining.push(item);
       }
@@ -149,6 +182,44 @@ export class OfflineStorageService {
     }
 
     return expiredIds;
+  }
+
+  /**
+   * Scans the finora_downloads directory on disk and removes any media files
+   * that do not belong to any record in the active catalog (prevents orphaned files).
+   */
+  public async cleanupOrphanDiskFiles(): Promise<number> {
+    let deletedCount = 0;
+    try {
+      if (FileSystem.documentDirectory && typeof FileSystem.readDirectoryAsync === "function") {
+        const mediaDir = `${FileSystem.documentDirectory}finora_downloads/`;
+        const dirInfo = await FileSystem.getInfoAsync(mediaDir);
+        if (!dirInfo || !dirInfo.exists) return 0;
+
+        const files = await FileSystem.readDirectoryAsync(mediaDir);
+        const catalog = await this.getAllOfflineMedia();
+        const activePaths = new Set(
+          catalog
+            .map((item) => item.localPath)
+            .filter(Boolean)
+            .map((p) => p.replace(/\\/g, "/"))
+        );
+
+        for (const file of files) {
+          const filePath = `${mediaDir}${file}`;
+          const normalized = filePath.replace(/\\/g, "/");
+          if (!activePaths.has(filePath) && !activePaths.has(normalized)) {
+            if (typeof FileSystem.deleteAsync === "function") {
+              await FileSystem.deleteAsync(filePath, { idempotent: true });
+              deletedCount++;
+            }
+          }
+        }
+      }
+    } catch {
+      // Safe execution
+    }
+    return deletedCount;
   }
 
   /**

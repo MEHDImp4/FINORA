@@ -27,8 +27,10 @@ export default function RootLayout() {
   useEffect(() => {
     restoreSession();
     loadOnboardingStatus();
-    // Auto-cleanup watched downloads older than 48h (2-3 days policy)
-    offlineStorageService.cleanupExpiredWatchedMedia(48).catch(() => {});
+    // Auto-cleanup watched downloads older than 48h (2-3 days policy) and any orphaned disk files
+    offlineStorageService.cleanupExpiredWatchedMedia(48).then(() => {
+      offlineStorageService.cleanupOrphanDiskFiles().catch(() => {});
+    }).catch(() => {});
     // Initialize notification engine and load stored notifications
     notificationService.init().catch(() => {});
     useNotificationStore.getState().loadPersisted().catch(() => {});
