@@ -151,4 +151,27 @@ describe("LibraryScreen", () => {
     const showsTab = tree.root.findByProps({ accessibilityLabel: "Select library TV Shows" });
     expect(showsTab.props.accessibilityState.selected).toBe(true);
   });
+
+  it("toggles search bar and accepts search query input", async () => {
+    let tree: any;
+    await act(async () => {
+      tree = ReactTestRenderer.create(<LibraryScreen />);
+    });
+
+    const searchToggle = tree.root.findByProps({ accessibilityLabel: "Open search" });
+    expect(searchToggle).toBeTruthy();
+
+    await act(async () => {
+      searchToggle.props.onPress();
+    });
+
+    const searchInput = tree.root.findByProps({ accessibilityLabel: "Search input" });
+    expect(searchInput).toBeTruthy();
+
+    await act(async () => {
+      searchInput.props.onChangeText("Inception");
+    });
+
+    expect(tree.root.findByProps({ accessibilityLabel: "Close search" })).toBeTruthy();
+  });
 });

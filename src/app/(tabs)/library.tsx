@@ -22,20 +22,42 @@ import { FinoraText } from "../../design-system/components/FinoraText";
 import { colors, spacing } from "../../design-system/tokens";
 import { useNetworkDiagnostic } from "../../core/network/networkStatusService";
 import { NetworkFailureStateView } from "../../design-system/components/NetworkFailureStateView";
+import { SearchBar } from "../../features/search/components/SearchBar";
+import { hapticService } from "../../core/feedback/hapticService";
 
 const WATCHLIST_ID = "watchlist";
 
 export default function LibraryScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ tab?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; q?: string }>();
   const session = useAuthStore((s) => s.session);
   const currentUserId = session?.userId;
   const serverUrl = session?.serverUrl || "";
+
+  // Search state in library
+  const [isSearchOpen, setIsSearchOpen] = useState(Boolean(params.q));
+  const [searchQuery, setSearchQuery] = useState(params.q || "");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(params.q || "");
 
   // Active library state
   const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(
     params.tab === "watchlist" ? WATCHLIST_ID : params.tab || null
   );
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (params.q) {
+      setIsSearchOpen(true);
+      setSearchQuery(params.q);
+      setDebouncedSearchQuery(params.q);
+    }
+  }, [params.q]);
 
   useEffect(() => {
     if (!params.tab) return;
@@ -121,13 +143,14 @@ export default function LibraryScreen() {
       sortBy: currentSort.sortBy,
       sortOrder: currentSort.sortOrder,
       genres: selectedGenre ? [selectedGenre] : undefined,
-      includeItemTypes
+      includeItemTypes,
+      searchTerm: debouncedSearchQuery.trim().length >= 2 ? debouncedSearchQuery.trim() : undefined
     }
   );
 
   // Fetch watchlist items
   const {
-    data: watchlistItems = [],
+    data: rawWatchlistItems = [],
     isLoading: isWatchlistLoading,
     isError: isWatchlistError,
     refetch: refetchWatchlist
@@ -141,6 +164,18 @@ export default function LibraryScreen() {
         }
       : undefined
   );
+
+  const watchlistItems = useMemo(() => {
+    if (!debouncedSearchQuery.trim() || debouncedSearchQuery.trim().length < 2) {
+      return rawWatchlistItems;
+    }
+    const q = debouncedSearchQuery.trim().toLowerCase();
+    return rawWatchlistItems.filter(
+      (item) =>
+        item.name.toLowerCase().includes(q) ||
+        (item.seriesName && item.seriesName.toLowerCase().includes(q))
+    );
+  }, [rawWatchlistItems, debouncedSearchQuery]);
 
   const items = isWatchlist ? watchlistItems : libraryItems;
   const isLoading = isWatchlist ? isWatchlistLoading : (isItemsLoading || isLibrariesLoading);
@@ -167,7 +202,11 @@ export default function LibraryScreen() {
 
   const handleItemPress = useCallback(
     (item: MediaItem) => {
-      router.push(`/details/${item.id}`);
+      const targetId =
+        (item.type === "Episode" || item.type === "Season") && item.seriesId
+          ? item.seriesId
+          : item.id;
+      router.push(`/details/${targetId}`);
     },
     [router]
   );
@@ -239,11 +278,34 @@ export default function LibraryScreen() {
         </ScrollView>
       </View>
 
-      {/* Action bar: Sort trigger & Active genre info */}
+      {/* Action bar: Search trigger, Results count, & Sort trigger */}
       <View style={styles.actionBar}>
-        <FinoraText variant="caption" style={styles.resultsCount}>
-          {items.length} {isWatchlist ? (items.length <= 1 ? "titre dans la liste" : "titres dans la liste") : (items.length <= 1 ? "titre" : "titres")}
-        </FinoraText>
+        <View style={styles.actionBarLeft}>
+          <Pressable
+            style={[styles.actionIconButton, isSearchOpen && styles.actionIconButtonActive]}
+            onPress={() => {
+              hapticService.selection();
+              if (isSearchOpen && searchQuery) {
+                setSearchQuery("");
+                setDebouncedSearchQuery("");
+              }
+              setIsSearchOpen((prev) => !prev);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={isSearchOpen ? "Close search" : "Open search"}
+          >
+            <Ionicons
+              name={isSearchOpen ? "close" : "search-outline"}
+              size={18}
+              color={isSearchOpen ? colors.primary : colors.textPrimary}
+            />
+          </Pressable>
+
+          <FinoraText variant="caption" style={styles.resultsCount}>
+            {items.length} {isWatchlist ? (items.length <= 1 ? "titre dans la liste" : "titres dans la liste") : (items.length <= 1 ? "titre" : "titres")}
+            {debouncedSearchQuery.trim() ? ` pour "${debouncedSearchQuery.trim()}"` : ""}
+          </FinoraText>
+        </View>
 
         <Pressable
           style={styles.sortButton}
@@ -257,6 +319,26 @@ export default function LibraryScreen() {
           </FinoraText>
         </Pressable>
       </View>
+
+      {/* Expandable Integrated Search Bar */}
+      {isSearchOpen && (
+        <View style={styles.searchBarWrapper}>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onClear={() => {
+              setSearchQuery("");
+              setDebouncedSearchQuery("");
+            }}
+            placeholder={
+              isWatchlist
+                ? "Rechercher dans la Watchlist..."
+                : `Rechercher dans ${activeLibrary?.name || "la bibliothèque"}...`
+            }
+            autoFocus={true}
+          />
+        </View>
+      )}
 
       {/* Genre filter horizontal list */}
       {!isWatchlist && (
@@ -354,6 +436,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs
+  },
+  actionBarLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flex: 1,
+    marginRight: spacing.sm
+  },
+  actionIconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: "#161622",
+    borderWidth: 1,
+    borderColor: "#262638",
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  actionIconButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: "rgba(229, 9, 20, 0.15)"
+  },
+  searchBarWrapper: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.xs
   },
   resultsCount: {
     color: colors.textSecondary

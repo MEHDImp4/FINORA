@@ -15,6 +15,7 @@ export interface GetItemsOptions {
   filters?: string[];
   isFavorite?: boolean;
   recursive?: boolean;
+  searchTerm?: string;
 }
 
 const MEDIA_FIELDS =
@@ -136,6 +137,10 @@ export class MediaRepository {
 
     if (options.genres && options.genres.length > 0) {
       params.Genres = options.genres.join(",");
+    }
+
+    if (options.searchTerm && options.searchTerm.trim().length > 0) {
+      params.SearchTerm = options.searchTerm.trim();
     }
 
     const response = await http.request<{ Items?: any[] }>(`/Users/${userId}/Items`, {

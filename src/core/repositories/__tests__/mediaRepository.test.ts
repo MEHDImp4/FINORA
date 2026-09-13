@@ -77,6 +77,39 @@ describe("MediaRepository", () => {
     expect(items[0].runtimeMinutes).toBe(120);
   });
 
+  it("getItems includes SearchTerm in query parameters when searchTerm is provided", async () => {
+    mockHttpClient.request.mockResolvedValue({
+      Items: [
+        {
+          Id: "item-search-1",
+          Name: "Inception",
+          Type: "Movie"
+        }
+      ]
+    });
+
+    const items = await repository.getItems(
+      "user-123",
+      {
+        parentId: "lib-1",
+        searchTerm: "Incep"
+      },
+      mockHttpClient
+    );
+
+    expect(mockHttpClient.request).toHaveBeenCalledWith(
+      "/Users/user-123/Items",
+      expect.objectContaining({
+        params: expect.objectContaining({
+          ParentId: "lib-1",
+          SearchTerm: "Incep"
+        })
+      })
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0].name).toBe("Inception");
+  });
+
   it("getResumeItems calls /UserItems/Resume with limit", async () => {
     mockHttpClient.request.mockResolvedValue({
       Items: [

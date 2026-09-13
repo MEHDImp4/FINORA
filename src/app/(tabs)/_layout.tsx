@@ -37,10 +37,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: "Search",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search-outline" size={size - 2} color={color} />
-          )
+          href: null
         }}
       />
       <Tabs.Screen
