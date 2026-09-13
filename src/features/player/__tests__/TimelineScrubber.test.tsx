@@ -60,5 +60,99 @@ describe("TimelineScrubber", () => {
         root.unmount();
       });
     });
+
+    it("handles layout change and displays scrubber thumb", () => {
+      let root: any;
+      act(() => {
+        root = renderer.create(
+          <TimelineScrubber
+            currentTimeSeconds={150}
+            durationSeconds={300}
+            bufferedSeconds={200}
+            onSeek={jest.fn()}
+          />
+        );
+      });
+
+      const touchArea = root.root.findByProps({ testID: "scrubber-touch-area" });
+      act(() => {
+        touchArea.props.onLayout({
+          nativeEvent: { layout: { width: 300 } }
+        });
+      });
+
+      const thumb = root.root.findByProps({ testID: "scrubber-thumb" });
+      expect(thumb).toBeDefined();
+
+      act(() => {
+        root.unmount();
+      });
+    });
+
+    it("triggers callbacks on scrub start, move, and release", () => {
+      const onSeekMock = jest.fn();
+      const onScrubbingChangeMock = jest.fn();
+      const onScrubMoveMock = jest.fn();
+
+      let root: any;
+      act(() => {
+        root = renderer.create(
+          <TimelineScrubber
+            currentTimeSeconds={0}
+            durationSeconds={100}
+            bufferedSeconds={50}
+            onSeek={onSeekMock}
+            onScrubbingChange={onScrubbingChangeMock}
+            onScrubMove={onScrubMoveMock}
+          />
+        );
+      });
+
+      const touchArea = root.root.findByProps({ testID: "scrubber-touch-area" });
+      // Simulate layout so trackWidthRef becomes 200
+      act(() => {
+        touchArea.props.onLayout({
+          nativeEvent: { layout: { width: 200 } }
+        });
+      });
+
+      // Simulate responder grant at x = 50 (25% = 25s)
+      act(() => {
+        touchArea.props.onResponderGrant({
+          nativeEvent: { locationX: 50 }
+        });
+      });
+
+      expect(onScrubbingChangeMock).toHaveBeenCalledWith(true);
+      expect(onScrubMoveMock).toHaveBeenCalledWith(25, 0.25);
+
+      // Simulate responder move: delta dx = 50 -> touchX = 100 (50% = 50s)
+      act(() => {
+        touchArea.props.onResponderMove({
+          nativeEvent: {},
+          touchHistory: {}
+        }, {
+          dx: 50
+        });
+      });
+
+      expect(onScrubMoveMock).toHaveBeenCalledWith(50, 0.5);
+
+      // Simulate responder release: delta dx = 50 -> seek to 50s
+      act(() => {
+        touchArea.props.onResponderRelease({
+          nativeEvent: {}
+        }, {
+          dx: 50
+        });
+      });
+
+      expect(onScrubbingChangeMock).toHaveBeenCalledWith(false);
+      expect(onSeekMock).toHaveBeenCalledWith(50);
+
+      act(() => {
+        root.unmount();
+      });
+    });
   });
 });
