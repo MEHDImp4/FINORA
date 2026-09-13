@@ -106,8 +106,29 @@ export default function LibraryScreen() {
 
   const activeLibraryId = activeLibrary?.id;
 
+  const isCollectionTab = useMemo(() => {
+    if (selectedLibraryId === "collections" || selectedLibraryId === "boxsets") return true;
+    if (activeLibrary) {
+      const type = (activeLibrary.collectionType || "").toLowerCase();
+      const name = (activeLibrary.name || "").toLowerCase();
+      return type === "boxsets" || name.includes("collection") || name.includes("boxset");
+    }
+    return false;
+  }, [selectedLibraryId, activeLibrary]);
+
+  const hasCollectionLib = useMemo(() => {
+    return libraries.some((l) => {
+      const type = (l.collectionType || "").toLowerCase();
+      const name = (l.name || "").toLowerCase();
+      return type === "boxsets" || name.includes("collection") || name.includes("boxset");
+    });
+  }, [libraries]);
+
   // Determine item types based on library collection type (prevents showing all episodes instead of series)
   const includeItemTypes = useMemo(() => {
+    if (isCollectionTab) {
+      return ["BoxSet"];
+    }
     if (!activeLibrary) return undefined;
     const type = activeLibrary.collectionType?.toLowerCase() || "";
     const name = activeLibrary.name?.toLowerCase() || "";
@@ -118,11 +139,8 @@ export default function LibraryScreen() {
     if (type === "movies" || name.includes("movie") || name.includes("film")) {
       return ["Movie"];
     }
-    if (type === "boxsets" || name.includes("collection")) {
-      return ["BoxSet"];
-    }
     return ["Movie", "Series"];
-  }, [activeLibrary]);
+  }, [activeLibrary, isCollectionTab]);
 
   // Fetch genres for active library
   const { data: genres = [] } = useGenres(
@@ -196,6 +214,7 @@ export default function LibraryScreen() {
   }, [refetchLibraries, refetchItems, refetchWatchlist, runDiagnostic]);
 
   const handleLibrarySelect = useCallback((libraryId: string) => {
+    hapticService.selection();
     setSelectedLibraryId(libraryId);
     setSelectedGenre(null); // reset genre when switching library
   }, []);
@@ -235,7 +254,7 @@ export default function LibraryScreen() {
             <Ionicons
               name="bookmark"
               size={13}
-              color={isWatchlist ? "#E50914" : colors.textSecondary}
+              color={isWatchlist ? "#FFFFFF" : colors.textSecondary}
               style={styles.tabIcon}
             />
             <FinoraText
@@ -275,6 +294,37 @@ export default function LibraryScreen() {
               </Pressable>
             );
           })}
+
+          {/* Dedicated Collections Tab if not present in server libraries views */}
+          {!hasCollectionLib ? (
+            <Pressable
+              key="collections"
+              style={[
+                styles.libraryTab,
+                isCollectionTab && styles.libraryTabSelected
+              ]}
+              onPress={() => handleLibrarySelect("collections")}
+              accessibilityRole="button"
+              accessibilityLabel="Select Collections"
+              accessibilityState={{ selected: isCollectionTab }}
+            >
+              <Ionicons
+                name="albums-outline"
+                size={13}
+                color={isCollectionTab ? "#FFFFFF" : colors.textSecondary}
+                style={styles.tabIcon}
+              />
+              <FinoraText
+                variant="body"
+                style={[
+                  styles.libraryTabText,
+                  isCollectionTab && styles.libraryTabTextSelected
+                ]}
+              >
+                Collections
+              </FinoraText>
+            </Pressable>
+          ) : null}
         </ScrollView>
       </View>
 
@@ -302,7 +352,18 @@ export default function LibraryScreen() {
           </Pressable>
 
           <FinoraText variant="caption" style={styles.resultsCount}>
-            {items.length} {isWatchlist ? (items.length <= 1 ? "titre dans la liste" : "titres dans la liste") : (items.length <= 1 ? "titre" : "titres")}
+            {items.length}{" "}
+            {isWatchlist
+              ? items.length <= 1
+                ? "titre dans la liste"
+                : "titres dans la liste"
+              : isCollectionTab
+              ? items.length <= 1
+                ? "collection"
+                : "collections"
+              : items.length <= 1
+              ? "titre"
+              : "titres"}
             {debouncedSearchQuery.trim() ? ` pour "${debouncedSearchQuery.trim()}"` : ""}
           </FinoraText>
         </View>
@@ -333,6 +394,8 @@ export default function LibraryScreen() {
             placeholder={
               isWatchlist
                 ? "Rechercher dans la Watchlist..."
+                : isCollectionTab
+                ? "Rechercher une collection..."
                 : `Rechercher dans ${activeLibrary?.name || "la bibliothèque"}...`
             }
             autoFocus={true}
@@ -341,7 +404,7 @@ export default function LibraryScreen() {
       )}
 
       {/* Genre filter horizontal list */}
-      {!isWatchlist && (
+      {!isWatchlist && !isCollectionTab && (
         <LibraryFilterBar
           genres={genres}
           selectedGenre={selectedGenre}
@@ -377,10 +440,18 @@ export default function LibraryScreen() {
           isLoading={isLoading}
           onItemPress={handleItemPress}
           loadingMessage="Chargement de vos médias..."
-          emptyTitle={isWatchlist ? "Votre Watchlist est vide" : "Aucun média trouvé"}
+          emptyTitle={
+            isWatchlist
+              ? "Votre Watchlist est vide"
+              : isCollectionTab
+              ? "Aucune collection trouvée"
+              : "Aucun média trouvé"
+          }
           emptyMessage={
             isWatchlist
               ? "Ajoutez des films et séries depuis la page d'accueil ou la recherche pour les retrouver rapidement ici."
+              : isCollectionTab
+              ? "Aucune saga ou collection n'a été trouvée sur votre serveur Jellyfin."
               : "Aucun film ou série ne correspond à vos filtres dans cette bibliothèque."
           }
         />

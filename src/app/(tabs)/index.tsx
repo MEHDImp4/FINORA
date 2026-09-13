@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, StyleSheet, ScrollView, RefreshControl, Pressable, ActivityIndicator } from "react-native";
+import { View, StyleSheet, ScrollView, RefreshControl, Pressable, ActivityIndicator, Animated } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
@@ -29,6 +29,51 @@ import {
   getRecommendedForYou,
   getBecauseYouWatched
 } from "../../features/recommendations/recommendationEngine";
+
+function CategoryPillItem({
+  label,
+  icon,
+  onPress,
+  accessibilityLabel
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  onPress: () => void;
+  accessibilityLabel: string;
+}) {
+  const scaleAnim = React.useRef(new Animated.Value(1)).current;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPressIn={() => {
+        hapticService.selection();
+        Animated.spring(scaleAnim, {
+          toValue: 0.94,
+          useNativeDriver: true,
+          friction: 6
+        }).start();
+      }}
+      onPressOut={() => {
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          friction: 6
+        }).start();
+      }}
+      onPress={onPress}
+      hitSlop={6}
+    >
+      <Animated.View style={[styles.categoryPill, { transform: [{ scale: scaleAnim }] }]}>
+        {icon}
+        <FinoraText variant="caption" color="textPrimary" weight="600" style={styles.categoryPillText}>
+          {label}
+        </FinoraText>
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 function HomeLibraryRow({
   library,
@@ -220,6 +265,30 @@ export default function HomeScreen() {
     return becauseYouWatched ? becauseYouWatched.items.map((r) => r.item) : [];
   }, [becauseYouWatched]);
 
+  const showsLib = useMemo(() => {
+    return libraries?.find((l) => {
+      const type = (l.collectionType || "").toLowerCase();
+      const name = (l.name || "").toLowerCase();
+      return type === "tvshows" || name.includes("show") || name.includes("série") || name.includes("serie");
+    });
+  }, [libraries]);
+
+  const moviesLib = useMemo(() => {
+    return libraries?.find((l) => {
+      const type = (l.collectionType || "").toLowerCase();
+      const name = (l.name || "").toLowerCase();
+      return type === "movies" || name.includes("movie") || name.includes("film");
+    });
+  }, [libraries]);
+
+  const collectionsLib = useMemo(() => {
+    return libraries?.find((l) => {
+      const type = (l.collectionType || "").toLowerCase();
+      const name = (l.name || "").toLowerCase();
+      return type === "boxsets" || name.includes("collection") || name.includes("boxset");
+    });
+  }, [libraries]);
+
   const handlePlay = (item: MediaItem) => {
     if (item.type === "Series" || item.type === "Season") {
       router.push({ pathname: "/details/[id]", params: { id: item.id } });
@@ -377,50 +446,37 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Quick Library Shortcuts / Categories Pills directly below Header */}
+          {/* Quick Library Shortcuts / 4 Core Category Pills */}
           <View style={styles.categoriesBar}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.categoriesContent}
             >
-              <Pressable
-                style={[styles.categoryPill, styles.watchlistPill]}
+              <CategoryPillItem
+                label={showsLib?.name || "Shows"}
+                onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: showsLib?.id || "shows" } })}
+                accessibilityLabel="Browse Shows"
+              />
+
+              <CategoryPillItem
+                label={moviesLib?.name || "Movies"}
+                onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: moviesLib?.id || "movies" } })}
+                accessibilityLabel="Browse Movies"
+              />
+
+              <CategoryPillItem
+                label={collectionsLib?.name || "Collections"}
+                onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: collectionsLib?.id || "collections" } })}
+                accessibilityLabel="Browse Collections"
+              />
+
+              <CategoryPillItem
+                label="Watchlist"
+                icon={<Ionicons name="bookmark" size={12} color="#FFFFFF" style={styles.pillIcon} />}
                 onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: "watchlist" } })}
-                accessibilityRole="button"
                 accessibilityLabel="Browse Watchlist"
-              >
-                <Ionicons name="bookmark" size={12} color="#E50914" style={styles.watchlistPillIcon} />
-                <FinoraText variant="caption" color="textPrimary" weight="700">
-                  Watchlist
-                </FinoraText>
-              </Pressable>
-
-              {libraries?.map((lib) => (
-                <Pressable
-                  key={lib.id}
-                  style={styles.categoryPill}
-                  onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: lib.id } })}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Browse ${lib.name}`}
-                >
-                  <FinoraText variant="caption" color="textSecondary" weight="600">
-                    {lib.name}
-                  </FinoraText>
-                </Pressable>
-              ))}
-
-              <Pressable
-                style={styles.categoryPill}
-                onPress={() => router.push("/(tabs)/library")}
-                accessibilityRole="button"
-                accessibilityLabel="Browse Categories"
-              >
-                <FinoraText variant="caption" color="textSecondary" weight="600">
-                  Catégories
-                </FinoraText>
-                <Ionicons name="chevron-down" size={11} color={colors.textSecondary} style={{ marginLeft: 3 }} />
-              </Pressable>
+              />
             </ScrollView>
           </View>
         </View>
@@ -594,7 +650,7 @@ const styles = StyleSheet.create({
     paddingRight: spacing.md
   },
   categoryPill: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 15,
     paddingVertical: 7,
     borderRadius: 20,
     backgroundColor: "rgba(255, 255, 255, 0.08)",
@@ -603,11 +659,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center"
   },
-  watchlistPill: {
-    backgroundColor: "rgba(229, 9, 20, 0.15)",
-    borderColor: "rgba(229, 9, 20, 0.45)"
+  categoryPillText: {
+    fontSize: 12.5,
+    letterSpacing: 0.1
   },
-  watchlistPillIcon: {
-    marginRight: 5
+  pillIcon: {
+    marginRight: 6
   }
 });

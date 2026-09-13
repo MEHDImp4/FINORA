@@ -7,6 +7,7 @@ import { useItemDetails } from "../../hooks/useMediaQueries";
 import { useToggleFavorite, useMarkPlayed } from "../../hooks/useUserDataMutations";
 import { MovieDetailsView } from "../../features/details/components/MovieDetailsView";
 import { SeriesDetailsView } from "../../features/details/components/SeriesDetailsView";
+import { CollectionDetailsView } from "../../features/details/components/CollectionDetailsView";
 import { FinoraText } from "../../design-system/components/FinoraText";
 import { FinoraButton } from "../../design-system/components/FinoraButton";
 import { colors, spacing } from "../../design-system/tokens";
@@ -285,6 +286,19 @@ export default function DetailsScreen() {
           }}
           onToggleFavorite={handleToggleFavorite}
           onDownloadEpisodes={handleDownloadSeriesEpisodes}
+        />
+      ) : item.type === "BoxSet" ? (
+        <CollectionDetailsView
+          collection={item}
+          serverUrl={serverUrl}
+          userId={userId}
+          onBack={() => router.back()}
+          onPlayItem={(targetItem) => handlePlay(targetItem.id)}
+          onSelectItem={(targetItem) => {
+            hapticService.selection();
+            router.push({ pathname: "/details/[id]", params: { id: targetItem.id } });
+          }}
+          onToggleFavorite={handleToggleFavorite}
         />
       ) : (
         <MovieDetailsView

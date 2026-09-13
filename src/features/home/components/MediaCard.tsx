@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Pressable, StyleProp, ViewStyle } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { View, StyleSheet, Pressable, StyleProp, ViewStyle, Animated } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { MediaItem } from "../../../types/media";
@@ -89,6 +89,8 @@ export const MediaCard = React.memo(
       ? String(item.year)
       : null;
 
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+
     const handlePress = () => {
       hapticService.impactLight();
       if (onPress) {
@@ -105,91 +107,110 @@ export const MediaCard = React.memo(
           style,
           pressed && styles.pressed
         ]}
+        onPressIn={() => {
+          hapticService.impactLight();
+          Animated.spring(scaleAnim, {
+            toValue: 0.95,
+            useNativeDriver: true,
+            friction: 6,
+            tension: 100
+          }).start();
+        }}
+        onPressOut={() => {
+          Animated.spring(scaleAnim, {
+            toValue: 1,
+            useNativeDriver: true,
+            friction: 6,
+            tension: 100
+          }).start();
+        }}
         onPress={handlePress}
         accessibilityRole="button"
         accessibilityLabel={`${mainTitle}${subTitle ? `, ${subTitle}` : ""}${progressLabel}`}
         accessibilityHint="Double tap to open media details"
       >
-        {/* Media Poster / Thumbnail Image */}
-        <View style={[styles.imageContainer, { width, height }]}>
-          {currentUrl && candidateIndex < candidateUrls.length ? (
-            <Image
-              key={currentUrl}
-              source={{ uri: currentUrl }}
-              placeholder={item.blurhash ? { blurhash: item.blurhash } : undefined}
-              style={styles.image}
-              contentFit="cover"
-              contentPosition="center"
-              transition={200}
-              cachePolicy="memory-disk"
-              onError={handleImageError}
-            />
-          ) : (
-            <View style={styles.fallbackContainer}>
-              <Ionicons
-                name={item.type === "Series" ? "tv-outline" : "film-outline"}
-                size={Math.min(width, height) * 0.28}
-                color={colors.textMuted}
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+          {/* Media Poster / Thumbnail Image */}
+          <View style={[styles.imageContainer, { width, height }]}>
+            {currentUrl && candidateIndex < candidateUrls.length ? (
+              <Image
+                key={currentUrl}
+                source={{ uri: currentUrl }}
+                placeholder={item.blurhash ? { blurhash: item.blurhash } : undefined}
+                style={styles.image}
+                contentFit="cover"
+                contentPosition="center"
+                transition={200}
+                cachePolicy="memory-disk"
+                onError={handleImageError}
               />
-              <FinoraText
-                variant="caption"
-                color="textMuted"
-                numberOfLines={2}
-                style={styles.fallbackText}
-              >
-                {mainTitle}
-              </FinoraText>
-            </View>
-          )}
-
-          {/* Progress Bar for In-Progress Media */}
-          {hasProgress ? (
-            <View style={styles.progressBarTrack}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  { width: `${Math.min(100, Math.max(5, item.playedPercentage))}%` }
-                ]}
-              />
-            </View>
-          ) : null}
-        </View>
-
-        {/* Media Metadata Caption */}
-        <View style={styles.captionContainer}>
-          <FinoraText
-            variant="caption"
-            color="textPrimary"
-            weight="600"
-            numberOfLines={1}
-            style={styles.titleText}
-          >
-            {mainTitle}
-          </FinoraText>
-
-          <View style={styles.subrow}>
-            {subTitle ? (
-              <FinoraText
-                variant="caption"
-                color="textMuted"
-                weight="500"
-                numberOfLines={1}
-                style={{ flex: 1, marginRight: 4 }}
-              >
-                {subTitle}
-              </FinoraText>
-            ) : null}
-
-            {!isEpisode && item.communityRating ? (
-              <View style={styles.ratingRow}>
-                <Ionicons name="star" size={10} color={colors.accent} style={styles.starIcon} />
-                <FinoraText variant="caption" color="accent" weight="700">
-                  {item.communityRating}
+            ) : (
+              <View style={styles.fallbackContainer}>
+                <Ionicons
+                  name={item.type === "Series" ? "tv-outline" : "film-outline"}
+                  size={Math.min(width, height) * 0.28}
+                  color={colors.textMuted}
+                />
+                <FinoraText
+                  variant="caption"
+                  color="textMuted"
+                  numberOfLines={2}
+                  style={styles.fallbackText}
+                >
+                  {mainTitle}
                 </FinoraText>
+              </View>
+            )}
+
+            {/* Progress Bar for In-Progress Media */}
+            {hasProgress ? (
+              <View style={styles.progressBarTrack}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${Math.min(100, Math.max(5, item.playedPercentage))}%` }
+                  ]}
+                />
               </View>
             ) : null}
           </View>
-        </View>
+
+          {/* Media Metadata Caption */}
+          <View style={styles.captionContainer}>
+            <FinoraText
+              variant="caption"
+              color="textPrimary"
+              weight="600"
+              numberOfLines={1}
+              style={styles.titleText}
+            >
+              {mainTitle}
+            </FinoraText>
+
+            <View style={styles.subrow}>
+              {subTitle ? (
+                <FinoraText
+                  variant="caption"
+                  color="textMuted"
+                  weight="500"
+                  numberOfLines={1}
+                  style={{ flex: 1, marginRight: 4 }}
+                >
+                  {subTitle}
+                </FinoraText>
+              ) : null}
+
+              {!isEpisode && item.communityRating ? (
+                <View style={styles.ratingRow}>
+                  <Ionicons name="star" size={10} color={colors.accent} style={styles.starIcon} />
+                  <FinoraText variant="caption" color="accent" weight="700">
+                    {item.communityRating}
+                  </FinoraText>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </Animated.View>
       </Pressable>
     );
   },
