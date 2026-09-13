@@ -4,6 +4,8 @@ import { useAuthStore } from "../../stores/authStore";
 import { useNotificationStore } from "../../stores/notificationStore";
 import { mediaRepository } from "../../core/repositories/mediaRepository";
 import { notificationService } from "../../core/notifications/notificationService";
+import { getMediaPosterUrl } from "../../core/repositories/imageUrlBuilder";
+import { jellyfinClient } from "../../core/jellyfin/jellyfinClient";
 import { MediaItem } from "../../types/media";
 import { logger } from "../../core/network/logger";
 
@@ -21,6 +23,13 @@ const SYNC_COOLDOWN_MS = 60000; // Throttle to at most once per minute
 export async function syncNewMediaNotifications(userId: string): Promise<void> {
   const { preferences } = useNotificationStore.getState();
   if (!preferences.enabled) return;
+
+  const serverUrl =
+    jellyfinClient.getServerUrl() ||
+    (typeof useAuthStore.getState === "function"
+      ? useAuthStore.getState()?.session?.serverUrl
+      : undefined) ||
+    "";
 
   try {
     // 1. Load known media IDs
@@ -79,6 +88,7 @@ export async function syncNewMediaNotifications(userId: string): Promise<void> {
       if (knownSet.has(item.id)) continue;
 
       newlyDiscoveredIds.push(item.id);
+      const posterUrl = serverUrl ? getMediaPosterUrl(serverUrl, item, 200) : undefined;
 
       // Category: New episode of watched series
       if (item.type === "Episode" && item.seriesId && watchedSeriesMap.has(item.seriesId)) {
@@ -89,21 +99,24 @@ export async function syncNewMediaNotifications(userId: string): Promise<void> {
           episodeId: item.id,
           seriesId: item.seriesId,
           seasonIndex: item.seasonIndex,
-          episodeIndex: item.episodeIndex
+          episodeIndex: item.episodeIndex,
+          posterUrl
         });
       } else if (item.type === "Movie") {
         // Category: New movie added
         await notificationService.notifyNewMovie({
           movieTitle: item.name,
           movieId: item.id,
-          year: item.year
+          year: item.year,
+          posterUrl
         });
       } else if (item.type === "Series") {
         // Category: New series added
         await notificationService.notifyNewSeries({
           seriesTitle: item.name,
           seriesId: item.id,
-          year: item.year
+          year: item.year,
+          posterUrl
         });
       }
     }
