@@ -7,7 +7,7 @@ import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
 import { getPosterUrl } from "../../../core/repositories/imageUrlBuilder";
 import { hapticService } from "../../../core/feedback/hapticService";
-import { formatBytes, getRetentionLabel } from "./DownloadsScreen";
+import { formatBytes, getRetentionLabel } from "../offlineFormatting";
 
 interface DownloadedSeriesViewProps {
   seriesName: string;

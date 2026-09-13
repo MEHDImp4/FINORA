@@ -7,38 +7,17 @@ import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
 import { getPosterUrl } from "../../../core/repositories/imageUrlBuilder";
 
-export function formatBytes(bytes: number): string {
-  if (bytes <= 0) return "0 MB";
-  const mb = bytes / (1024 * 1024);
-  if (mb >= 1000) {
-    return `${(mb / 1024).toFixed(1)} GB`;
-  }
-  return `${Math.round(mb)} MB`;
-}
+import {
+  formatBytes,
+  formatSpeed,
+  formatTimeRemaining
+} from "../offlineFormatting";
 
-export function formatSpeed(bytesPerSec?: number): string {
-  if (!bytesPerSec || bytesPerSec <= 0) return "";
-  const mb = bytesPerSec / (1024 * 1024);
-  if (mb >= 1) {
-    return `${mb.toFixed(1)} MB/s`;
-  }
-  const kb = bytesPerSec / 1024;
-  return `${Math.round(kb)} KB/s`;
-}
-
-export function formatTimeRemaining(seconds?: number): string {
-  if (!seconds || seconds <= 0) return "";
-  if (seconds >= 3600) {
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    return `~${hours}h ${mins}m`;
-  }
-  if (seconds >= 60) {
-    const mins = Math.ceil(seconds / 60);
-    return `~${mins} min`;
-  }
-  return `~${seconds}s`;
-}
+export {
+  formatBytes,
+  formatSpeed,
+  formatTimeRemaining
+};
 
 interface DownloadProgressCardProps {
   download: DownloadItem;
