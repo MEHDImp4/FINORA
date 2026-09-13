@@ -22,12 +22,13 @@ import { FinoraButton } from "../../../design-system/components/FinoraButton";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../../../design-system/tokens";
 import { formatAuthorizationHeader } from "../../../core/jellyfin/clientInfo";
-import { findMatchingAudioTrack, findMatchingSubtitleTrack } from "../trackUtils";
+import { findMatchingAudioTrack, findMatchingSubtitleTrack, normalizeLanguage } from "../trackUtils";
 import { logger } from "../../../core/network/logger";
 import { useQueryClient } from "@tanstack/react-query";
 import { mediaKeys } from "../../../hooks/useMediaQueries";
 import { FinoraSubtitleOverlay } from "./FinoraSubtitleOverlay";
 import { SubtitleStyleModal } from "./SubtitleStyleModal";
+import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
 import { useSubtitleCues } from "../useSubtitleCues";
 
 export interface PlayerScreenProps {
@@ -55,18 +56,18 @@ export function PlayerScreen({
   const [statsModalVisible, setStatsModalVisible] = useState(false);
   const queryClient = useQueryClient();
 
-  // Compute default audio stream index
-  const defaultAudioIndex = useMemo(() => {
-    const audioStreams = item.mediaStreams?.filter((s) => s.type === "Audio") || [];
-    const defaultStream = audioStreams.find((s) => s.isDefault);
-    if (defaultStream?.index !== undefined) return defaultStream.index;
-    if (audioStreams[0]?.index !== undefined) return audioStreams[0].index;
-    return undefined;
-  }, [item.mediaStreams]);
+  // Persistent preferences store
+  const resolveBestTracks = usePlaybackPreferencesStore((state) => state.resolveBestTracks);
+  const setSeriesPreference = usePlaybackPreferencesStore((state) => state.setSeriesPreference);
+
+  // Compute best initial audio and subtitle stream index according to user / series preferences
+  const { initialAudioIndex: bestAudioIndex, initialSubtitleIndex: bestSubtitleIndex } = useMemo(() => {
+    return resolveBestTracks(item);
+  }, [item, resolveBestTracks]);
 
   // UI Selection states (controls checkmarks in TrackSelectionModal)
-  const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | undefined>(defaultAudioIndex);
-  const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState<number | null>(null);
+  const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | undefined>(bestAudioIndex);
+  const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState<number | null>(bestSubtitleIndex);
   const [selectedQuality, setSelectedQuality] = useState<string>("auto");
   const [isLandscape, setIsLandscape] = useState(false);
   const [showSubtitleStyleModal, setShowSubtitleStyleModal] = useState(false);
@@ -91,10 +92,16 @@ export function PlayerScreen({
   const [availableSubtitleTracks, setAvailableSubtitleTracks] = useState<any[]>([]);
 
   useEffect(() => {
-    if (selectedAudioIndex === undefined && defaultAudioIndex !== undefined) {
-      setSelectedAudioIndex(defaultAudioIndex);
+    if (selectedAudioIndex === undefined && bestAudioIndex !== undefined) {
+      setSelectedAudioIndex(bestAudioIndex);
     }
-  }, [defaultAudioIndex]);
+  }, [bestAudioIndex]);
+
+  useEffect(() => {
+    if (selectedSubtitleIndex === null && bestSubtitleIndex !== null) {
+      setSelectedSubtitleIndex(bestSubtitleIndex);
+    }
+  }, [bestSubtitleIndex]);
 
   // Auto/Manual screen orientation handling
   useEffect(() => {
@@ -431,6 +438,14 @@ export function PlayerScreen({
 
           const audioStreams = item.mediaStreams?.filter((s) => s.type === "Audio") || [];
           const targetStream = audioStreams.find((s) => s.index === idx);
+
+          // Persist audio language preference for this series / media
+          if (item.seriesId && targetStream?.language) {
+            setSeriesPreference(item.seriesId, {
+              audioLanguage: normalizeLanguage(targetStream.language)
+            });
+          }
+
           const currentTracks =
             player.availableAudioTracks && player.availableAudioTracks.length > 0
               ? player.availableAudioTracks
@@ -457,12 +472,21 @@ export function PlayerScreen({
           setServerSubtitleIndex(idx);
           setTracksModalVisible(false);
 
+          const subStreams = item.mediaStreams?.filter((s) => s.type === "Subtitle") || [];
+          const targetSubStream = idx !== null ? subStreams.find((s) => s.index === idx) : null;
+
+          // Persist subtitle language preference for this series / media
+          if (item.seriesId) {
+            setSeriesPreference(item.seriesId, {
+              subtitleLanguage: targetSubStream?.language ? normalizeLanguage(targetSubStream.language) : null
+            });
+          }
+
           if (idx === null) {
             player.subtitleTrack = null;
             return;
           }
 
-          const subStreams = item.mediaStreams?.filter((s) => s.type === "Subtitle") || [];
           const currentTracks =
             player.availableSubtitleTracks && player.availableSubtitleTracks.length > 0
               ? player.availableSubtitleTracks

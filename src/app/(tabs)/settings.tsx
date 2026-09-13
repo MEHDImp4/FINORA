@@ -4,13 +4,15 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  ScrollView
+  ScrollView,
+  TouchableOpacity
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FinoraScreen } from "../../design-system/components/FinoraScreen";
 import { FinoraButton } from "../../design-system/components/FinoraButton";
 import { useAuthStore } from "../../stores/authStore";
 import { useServerStore } from "../../stores/serverStore";
+import { usePlaybackPreferencesStore, SubtitleMode } from "../../stores/playbackPreferencesStore";
 import {
   diagnosticsService,
   ServerDiagnosticsResult
@@ -26,6 +28,12 @@ export default function SettingsScreen() {
   const loadSavedAccounts = useServerStore((state) => state.loadSavedAccounts);
   const switchAccount = useServerStore((state) => state.switchAccount);
   const removeAccount = useServerStore((state) => state.removeAccount);
+
+  // Playback & Language preferences
+  const preferences = usePlaybackPreferencesStore((state) => state.preferences);
+  const setPreferredAudioLanguage = usePlaybackPreferencesStore((state) => state.setPreferredAudioLanguage);
+  const setPreferredSubtitleLanguage = usePlaybackPreferencesStore((state) => state.setPreferredSubtitleLanguage);
+  const setSubtitleMode = usePlaybackPreferencesStore((state) => state.setSubtitleMode);
 
   const [isRunning, setIsRunning] = useState(false);
   const [diagResult, setDiagResult] = useState<ServerDiagnosticsResult | null>(null);
@@ -258,6 +266,117 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {/* Audio & Subtitle Language Preferences */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>Langues & Lecture</Text>
+          <Text style={styles.cardDescription}>
+            Définissez votre langue audio et vos sous-titres préférés. Ces choix s'appliquent automatiquement à tous les films et séries, et vos modifications manuelles en cours de visionnage sont mémorisées par série.
+          </Text>
+
+          {/* Preferred Audio Language */}
+          <View style={styles.formGroup}>
+            <Text style={styles.inputLabel}>Langue Audio Préférée</Text>
+            <View style={styles.chipRow}>
+              {[
+                { id: "fr", label: "Français 🇫🇷" },
+                { id: "en", label: "Anglais 🇬🇧" },
+                { id: "ja", label: "Japonais 🇯🇵" },
+                { id: "es", label: "Espagnol 🇪🇸" },
+                { id: "de", label: "Allemand 🇩🇪" },
+                { id: "auto", label: "Auto / Original" }
+              ].map((opt) => {
+                const isSelected = preferences.preferredAudioLanguage === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={[styles.chip, isSelected && styles.chipActive]}
+                    onPress={() => setPreferredAudioLanguage(opt.id)}
+                    testID={`audio-lang-chip-${opt.id}`}
+                  >
+                    <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Preferred Subtitle Language */}
+          <View style={styles.formGroup}>
+            <Text style={styles.inputLabel}>Sous-titres Préférés</Text>
+            <View style={styles.chipRow}>
+              {[
+                { id: "fr", label: "Français 🇫🇷" },
+                { id: "en", label: "Anglais 🇬🇧" },
+                { id: "es", label: "Espagnol 🇪🇸" },
+                { id: "none", label: "Désactivés" }
+              ].map((opt) => {
+                const isSelected = preferences.preferredSubtitleLanguage === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={[styles.chip, isSelected && styles.chipActive]}
+                    onPress={() => setPreferredSubtitleLanguage(opt.id)}
+                    testID={`sub-lang-chip-${opt.id}`}
+                  >
+                    <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Subtitle Activation Mode */}
+          <View style={styles.formGroup}>
+            <Text style={styles.inputLabel}>Activation des Sous-titres</Text>
+            <View style={styles.modeColumn}>
+              {[
+                {
+                  id: "smart" as SubtitleMode,
+                  title: "Intelligent (Recommandé)",
+                  desc: "Active les sous-titres uniquement si l'audio n'est pas dans votre langue préférée (ex: VO sous-titrée)."
+                },
+                {
+                  id: "always" as SubtitleMode,
+                  title: "Toujours afficher",
+                  desc: "Affiche toujours vos sous-titres préférés s'ils sont disponibles."
+                },
+                {
+                  id: "off" as SubtitleMode,
+                  title: "Toujours désactivés",
+                  desc: "Ne charge aucun sous-titre au démarrage de la lecture."
+                }
+              ].map((m) => {
+                const isSelected = preferences.subtitleMode === m.id;
+                return (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={[styles.modeRow, isSelected && styles.modeRowActive]}
+                    onPress={() => setSubtitleMode(m.id)}
+                    testID={`sub-mode-${m.id}`}
+                  >
+                    <Ionicons
+                      name={isSelected ? "radio-button-on" : "radio-button-off"}
+                      size={18}
+                      color={isSelected ? "#E50914" : "#666680"}
+                      style={{ marginRight: 10, marginTop: 2 }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.modeTitle, isSelected && styles.modeTitleActive]}>
+                        {m.title}
+                      </Text>
+                      <Text style={styles.modeDesc}>{m.desc}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
         {/* Subtitle & Accessibility Appearance */}
         <View style={styles.card}>
           <Text style={styles.sectionHeader}>Sous-titres & Accessibilité</Text>
@@ -488,5 +607,63 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     flex: 1
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4
+  },
+  chip: {
+    backgroundColor: "#1C1C26",
+    borderWidth: 1,
+    borderColor: "#2D2D3D",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7
+  },
+  chipActive: {
+    backgroundColor: "rgba(229, 9, 20, 0.15)",
+    borderColor: "#E50914"
+  },
+  chipText: {
+    color: "#B3B3CC",
+    fontSize: 13,
+    fontWeight: "500"
+  },
+  chipTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "600"
+  },
+  modeColumn: {
+    gap: 8,
+    marginTop: 4
+  },
+  modeRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#16161F",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#22222E",
+    padding: 12
+  },
+  modeRowActive: {
+    borderColor: "#E50914",
+    backgroundColor: "rgba(229, 9, 20, 0.05)"
+  },
+  modeTitle: {
+    color: "#D1D1E0",
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 2
+  },
+  modeTitleActive: {
+    color: "#FFFFFF"
+  },
+  modeDesc: {
+    color: "#8A8A9E",
+    fontSize: 12,
+    lineHeight: 16
   }
 });

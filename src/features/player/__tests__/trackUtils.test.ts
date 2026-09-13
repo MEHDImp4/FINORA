@@ -1,4 +1,10 @@
-import { normalizeLanguage, findMatchingAudioTrack, findMatchingSubtitleTrack } from "../trackUtils";
+import {
+  normalizeLanguage,
+  findMatchingAudioTrack,
+  findMatchingSubtitleTrack,
+  selectInitialAudioTrack,
+  selectInitialSubtitleTrack
+} from "../trackUtils";
 import { MediaStreamInfo } from "../../../types/media";
 
 describe("trackUtils", () => {
@@ -160,6 +166,68 @@ describe("trackUtils", () => {
 
       expect(findMatchingSubtitleTrack(availableTracks, subtitleStreams, 3)).toEqual(availableTracks[0]);
       expect(findMatchingSubtitleTrack(availableTracks, subtitleStreams, 4)).toEqual(availableTracks[1]);
+    });
+  });
+
+  describe("selectInitialAudioTrack", () => {
+    const audioStreams: MediaStreamInfo[] = [
+      { index: 1, type: "Audio", language: "eng", isDefault: true },
+      { index: 2, type: "Audio", language: "fre", isDefault: false },
+      { index: 3, type: "Audio", language: "jpn", isDefault: false }
+    ];
+
+    it("prefers series preference language when available", () => {
+      const match = selectInitialAudioTrack(audioStreams, "fr", "en");
+      expect(match?.index).toBe(2);
+    });
+
+    it("falls back to global preference if series preference is not matched or auto", () => {
+      const match = selectInitialAudioTrack(audioStreams, "auto", "ja");
+      expect(match?.index).toBe(3);
+    });
+
+    it("falls back to default stream if neither preference matches", () => {
+      const match = selectInitialAudioTrack(audioStreams, "de", "es");
+      expect(match?.index).toBe(1);
+    });
+  });
+
+  describe("selectInitialSubtitleTrack", () => {
+    const subtitleStreams: MediaStreamInfo[] = [
+      { index: 10, type: "Subtitle", language: "eng" },
+      { index: 11, type: "Subtitle", language: "fre" }
+    ];
+
+    it("respects series preference when explicitly set to a language", () => {
+      const match = selectInitialSubtitleTrack(subtitleStreams, "en", "fr");
+      expect(match?.index).toBe(11);
+    });
+
+    it("respects series preference when explicitly disabled (null or none)", () => {
+      const match = selectInitialSubtitleTrack(subtitleStreams, "en", null);
+      expect(match).toBeNull();
+    });
+
+    it("activates subtitle in smart mode when audio differs from preferred subtitle", () => {
+      // Audio is English, preferred subtitle is French -> activates French subtitle
+      const match = selectInitialSubtitleTrack(subtitleStreams, "en", undefined, "fr", "smart");
+      expect(match?.index).toBe(11);
+    });
+
+    it("keeps subtitles disabled in smart mode when audio matches preferred subtitle", () => {
+      // Audio is French, preferred subtitle is French -> no need for subtitles
+      const match = selectInitialSubtitleTrack(subtitleStreams, "fr", undefined, "fr", "smart");
+      expect(match).toBeNull();
+    });
+
+    it("activates subtitles in always mode even when audio matches subtitle language", () => {
+      const match = selectInitialSubtitleTrack(subtitleStreams, "fr", undefined, "fr", "always");
+      expect(match?.index).toBe(11);
+    });
+
+    it("returns null when subtitleMode is off", () => {
+      const match = selectInitialSubtitleTrack(subtitleStreams, "en", undefined, "fr", "off");
+      expect(match).toBeNull();
     });
   });
 });

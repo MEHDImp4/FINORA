@@ -255,3 +255,88 @@ export function findMatchingSubtitleTrack(
 
   return undefined;
 }
+
+/**
+ * Resolves the optimal initial audio stream index based on:
+ * 1. Series-level saved language preference
+ * 2. User global language preference
+ * 3. Media stream marked as default (isDefault)
+ * 4. First audio stream in list
+ */
+export function selectInitialAudioTrack(
+  audioStreams: MediaStreamInfo[] = [],
+  seriesPrefLang?: string,
+  globalPrefLang?: string
+): MediaStreamInfo | undefined {
+  if (!audioStreams || audioStreams.length === 0) return undefined;
+
+  // 1. Series preference
+  if (seriesPrefLang && seriesPrefLang !== "auto") {
+    const normSeries = normalizeLanguage(seriesPrefLang);
+    const match = audioStreams.find((s) => normalizeLanguage(s.language) === normSeries);
+    if (match) return match;
+  }
+
+  // 2. Global preference
+  if (globalPrefLang && globalPrefLang !== "auto") {
+    const normGlobal = normalizeLanguage(globalPrefLang);
+    const match = audioStreams.find((s) => normalizeLanguage(s.language) === normGlobal);
+    if (match) return match;
+  }
+
+  // 3. Media default stream
+  const defaultStream = audioStreams.find((s) => s.isDefault);
+  if (defaultStream) return defaultStream;
+
+  // 4. First available stream
+  return audioStreams[0];
+}
+
+/**
+ * Resolves the optimal initial subtitle stream index based on:
+ * 1. Series-level saved subtitle preference (can be null/none)
+ * 2. User global subtitle preference and subtitle mode (smart / always / off)
+ * 3. Forced subtitles or default subtitles when appropriate
+ */
+export function selectInitialSubtitleTrack(
+  subtitleStreams: MediaStreamInfo[] = [],
+  selectedAudioLanguage?: string,
+  seriesPrefSub?: string | null,
+  globalPrefSub: string = "none",
+  subtitleMode: "smart" | "always" | "off" = "smart"
+): MediaStreamInfo | null {
+  if (!subtitleStreams || subtitleStreams.length === 0) return null;
+
+  // 1. Series preference takes absolute precedence if defined
+  if (seriesPrefSub !== undefined) {
+    if (seriesPrefSub === null || seriesPrefSub === "none" || seriesPrefSub === "") {
+      return null;
+    }
+    const normPref = normalizeLanguage(seriesPrefSub);
+    const match = subtitleStreams.find((s) => normalizeLanguage(s.language) === normPref);
+    if (match) return match;
+    // Fallback: If requested subtitle language not found, disable
+    return null;
+  }
+
+  // 2. Subtitle mode checks
+  if (subtitleMode === "off" || globalPrefSub === "none" || !globalPrefSub) {
+    return null;
+  }
+
+  const normGlobalSub = normalizeLanguage(globalPrefSub);
+  const normAudio = normalizeLanguage(selectedAudioLanguage);
+
+  if (subtitleMode === "smart") {
+    // Smart mode: only turn on subtitles if the audio is different from the preferred subtitle language
+    if (normAudio && normAudio === normGlobalSub) {
+      return null;
+    }
+  }
+
+  // Find matching subtitle for the user's preferred language
+  const match = subtitleStreams.find((s) => normalizeLanguage(s.language) === normGlobalSub);
+  if (match) return match;
+
+  return null;
+}
