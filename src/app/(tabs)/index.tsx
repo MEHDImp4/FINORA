@@ -45,6 +45,7 @@ function CategoryPillItem({
 
   return (
     <Pressable
+      style={styles.pillPressable}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPressIn={() => {
@@ -63,11 +64,17 @@ function CategoryPillItem({
         }).start();
       }}
       onPress={onPress}
-      hitSlop={6}
+      hitSlop={4}
     >
       <Animated.View style={[styles.categoryPill, { transform: [{ scale: scaleAnim }] }]}>
         {icon}
-        <FinoraText variant="caption" color="textPrimary" weight="600" style={styles.categoryPillText}>
+        <FinoraText
+          variant="caption"
+          color="textPrimary"
+          weight="600"
+          numberOfLines={1}
+          style={styles.categoryPillText}
+        >
           {label}
         </FinoraText>
       </Animated.View>
@@ -446,13 +453,9 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Quick Library Shortcuts / 4 Core Category Pills */}
+          {/* Quick 4 Core Category Pills (Static, Non-Scrollable Row) */}
           <View style={styles.categoriesBar}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesContent}
-            >
+            <View style={styles.categoriesRow}>
               <CategoryPillItem
                 label={showsLib?.name || "Shows"}
                 onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: showsLib?.id || "shows" } })}
@@ -473,11 +476,11 @@ export default function HomeScreen() {
 
               <CategoryPillItem
                 label="Watchlist"
-                icon={<Ionicons name="bookmark" size={12} color="#FFFFFF" style={styles.pillIcon} />}
+                icon={<Ionicons name="bookmark" size={11} color="#FFFFFF" style={styles.pillIcon} />}
                 onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: "watchlist" } })}
                 accessibilityLabel="Browse Watchlist"
               />
-            </ScrollView>
+            </View>
           </View>
         </View>
 
@@ -645,25 +648,31 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     marginBottom: spacing.xs
   },
-  categoriesContent: {
-    gap: spacing.sm,
-    paddingRight: spacing.md
+  categoriesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 7
+  },
+  pillPressable: {
+    flex: 1
   },
   categoryPill: {
-    paddingHorizontal: 15,
+    paddingHorizontal: 4,
     paddingVertical: 7,
-    borderRadius: 20,
+    borderRadius: 18,
     backgroundColor: "rgba(255, 255, 255, 0.08)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.12)",
     flexDirection: "row",
-    alignItems: "center"
+    alignItems: "center",
+    justifyContent: "center"
   },
   categoryPillText: {
-    fontSize: 12.5,
-    letterSpacing: 0.1
+    fontSize: 12,
+    letterSpacing: -0.2
   },
   pillIcon: {
-    marginRight: 6
+    marginRight: 4
   }
 });
