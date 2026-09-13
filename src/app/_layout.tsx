@@ -14,11 +14,19 @@ export default function RootLayout() {
   const status = useAuthStore((state) => state.status);
   const session = useAuthStore((state) => state.session);
   const restoreSession = useAuthStore((state) => state.restoreSession);
+  const [minSplashDone, setMinSplashDone] = React.useState(false);
 
   useEffect(() => {
     restoreSession();
     // Auto-cleanup watched downloads older than 48h (2-3 days policy)
     offlineStorageService.cleanupExpiredWatchedMedia(48).catch(() => {});
+
+    // Ensure splash screen remains visible for at least 2 seconds
+    const timer = setTimeout(() => {
+      setMinSplashDone(true);
+    }, 2000);
+
+    return () => clearTimeout(timer);
   }, [restoreSession]);
 
   useEffect(() => {
@@ -28,12 +36,14 @@ export default function RootLayout() {
     }
   }, [status, session?.userId]);
 
+  const showSplash = !minSplashDone || status === "idle" || status === "restoring";
+
   return (
     <SafeAreaProvider>
       <QueryProvider>
         <View style={styles.container}>
           <StatusBar style="light" />
-          {status === "idle" || status === "restoring" ? (
+          {showSplash ? (
             <View style={styles.loadingContainer}>
               <Image
                 source={require("../../assets/finora-logo-text.png")}
