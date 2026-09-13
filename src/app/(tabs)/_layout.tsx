@@ -4,6 +4,8 @@ import { StyleSheet, Platform, View, Pressable, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { hapticService } from "../../core/feedback/hapticService";
 
+const HIDDEN_ROUTES = new Set(["search", "downloads"]);
+
 function FinoraPillTabBar({ state, descriptors, navigation, insets }: any) {
   const bottomInset = Platform.OS === "ios" ? insets.bottom + 6 : 14;
 
@@ -11,8 +13,10 @@ function FinoraPillTabBar({ state, descriptors, navigation, insets }: any) {
     <View style={[styles.tabBarWrapper, { bottom: bottomInset }]} pointerEvents="box-none">
       <View style={styles.pillContainer}>
         {state.routes.map((route: any, index: number) => {
+          if (HIDDEN_ROUTES.has(route.name)) return null;
+
           const { options } = descriptors[route.key];
-          if (options.href === null) return null;
+          if (options?.href === null) return null;
 
           const isFocused = state.index === index;
           const label = options.title !== undefined ? options.title : route.name;
