@@ -177,7 +177,7 @@ describe("imageUrlBuilder", () => {
       expect(getHeroBannerUrls(baseUrl, null as any)).toEqual([]);
     });
 
-    it("prioritizes backdrop tag with 1280 target width and falls back to primary and fallbacks", () => {
+    it("prioritizes official primary poster in 1080p and falls back to backdrop", () => {
       const item: any = {
         id: "hero-1",
         type: "Movie",
@@ -185,27 +185,32 @@ describe("imageUrlBuilder", () => {
         primaryImageTag: "hero-pri-456"
       };
 
-      const urls = getHeroBannerUrls(baseUrl, item, 1280);
+      const urls = getHeroBannerUrls(baseUrl, item, 1080);
       expect(urls.length).toBeGreaterThanOrEqual(2);
-      expect(urls[0]).toContain("/Items/hero-1/Images/Backdrop");
-      expect(urls[0]).toContain("maxWidth=1280");
-      expect(urls[0]).toContain("tag=hero-bd-123");
+      expect(urls[0]).toContain("/Items/hero-1/Images/Primary");
+      expect(urls[0]).toContain("maxWidth=1080");
+      expect(urls[0]).toContain("tag=hero-pri-456");
 
-      // Verify fallback without tag is also present
-      expect(urls.some((u) => u.includes("/Items/hero-1/Images/Backdrop") && !u.includes("tag="))).toBe(true);
+      // Verify backdrop fallback is also present
+      expect(urls.some((u) => u.includes("/Items/hero-1/Images/Backdrop"))).toBe(true);
     });
 
-    it("includes parent backdrop and thumb when item is an episode with parent info", () => {
+    it("prioritizes series primary poster and excludes episode still when item is an episode", () => {
       const episode: any = {
         id: "ep-10",
         type: "Episode",
         seriesId: "series-50",
+        seriesPrimaryImageTag: "series-poster-tag",
         parentBackdropImageTag: "series-bd-tag",
         primaryImageTag: "ep-still-tag"
       };
 
-      const urls = getHeroBannerUrls(baseUrl, episode, 1280);
+      const urls = getHeroBannerUrls(baseUrl, episode, 1080);
+      expect(urls[0]).toContain("/Items/series-50/Images/Primary");
+      expect(urls[0]).toContain("tag=series-poster-tag");
       expect(urls.some((u) => u.includes("/Items/series-50/Images/Backdrop") && u.includes("series-bd-tag"))).toBe(true);
+      // Episode still should never appear on the hero banner
+      expect(urls.some((u) => u.includes("ep-still-tag"))).toBe(false);
     });
   });
 });

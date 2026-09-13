@@ -117,6 +117,7 @@ export const HeroBanner = React.memo(function HeroBanner({
           placeholder={item.blurhash ? { blurhash: item.blurhash } : undefined}
           style={styles.backdropImage}
           contentFit="cover"
+          contentPosition="center"
           transition={600}
           cachePolicy="memory-disk"
           onError={handleImageError}

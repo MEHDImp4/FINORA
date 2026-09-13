@@ -50,6 +50,7 @@ describe("HeroBanner", () => {
   it("cycles to next candidate URL when image error occurs", () => {
     const itemWithFallbacks: MediaItem = {
       ...sampleItem,
+      primaryImageTag: "primary-poster-tag",
       backdropImageTag: "primary-backdrop-tag"
     };
 
@@ -61,7 +62,8 @@ describe("HeroBanner", () => {
     expect(images.length).toBeGreaterThan(0);
     const backdropImg = images[0];
     const initialSource = backdropImg.props.source.uri;
-    expect(initialSource).toContain("tag=primary-backdrop-tag");
+    expect(initialSource).toContain("tag=primary-poster-tag");
+    expect(backdropImg.props.contentPosition).toBe("center");
 
     // Trigger onError on backdrop image
     ReactTestRenderer.act(() => {
@@ -70,7 +72,7 @@ describe("HeroBanner", () => {
 
     const updatedImages = component.root.findAllByType("Image" as any);
     const updatedBackdrop = updatedImages[0];
-    // Candidate should now have moved forward to the next candidate without the tag
+    // Candidate should now have moved forward to the next candidate
     expect(updatedBackdrop.props.source.uri).not.toBe(initialSource);
   });
 

@@ -162,12 +162,16 @@ export default function HomeScreen() {
       }
     };
 
-    // Priority 1: Recently added with backdrops (cinematic widescreen)
-    addIfValid(recentItems?.filter((i) => Boolean(i.backdropImageTag)));
-    // Priority 2: Other recently added with primary tags
-    addIfValid(recentItems);
-    // Priority 3: In-progress resume items with visuals
+    // Priority 1: Items with official primary posters (Movies, Series, or Episodes with Series poster)
+    addIfValid(
+      recentItems?.filter(
+        (i) => Boolean(i.primaryImageTag || i.seriesPrimaryImageTag || i.parentPrimaryImageTag)
+      )
+    );
+    // Priority 2: In-progress resume items with official posters
     addIfValid(resumeItems);
+    // Priority 3: Other items
+    addIfValid(recentItems);
 
     return list;
   }, [recentItems, resumeItems]);

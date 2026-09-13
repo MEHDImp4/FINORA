@@ -106,30 +106,84 @@ export function getPersonImageUrl(
 }
 
 /**
- * Resolves an ordered list of candidate high-definition banner/backdrop URLs for the Hero Banner.
+ * Resolves an ordered list of candidate high-definition banner URLs for the Hero Banner.
+ * Prioritizes official Primary posters (2:3 vertical key art, centered) in 1080p
+ * over backdrops, avoiding random episode still frames.
  */
 export function getHeroBannerUrls(
   baseUrl: string,
   item: MediaItem,
-  targetWidth: number = 1280
+  targetWidth: number = 1080
 ): string[] {
   if (!baseUrl || !item) return [];
 
   const urls: string[] = [];
   const parentId = item.parentBackdropItemId || item.seriesId || item.parentId;
 
-  // 1. Item Backdrop with tag
+  if (item.type === "Episode") {
+    // 1. Official Series Primary Poster with tag (1080p key art)
+    const seriesPosterTag = item.seriesPrimaryImageTag || item.parentPrimaryImageTag;
+    if (parentId && seriesPosterTag) {
+      urls.push(getPosterUrl(baseUrl, parentId, seriesPosterTag, targetWidth));
+    }
+
+    // 2. Season Primary Poster
+    if (item.seasonId) {
+      urls.push(
+        buildImageUrl(baseUrl, item.seasonId, "Primary", {
+          width: targetWidth,
+          quality: 85
+        })
+      );
+    }
+
+    // 3. Series Primary fallback without tag
+    if (parentId) {
+      urls.push(getPosterUrl(baseUrl, parentId, undefined, targetWidth));
+    }
+
+    // 4. Parent Series Backdrop with tag
+    const parentBackdropTag = item.parentBackdropImageTag || item.backdropImageTag;
+    if (parentId && parentBackdropTag) {
+      urls.push(getBackdropUrl(baseUrl, parentId, parentBackdropTag, Math.max(targetWidth, 1280)));
+    }
+
+    // 5. Parent Series Thumb with tag
+    const parentThumbTag = item.parentThumbImageTag || item.thumbImageTag;
+    const parentThumbId = item.parentThumbItemId || parentId;
+    if (parentThumbId && parentThumbTag) {
+      urls.push(
+        buildImageUrl(baseUrl, parentThumbId, "Thumb", {
+          width: targetWidth,
+          quality: 85,
+          tag: parentThumbTag
+        })
+      );
+    }
+
+    // 6. Parent Backdrop fallback without tag
+    if (parentId) {
+      urls.push(getBackdropUrl(baseUrl, parentId, undefined, Math.max(targetWidth, 1280)));
+    }
+
+    return Array.from(new Set(urls.filter(Boolean)));
+  }
+
+  // For Movies, Series, BoxSets:
+  // 1. Official Primary Poster with tag (1080p key art)
+  if (item.primaryImageTag) {
+    urls.push(getPosterUrl(baseUrl, item.id, item.primaryImageTag, targetWidth));
+  }
+
+  // 2. Primary fallback without tag
+  urls.push(getPosterUrl(baseUrl, item.id, undefined, targetWidth));
+
+  // 3. Official Backdrop with tag
   if (item.backdropImageTag) {
-    urls.push(getBackdropUrl(baseUrl, item.id, item.backdropImageTag, targetWidth));
+    urls.push(getBackdropUrl(baseUrl, item.id, item.backdropImageTag, Math.max(targetWidth, 1280)));
   }
 
-  // 2. Parent Backdrop with tag
-  const parentBackdropTag = item.parentBackdropImageTag || item.backdropImageTag;
-  if (parentId && parentBackdropTag) {
-    urls.push(getBackdropUrl(baseUrl, parentId, parentBackdropTag, targetWidth));
-  }
-
-  // 3. Item Thumb with tag
+  // 4. Thumb with tag
   if (item.thumbImageTag) {
     urls.push(
       buildImageUrl(baseUrl, item.id, "Thumb", {
@@ -140,47 +194,8 @@ export function getHeroBannerUrls(
     );
   }
 
-  // 4. Parent Thumb with tag
-  const parentThumbTag = item.parentThumbImageTag || item.thumbImageTag;
-  const parentThumbId = item.parentThumbItemId || parentId;
-  if (parentThumbId && parentThumbTag) {
-    urls.push(
-      buildImageUrl(baseUrl, parentThumbId, "Thumb", {
-        width: targetWidth,
-        quality: 85,
-        tag: parentThumbTag
-      })
-    );
-  }
-
-  // 5. Item or Series Primary with tag
-  const seriesPosterTag = item.seriesPrimaryImageTag || item.parentPrimaryImageTag;
-  if (item.type === "Episode") {
-    if (parentId && seriesPosterTag) {
-      urls.push(getPosterUrl(baseUrl, parentId, seriesPosterTag, Math.min(targetWidth, 1080)));
-    }
-  } else if (item.primaryImageTag) {
-    urls.push(getPosterUrl(baseUrl, item.id, item.primaryImageTag, Math.min(targetWidth, 1080)));
-  }
-
-  // 6. Parent Primary with tag
-  if (parentId && seriesPosterTag) {
-    urls.push(getPosterUrl(baseUrl, parentId, seriesPosterTag, Math.min(targetWidth, 1080)));
-  }
-
-  // 7. Backdrop fallback without tag
-  urls.push(getBackdropUrl(baseUrl, item.id, undefined, targetWidth));
-  if (parentId) {
-    urls.push(getBackdropUrl(baseUrl, parentId, undefined, targetWidth));
-  }
-
-  // 8. Primary fallback without tag
-  if (item.type !== "Episode") {
-    urls.push(getPosterUrl(baseUrl, item.id, undefined, Math.min(targetWidth, 1080)));
-  }
-  if (parentId) {
-    urls.push(getPosterUrl(baseUrl, parentId, undefined, Math.min(targetWidth, 1080)));
-  }
+  // 5. Backdrop fallback without tag
+  urls.push(getBackdropUrl(baseUrl, item.id, undefined, Math.max(targetWidth, 1280)));
 
   return Array.from(new Set(urls.filter(Boolean)));
 }
