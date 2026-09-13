@@ -20,6 +20,8 @@ import {
 import { MediaItem } from "../../types/media";
 import { FinoraText } from "../../design-system/components/FinoraText";
 import { colors, spacing } from "../../design-system/tokens";
+import { useNetworkDiagnostic } from "../../core/network/networkStatusService";
+import { NetworkFailureStateView } from "../../design-system/components/NetworkFailureStateView";
 
 const WATCHLIST_ID = "watchlist";
 
@@ -54,9 +56,12 @@ export default function LibraryScreen() {
   const isWatchlist = selectedLibraryId === WATCHLIST_ID;
 
   // Fetch libraries
-  const { data: libraries = [], isLoading: isLibrariesLoading } = useLibraries(
-    currentUserId
-  );
+  const {
+    data: libraries = [],
+    isLoading: isLibrariesLoading,
+    isError: isLibrariesError,
+    refetch: refetchLibraries
+  } = useLibraries(currentUserId);
 
   // Default to first library if none selected and not on watchlist
   const activeLibrary = useMemo(() => {
@@ -94,7 +99,12 @@ export default function LibraryScreen() {
   );
 
   // Fetch library items
-  const { data: libraryItems = [], isLoading: isItemsLoading } = useLibraryItems(
+  const {
+    data: libraryItems = [],
+    isLoading: isItemsLoading,
+    isError: isItemsError,
+    refetch: refetchItems
+  } = useLibraryItems(
     currentUserId,
     isWatchlist ? undefined : activeLibraryId,
     {
@@ -106,7 +116,12 @@ export default function LibraryScreen() {
   );
 
   // Fetch watchlist items
-  const { data: watchlistItems = [], isLoading: isWatchlistLoading } = useWatchlistItems(
+  const {
+    data: watchlistItems = [],
+    isLoading: isWatchlistLoading,
+    isError: isWatchlistError,
+    refetch: refetchWatchlist
+  } = useWatchlistItems(
     currentUserId,
     isWatchlist
       ? {
@@ -119,6 +134,21 @@ export default function LibraryScreen() {
 
   const items = isWatchlist ? watchlistItems : libraryItems;
   const isLoading = isWatchlist ? isWatchlistLoading : (isItemsLoading || isLibrariesLoading);
+  const isAnyError = isWatchlist ? Boolean(isWatchlistError) : Boolean(isLibrariesError || isItemsError);
+
+  const { failureType, isChecking: isDiagChecking, runDiagnostic } = useNetworkDiagnostic(
+    serverUrl,
+    isAnyError
+  );
+
+  const handleRetry = useCallback(async () => {
+    await Promise.allSettled([
+      refetchLibraries(),
+      refetchItems(),
+      refetchWatchlist(),
+      runDiagnostic()
+    ]);
+  }, [refetchLibraries, refetchItems, refetchWatchlist, runDiagnostic]);
 
   const handleLibrarySelect = useCallback((libraryId: string) => {
     setSelectedLibraryId(libraryId);
@@ -202,7 +232,7 @@ export default function LibraryScreen() {
       {/* Action bar: Sort trigger & Active genre info */}
       <View style={styles.actionBar}>
         <FinoraText variant="caption" style={styles.resultsCount}>
-          {items.length} {isWatchlist ? (items.length <= 1 ? "item in watchlist" : "items in watchlist") : (items.length === 1 ? "item" : "items")}
+          {items.length} {isWatchlist ? (items.length <= 1 ? "titre dans la liste" : "titres dans la liste") : (items.length <= 1 ? "titre" : "titres")}
         </FinoraText>
 
         <Pressable
@@ -227,18 +257,42 @@ export default function LibraryScreen() {
         />
       )}
 
-      {/* 3-Column Virtualized Media Grid */}
-      <LibraryGridView
-        items={items}
-        serverUrl={serverUrl}
-        isLoading={isLoading}
-        onItemPress={handleItemPress}
-        emptyMessage={
-          isWatchlist
-            ? "Your watchlist is empty. Add movies and series to find them here."
-            : "No media found in this library"
-        }
-      />
+      {/* Network Failure State or 3-Column Virtualized Media Grid */}
+      {items.length === 0 && (isAnyError || failureType !== null) ? (
+        <NetworkFailureStateView
+          failureType={failureType}
+          onRetry={handleRetry}
+          isRetrying={isDiagChecking || isLoading}
+          customTitle={
+            failureType === "no_internet"
+              ? "Bibliothèque indisponible hors-ligne"
+              : failureType === "server_unreachable"
+              ? "Serveur Jellyfin indisponible"
+              : "Impossible de charger la bibliothèque"
+          }
+          customMessage={
+            failureType === "no_internet"
+              ? "La navigation dans votre catalogue complet nécessite une connexion réseau. Retrouvez vos contenus prêts à regarder dans vos téléchargements."
+              : failureType === "server_unreachable"
+              ? "Le serveur Jellyfin est éteint ou inaccessible. Visionnez vos films et séries téléchargés."
+              : "Une erreur réseau est survenue lors du chargement des médias."
+          }
+        />
+      ) : (
+        <LibraryGridView
+          items={items}
+          serverUrl={serverUrl}
+          isLoading={isLoading}
+          onItemPress={handleItemPress}
+          loadingMessage="Chargement de vos médias..."
+          emptyTitle={isWatchlist ? "Votre Watchlist est vide" : "Aucun média trouvé"}
+          emptyMessage={
+            isWatchlist
+              ? "Ajoutez des films et séries depuis la page d'accueil ou la recherche pour les retrouver rapidement ici."
+              : "Aucun film ou série ne correspond à vos filtres dans cette bibliothèque."
+          }
+        />
+      )}
 
       {/* Sort bottom sheet */}
       <SortOptionsModal

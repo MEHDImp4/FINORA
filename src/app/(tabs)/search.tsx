@@ -22,6 +22,8 @@ import { LibraryGridView } from "../../features/library/components/LibraryGridVi
 import { MediaItem } from "../../types/media";
 import { FinoraText } from "../../design-system/components/FinoraText";
 import { colors, spacing } from "../../design-system/tokens";
+import { useNetworkDiagnostic } from "../../core/network/networkStatusService";
+import { NetworkFailureStateView } from "../../design-system/components/NetworkFailureStateView";
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -49,11 +51,29 @@ export default function SearchScreen() {
     searchHistoryService.getRecentSearches().then(setRecentSearches);
   }, []);
 
-  const { data: results = [], isLoading, isFetching } = useSearchMedia(
+  const {
+    data: results = [],
+    isLoading,
+    isFetching,
+    isError,
+    refetch
+  } = useSearchMedia(
     currentUserId,
     debouncedQuery,
     selectedCategory.itemTypes
   );
+
+  const hasSearchTerm = query.trim().length > 0;
+  const isSearching = (isLoading || isFetching) && debouncedQuery.trim().length >= 2;
+
+  const { failureType, isChecking: isDiagChecking, runDiagnostic } = useNetworkDiagnostic(
+    serverUrl,
+    Boolean(isError && hasSearchTerm)
+  );
+
+  const handleRetrySearch = useCallback(async () => {
+    await Promise.allSettled([refetch(), runDiagnostic()]);
+  }, [refetch, runDiagnostic]);
 
   const handleSubmitSearch = useCallback(async () => {
     Keyboard.dismiss();
@@ -89,9 +109,6 @@ export default function SearchScreen() {
     [query, router]
   );
 
-  const hasSearchTerm = query.trim().length > 0;
-  const isSearching = (isLoading || isFetching) && debouncedQuery.trim().length >= 2;
-
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <View style={styles.header}>
@@ -112,22 +129,46 @@ export default function SearchScreen() {
 
       {hasSearchTerm ? (
         <View style={styles.resultsContainer}>
-          {results.length > 0 && (
-            <View style={styles.resultsHeader}>
-              <FinoraText variant="caption" color="textSecondary" weight="600">
-                {results.length} {results.length === 1 ? "item found" : "items found"}
-              </FinoraText>
-            </View>
+          {isError && results.length === 0 ? (
+            <NetworkFailureStateView
+              failureType={failureType}
+              onRetry={handleRetrySearch}
+              isRetrying={isDiagChecking || isSearching}
+              customTitle={
+                failureType === "no_internet"
+                  ? "Recherche indisponible hors-ligne"
+                  : failureType === "server_unreachable"
+                  ? "Serveur indisponible pour la recherche"
+                  : "Erreur lors de la recherche"
+              }
+              customMessage={
+                failureType === "no_internet"
+                  ? "La recherche dans le catalogue nécessite une connexion Internet ou un accès au serveur. Visionnez vos contenus téléchargés."
+                  : failureType === "server_unreachable"
+                  ? "Le serveur Jellyfin est injoignable pour effectuer cette recherche. Vous pouvez regarder vos contenus téléchargés."
+                  : "Une erreur est survenue lors de la communication avec le serveur."
+              }
+            />
+          ) : (
+            <>
+              {results.length > 0 && (
+                <View style={styles.resultsHeader}>
+                  <FinoraText variant="caption" color="textSecondary" weight="600">
+                    {results.length} {results.length === 1 ? "résultat trouvé" : "résultats trouvés"}
+                  </FinoraText>
+                </View>
+              )}
+              <LibraryGridView
+                items={results}
+                serverUrl={serverUrl}
+                isLoading={isSearching}
+                onItemPress={handleItemPress}
+                loadingMessage="Recherche dans le catalogue..."
+                emptyTitle="Aucun résultat trouvé"
+                emptyMessage="Essayez un autre mot-clé ou modifiez la catégorie sélectionnée."
+              />
+            </>
           )}
-          <LibraryGridView
-            items={results}
-            serverUrl={serverUrl}
-            isLoading={isSearching}
-            onItemPress={handleItemPress}
-            loadingMessage="Searching catalog..."
-            emptyTitle="No Results Found"
-            emptyMessage="Try a different search term or category"
-          />
         </View>
       ) : (
         <View style={styles.idleContainer}>
@@ -140,10 +181,10 @@ export default function SearchScreen() {
           {recentSearches.length === 0 && (
             <View style={styles.centeredState}>
               <FinoraText variant="title" style={styles.stateTitle}>
-                Explore FINORA
+                Explorer FINORA
               </FinoraText>
               <FinoraText variant="caption" style={styles.stateSubtitle}>
-                Search movies, TV shows, and series
+                Recherchez des films, séries et animés
               </FinoraText>
             </View>
           )}

@@ -368,18 +368,39 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons
-              name="download-outline"
-              size={54}
-              color={colors.textSecondary}
-              style={styles.emptyIcon}
-            />
-            <FinoraText variant="title" style={styles.emptyTitle}>
-              No Downloads Yet
+            <View style={styles.emptyBadge}>
+              <Ionicons name="sparkles" size={12} color={colors.primary} style={{ marginRight: 4 }} />
+              <FinoraText variant="caption" weight="700" style={styles.emptyBadgeText}>
+                STOCKAGE HORS-LIGNE
+              </FinoraText>
+            </View>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons
+                name="cloud-download-outline"
+                size={44}
+                color={colors.primary}
+              />
+            </View>
+            <FinoraText variant="title" weight="700" style={styles.emptyTitle}>
+              Aucun téléchargement
             </FinoraText>
             <FinoraText variant="caption" style={styles.emptySubtitle}>
-              Download movies and episodes to watch on the go without internet
+              Téléchargez des films et séries depuis votre catalogue pour en profiter partout en voyage ou en déplacement, même sans connexion.
             </FinoraText>
+            <Pressable
+              style={styles.exploreButton}
+              onPress={() => {
+                hapticService.impactMedium();
+                router.push("/(tabs)");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Explorer le catalogue"
+            >
+              <Ionicons name="film-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <FinoraText variant="body" weight="700" style={styles.exploreButtonText}>
+                Explorer le catalogue
+              </FinoraText>
+            </Pressable>
           </View>
         }
       />
@@ -507,23 +528,66 @@ const styles = StyleSheet.create({
     padding: 6
   },
   emptyState: {
-    paddingVertical: spacing.xxl,
+    paddingVertical: spacing.xxl + spacing.lg,
+    paddingHorizontal: spacing.xl,
     alignItems: "center",
     justifyContent: "center"
   },
-  emptyIcon: {
-    marginBottom: spacing.md,
-    opacity: 0.7
+  emptyBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(139, 92, 246, 0.12)",
+    borderColor: "rgba(139, 92, 246, 0.3)",
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: spacing.md
+  },
+  emptyBadgeText: {
+    color: colors.primary,
+    fontSize: 10,
+    letterSpacing: 0.8
+  },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(139, 92, 246, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.md
   },
   emptyTitle: {
-    fontWeight: "700",
     color: colors.textPrimary,
-    marginBottom: spacing.xs
+    marginBottom: spacing.xs,
+    fontSize: 18,
+    textAlign: "center"
   },
   emptySubtitle: {
     color: colors.textSecondary,
     textAlign: "center",
-    maxWidth: 280
+    maxWidth: 300,
+    lineHeight: 18,
+    marginBottom: spacing.lg
+  },
+  exploreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3
+  },
+  exploreButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14
   },
   orphanBanner: {
     flexDirection: "row",

@@ -20,6 +20,8 @@ import {
   buildDownloadUrl,
   getDownloadHeaders
 } from "../../features/offline/downloadQuality";
+import { useNetworkDiagnostic } from "../../core/network/networkStatusService";
+import { NetworkFailureStateView } from "../../design-system/components/NetworkFailureStateView";
 
 export default function DetailsScreen() {
   const insets = useSafeAreaInsets();
@@ -30,12 +32,21 @@ export default function DetailsScreen() {
   const serverUrl = session?.serverUrl || "";
   const token = session?.token || "";
 
-  const { data: item, isLoading, isError } = useItemDetails(userId, id);
+  const { data: item, isLoading, isError, refetch } = useItemDetails(userId, id);
   const toggleFavoriteMutation = useToggleFavorite(userId);
   const markPlayedMutation = useMarkPlayed(userId);
 
   const [offlineRecord, setOfflineRecord] = React.useState<OfflineMediaRecord | null>(null);
   const [activeDownload, setActiveDownload] = React.useState<DownloadItem | undefined>(undefined);
+
+  const { failureType, isChecking: isDiagChecking, runDiagnostic } = useNetworkDiagnostic(
+    serverUrl,
+    Boolean(isError && !item)
+  );
+
+  const handleRetryLoad = React.useCallback(async () => {
+    await Promise.allSettled([refetch(), runDiagnostic()]);
+  }, [refetch, runDiagnostic]);
 
   React.useEffect(() => {
     if (id) {
@@ -165,20 +176,80 @@ export default function DetailsScreen() {
     );
   }
 
-  if (isError || !item || item.locationType === "Virtual" || item.isMissing) {
+  if ((isError && !item) || (failureType !== null && !item)) {
+    if (offlineRecord) {
+      return (
+        <View style={styles.centerContainer} testID="details-offline-available">
+          <FinoraText variant="title" weight="700" style={styles.errorTitle}>
+            {offlineRecord.title}
+          </FinoraText>
+          <FinoraText
+            variant="caption"
+            style={{ color: colors.textSecondary, marginBottom: spacing.lg, textAlign: "center", maxWidth: 300 }}
+          >
+            Le serveur est actuellement inaccessible, mais une copie locale est téléchargée sur votre appareil.
+          </FinoraText>
+          <FinoraButton
+            label="Visionner la copie locale"
+            variant="primary"
+            onPress={() => handlePlay(offlineRecord.itemId)}
+            style={styles.backButton}
+          />
+          <FinoraButton
+            label="Retour"
+            variant="secondary"
+            onPress={() => router.back()}
+            style={{ ...styles.backButton, marginTop: spacing.sm }}
+          />
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.centerContainer} testID="details-error">
+        <NetworkFailureStateView
+          failureType={failureType}
+          onRetry={handleRetryLoad}
+          isRetrying={isDiagChecking || isLoading}
+          customTitle={
+            failureType === "no_internet"
+              ? "Média inaccessible hors-ligne"
+              : failureType === "server_unreachable"
+              ? "Serveur Jellyfin injoignable"
+              : "Impossible de charger la fiche"
+          }
+          customMessage={
+            failureType === "no_internet"
+              ? "Cette fiche requiert une connexion réseau active. Retrouvez vos contenus déjà téléchargés."
+              : failureType === "server_unreachable"
+              ? "Le serveur Jellyfin est éteint ou inaccessible. Visionnez vos films et séries téléchargés."
+              : "Une erreur réseau est survenue lors de la récupération des détails."
+          }
+        />
+        <FinoraButton
+          label="Retour"
+          variant="secondary"
+          onPress={() => router.back()}
+          style={styles.backButton}
+        />
+      </View>
+    );
+  }
+
+  if (!item || item.locationType === "Virtual" || item.isMissing) {
     return (
       <View style={styles.centerContainer} testID="details-error">
         <FinoraText variant="title" style={styles.errorTitle}>
-          Item not found
+          Média introuvable
         </FinoraText>
         <FinoraText
           variant="caption"
           style={{ color: colors.textSecondary, marginBottom: spacing.md, textAlign: "center" }}
         >
-          This media is not available on the server.
+          Ce média n'est plus disponible sur le serveur.
         </FinoraText>
         <FinoraButton
-          label="Go Back"
+          label="Retour"
           variant="secondary"
           onPress={() => router.back()}
           style={styles.backButton}

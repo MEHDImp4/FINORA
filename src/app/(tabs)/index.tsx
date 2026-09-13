@@ -21,6 +21,9 @@ import { MediaItem, MediaLibrary } from "../../types/media";
 import { mediaRepository } from "../../core/repositories/mediaRepository";
 import { jellyfinClient } from "../../core/jellyfin/jellyfinClient";
 import { hapticService } from "../../core/feedback/hapticService";
+import { useNetworkDiagnostic } from "../../core/network/networkStatusService";
+import { NetworkFailureStateView } from "../../design-system/components/NetworkFailureStateView";
+import { OfflineBanner } from "../../design-system/components/OfflineBanner";
 
 function HomeLibraryRow({
   library,
@@ -59,20 +62,40 @@ export default function HomeScreen() {
 
   // Data queries
   const {
-    data: resumeItems
+    data: resumeItems,
+    isError: isResumeError,
+    isLoading: isResumeLoading
   } = useResumeItems(userId);
 
   const {
-    data: recentItems
+    data: recentItems,
+    isError: isRecentError,
+    isLoading: isRecentLoading
   } = useRecentlyAdded(userId);
 
   const {
-    data: libraries
+    data: libraries,
+    isError: isLibrariesError,
+    isLoading: isLibrariesLoading
   } = useLibraries(userId);
 
   const {
-    data: watchlistItems = []
+    data: watchlistItems = [],
+    isError: isWatchlistError
   } = useWatchlistItems(userId);
+
+  const isAnyError = Boolean(isResumeError || isRecentError || isLibrariesError);
+  const { failureType, isChecking: isDiagChecking, runDiagnostic } = useNetworkDiagnostic(
+    serverUrl,
+    isAnyError
+  );
+
+  const hasAnyContent = Boolean(
+    (resumeItems && resumeItems.length > 0) ||
+    (recentItems && recentItems.length > 0) ||
+    (libraries && libraries.length > 0) ||
+    (watchlistItems && watchlistItems.length > 0)
+  );
 
   const toggleFavorite = useToggleFavorite(userId || "");
 
@@ -89,10 +112,12 @@ export default function HomeScreen() {
       await mediaRepository.refreshLibrary().catch(() => {});
       // 2. Refetch active queries and wait for server responses
       await queryClient.refetchQueries({ queryKey: mediaKeys.all, type: "active" });
+      // 3. Re-run diagnostic
+      await runDiagnostic();
     } finally {
       setIsPullRefreshing(false);
     }
-  }, [queryClient]);
+  }, [queryClient, runDiagnostic]);
 
   const isFocusedRef = React.useRef(true);
 
@@ -180,8 +205,44 @@ export default function HomeScreen() {
     });
   };
 
+  if (!hasAnyContent && (isAnyError || failureType !== null)) {
+    return (
+      <FinoraScreen safeTop={true} safeBottom={false}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.failureContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={isPullRefreshing || isDiagChecking}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        >
+          <NetworkFailureStateView
+            failureType={failureType}
+            onRetry={onRefresh}
+            isRetrying={isPullRefreshing || isDiagChecking}
+          />
+        </ScrollView>
+      </FinoraScreen>
+    );
+  }
+
   return (
     <FinoraScreen safeTop={false} safeBottom={false}>
+      {/* Offline / Server Unreachable Banner if cached content is shown */}
+      <OfflineBanner
+        isOffline={Boolean(isAnyError && failureType)}
+        message={
+          failureType === "no_internet"
+            ? "Appareil hors-ligne. Affichage des médias en cache."
+            : "Serveur Jellyfin indisponible. Affichage des médias en cache."
+        }
+        onRetry={onRefresh}
+      />
+
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
@@ -294,6 +355,12 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingBottom: 60
+  },
+  failureContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: spacing.xxl
   },
   categoriesBar: {
     marginVertical: spacing.md

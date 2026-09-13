@@ -7,3 +7,4 @@ export * from "./ErrorStateView";
 export * from "./MediaCardSkeleton";
 export * from "./OfflineBanner";
 export * from "./ShimmerSkeleton";
+export * from "./NetworkFailureStateView";
