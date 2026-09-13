@@ -5,7 +5,6 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { Image } from "expo-image";
-import * as Notifications from "expo-notifications";
 import { useAuthStore } from "../stores/authStore";
 import { useNotificationStore } from "../stores/notificationStore";
 import { notificationService } from "../core/notifications/notificationService";
@@ -38,22 +37,12 @@ export default function RootLayout() {
 
   // Deep linking: when user taps a notification on their device
   useEffect(() => {
-    let sub: any;
-    try {
-      sub = Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response?.notification?.request?.content?.data;
-        if (data?.mediaId) {
-          router.push({ pathname: "/details/[id]", params: { id: String(data.mediaId) } });
-        }
-      });
-    } catch {
-      // Safe fallback if notifications listener is not supported on environment
-    }
+    const unsubscribe = notificationService.addNotificationResponseListener((mediaId) => {
+      router.push({ pathname: "/details/[id]", params: { id: mediaId } });
+    });
 
     return () => {
-      if (sub && typeof sub.remove === "function") {
-        sub.remove();
-      }
+      unsubscribe();
     };
   }, [router]);
 

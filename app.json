@@ -13,6 +13,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0C"
     },
+    "icon": "./assets/finora-icon-f.png",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.finora.app"
@@ -20,6 +21,7 @@
     "android": {
       "package": "com.finora.app",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/finora-icon-f.png",
         "backgroundColor": "#0A0A0C"
       }
     },

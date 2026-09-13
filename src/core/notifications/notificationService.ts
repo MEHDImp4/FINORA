@@ -1,7 +1,31 @@
 import { Platform } from "react-native";
-import * as Notifications from "expo-notifications";
 import { useNotificationStore, NotificationType } from "../../stores/notificationStore";
 import { logger } from "../network/logger";
+
+let ExpoNotifications: typeof import("expo-notifications") | null = null;
+let isNativeSupported = true;
+
+function getExpoNotifications(): typeof import("expo-notifications") | null {
+  if (ExpoNotifications !== null) {
+    return ExpoNotifications;
+  }
+  if (!isNativeSupported) {
+    return null;
+  }
+
+  try {
+    // Dynamic require prevents crashes in environments where native push is disabled (e.g. Expo Go on Android)
+    ExpoNotifications = require("expo-notifications");
+    return ExpoNotifications;
+  } catch (err: any) {
+    isNativeSupported = false;
+    logger.warn(
+      "[NotificationService] Native notifications not supported in current environment (e.g. Expo Go Android). In-app notifications active.",
+      err?.message || err
+    );
+    return null;
+  }
+}
 
 class NotificationService {
   private initialized = false;
@@ -10,23 +34,26 @@ class NotificationService {
     if (this.initialized) return;
 
     try {
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowBanner: true,
-          shouldShowList: true,
-          shouldPlaySound: true,
-          shouldSetBadge: true
-        })
-      });
-
-      if (Platform.OS === "android") {
-        await Notifications.setNotificationChannelAsync("finora_updates", {
-          name: "FINORA Mises à jour",
-          importance: Notifications.AndroidImportance.HIGH,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: "#E50914",
-          sound: "default"
+      const Notifications = getExpoNotifications();
+      if (Notifications) {
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowBanner: true,
+            shouldShowList: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true
+          })
         });
+
+        if (Platform.OS === "android") {
+          await Notifications.setNotificationChannelAsync("finora_updates", {
+            name: "FINORA Mises à jour",
+            importance: Notifications.AndroidImportance.HIGH,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: "#E50914",
+            sound: "default"
+          });
+        }
       }
 
       this.initialized = true;
@@ -38,6 +65,12 @@ class NotificationService {
 
   public async requestPermissions(): Promise<boolean> {
     try {
+      const Notifications = getExpoNotifications();
+      if (!Notifications) {
+        useNotificationStore.getState().setHasPermissions(true);
+        return true;
+      }
+
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
 
@@ -51,8 +84,8 @@ class NotificationService {
       return granted;
     } catch (err: any) {
       logger.warn("[NotificationService] Permission request failed:", err?.message || err);
-      useNotificationStore.getState().setHasPermissions(false);
-      return false;
+      useNotificationStore.getState().setHasPermissions(true);
+      return true;
     }
   }
 
@@ -80,45 +113,73 @@ class NotificationService {
     if (params.type === "new_series" && !preferences.newSeries) return null;
     if (params.type === "download_completed" && !preferences.downloadsCompleted) return null;
 
+    // 1. Add to in-app store / inbox
+    const notifId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    useNotificationStore.getState().addNotification({
+      id: notifId,
+      type: params.type,
+      title: params.title,
+      body: params.body,
+      mediaId: params.mediaId,
+      seriesId: params.seriesId,
+      seriesName: params.seriesName,
+      posterUrl: params.posterUrl,
+      seasonIndex: params.seasonIndex,
+      episodeIndex: params.episodeIndex
+    });
+
+    // 2. Schedule native system notification banner if supported
     try {
-      // 1. Add to in-app store / inbox
-      const notifId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      useNotificationStore.getState().addNotification({
-        id: notifId,
-        type: params.type,
-        title: params.title,
-        body: params.body,
-        mediaId: params.mediaId,
-        seriesId: params.seriesId,
-        seriesName: params.seriesName,
-        posterUrl: params.posterUrl,
-        seasonIndex: params.seasonIndex,
-        episodeIndex: params.episodeIndex
-      });
-
-      // 2. Schedule native system notification banner
-      const identifier = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: params.title,
-          body: params.body,
-          data: {
-            notificationId: notifId,
-            mediaId: params.mediaId,
-            seriesId: params.seriesId,
-            type: params.type
+      const Notifications = getExpoNotifications();
+      if (Notifications) {
+        const identifier = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: params.title,
+            body: params.body,
+            data: {
+              notificationId: notifId,
+              mediaId: params.mediaId,
+              seriesId: params.seriesId,
+              type: params.type
+            },
+            sound: "default",
+            color: "#E50914"
           },
-          sound: "default",
-          color: "#E50914"
-        },
-        trigger: null // Deliver immediately
-      });
+          trigger: null // Deliver immediately
+        });
 
-      logger.info(`[NotificationService] Dispatched native notification: ${params.title}`);
-      return identifier;
+        logger.info(`[NotificationService] Dispatched native notification: ${params.title}`);
+        return identifier;
+      }
     } catch (err: any) {
-      logger.warn("[NotificationService] Failed to schedule notification:", err?.message || err);
-      return null;
+      logger.warn("[NotificationService] Failed to schedule native notification:", err?.message || err);
     }
+
+    return notifId;
+  }
+
+  public addNotificationResponseListener(onSelectMedia: (mediaId: string) => void): () => void {
+    try {
+      const Notifications = getExpoNotifications();
+      if (Notifications && typeof Notifications.addNotificationResponseReceivedListener === "function") {
+        const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+          const data = response?.notification?.request?.content?.data;
+          if (data?.mediaId) {
+            onSelectMedia(String(data.mediaId));
+          }
+        });
+
+        return () => {
+          if (sub && typeof sub.remove === "function") {
+            sub.remove();
+          }
+        };
+      }
+    } catch {
+      // Safe fallback
+    }
+
+    return () => {};
   }
 
   public async notifyNewEpisode(params: {
