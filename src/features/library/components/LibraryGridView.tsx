@@ -91,7 +91,7 @@ export const LibraryGridView = React.memo(function LibraryGridView({
 const styles = StyleSheet.create({
   container: {
     paddingTop: spacing.sm,
-    paddingBottom: 100
+    paddingBottom: 80
   },
   centerContainer: {
     flex: 1,

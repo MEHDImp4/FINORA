@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   contentContainer: {
-    paddingBottom: 100
+    paddingBottom: 80
   },
   failureContainer: {
     flexGrow: 1,

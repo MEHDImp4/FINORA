@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: 100
+    paddingBottom: 80
   },
   catalogHeader: {
     marginBottom: spacing.sm

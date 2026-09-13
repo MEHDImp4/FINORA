@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const bottomInset = Platform.OS === "ios" ? insets.bottom + 6 : 16;
+  const bottomInset = Platform.OS === "ios" ? insets.bottom + 4 : 12;
 
   return (
     <Tabs
@@ -31,7 +31,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "home" : "home-outline"}
-              size={20}
+              size={18}
               color={focused ? "#E50914" : color}
             />
           )
@@ -50,7 +50,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "film" : "film-outline"}
-              size={20}
+              size={18}
               color={focused ? "#E50914" : color}
             />
           )
@@ -69,7 +69,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "settings" : "settings-outline"}
-              size={20}
+              size={18}
               color={focused ? "#E50914" : color}
             />
           )
@@ -82,19 +82,19 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   floatingTabBar: {
     position: "absolute",
-    left: 24,
-    right: 24,
-    height: 60,
-    borderRadius: 30,
+    left: 40,
+    right: 40,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: "rgba(18, 18, 24, 0.94)",
     borderTopWidth: 0,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.12)",
-    elevation: 12,
+    elevation: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
     paddingHorizontal: 8,
     paddingBottom: 0,
     paddingTop: 0,
@@ -102,14 +102,14 @@ const styles = StyleSheet.create({
     alignItems: "center"
   },
   tabBarItem: {
-    paddingVertical: 6,
+    paddingVertical: 2,
     justifyContent: "center",
     alignItems: "center"
   },
   tabBarLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
-    marginTop: 2
+    marginTop: 1
   }
 });
 

@@ -475,7 +475,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    paddingBottom: 100
+    paddingBottom: 80
   },
   headerTitle: {
     fontSize: 28,
