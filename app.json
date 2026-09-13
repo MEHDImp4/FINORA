@@ -28,7 +28,14 @@
       "expo-secure-store",
       "expo-video",
       "expo-asset",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/finora-icon-f.png",
+          "color": "#E50914"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

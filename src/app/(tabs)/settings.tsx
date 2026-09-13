@@ -31,6 +31,8 @@ import {
 import { ServerConnectModal } from "../../features/settings/components/ServerConnectModal";
 import { ServerDiagnosticsModal } from "../../features/settings/components/ServerDiagnosticsModal";
 import { hapticService } from "../../core/feedback/hapticService";
+import { useNotificationStore } from "../../stores/notificationStore";
+import { notificationService } from "../../core/notifications/notificationService";
 
 // Options de langues audio (Strictement sans emojis)
 const AUDIO_LANG_OPTIONS: SelectionOption<string>[] = [
@@ -132,6 +134,32 @@ export default function SettingsScreen() {
   useEffect(() => {
     loadSavedAccounts();
   }, [loadSavedAccounts]);
+
+  const notifPreferences = useNotificationStore((state) => state.preferences);
+  const updateNotifPreferences = useNotificationStore((state) => state.updatePreferences);
+
+  const handleToggleGlobalNotifs = async (enabled: boolean) => {
+    if (enabled) {
+      const granted = await notificationService.requestPermissions();
+      if (!granted) {
+        Alert.alert(
+          "Autorisation requise",
+          "Veuillez autoriser les notifications dans les paramètres de votre téléphone pour recevoir des alertes."
+        );
+        return;
+      }
+    }
+    updateNotifPreferences({ enabled });
+  };
+
+  const handleSendTestNotification = async () => {
+    hapticService.notificationSuccess();
+    await notificationService.sendTestNotification();
+    Alert.alert(
+      "Notification envoyée",
+      "Une notification de test a été envoyée sur votre appareil."
+    );
+  };
 
   const handleClearCache = () => {
     hapticService.impactMedium();
@@ -353,7 +381,64 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
-        {/* 5. APPLICATION */}
+        {/* 5. NOTIFICATIONS */}
+        <SettingsSection title="Notifications">
+          <SettingsSwitchRow
+            iconName="notifications-outline"
+            iconColor="#FF3B30"
+            title="Autoriser les notifications"
+            value={notifPreferences.enabled}
+            onValueChange={handleToggleGlobalNotifs}
+            isLast={!notifPreferences.enabled}
+          />
+
+          {notifPreferences.enabled ? (
+            <>
+              <SettingsSwitchRow
+                iconName="tv-outline"
+                iconColor="#8B5CF6"
+                title="Épisodes de mes séries"
+                value={notifPreferences.newEpisodes}
+                onValueChange={(val) => updateNotifPreferences({ newEpisodes: val })}
+              />
+
+              <SettingsSwitchRow
+                iconName="film-outline"
+                iconColor="#F59E0B"
+                title="Nouveaux films ajoutés"
+                value={notifPreferences.newMovies}
+                onValueChange={(val) => updateNotifPreferences({ newMovies: val })}
+              />
+
+              <SettingsSwitchRow
+                iconName="sparkles-outline"
+                iconColor="#E50914"
+                title="Nouvelles séries ajoutées"
+                value={notifPreferences.newSeries}
+                onValueChange={(val) => updateNotifPreferences({ newSeries: val })}
+              />
+
+              <SettingsSwitchRow
+                iconName="arrow-down-circle-outline"
+                iconColor="#10B981"
+                title="Téléchargements terminés"
+                value={notifPreferences.downloadsCompleted}
+                onValueChange={(val) => updateNotifPreferences({ downloadsCompleted: val })}
+              />
+
+              <SettingsRow
+                iconName="paper-plane-outline"
+                iconColor="#00E5FF"
+                title="Tester une notification"
+                showChevron={false}
+                isLast
+                onPress={handleSendTestNotification}
+              />
+            </>
+          ) : null}
+        </SettingsSection>
+
+        {/* 6. APPLICATION */}
         <SettingsSection title="Application">
           <SettingsSwitchRow
             iconName="phone-portrait-outline"

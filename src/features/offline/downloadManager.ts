@@ -2,6 +2,7 @@ import { DownloadItem, DownloadStatus, OfflineMediaRecord } from "./types";
 import { offlineStorageService } from "./offlineStorage";
 import * as FileSystem from "expo-file-system/legacy";
 import { logger } from "../../core/network/logger";
+import { notificationService } from "../../core/notifications/notificationService";
 
 export type DownloadListener = (downloads: DownloadItem[]) => void;
 
@@ -408,6 +409,8 @@ export class DownloadManager {
         savedAt: Date.now()
       };
       await offlineStorageService.saveOfflineMedia(record);
+      // Notify user of completed download
+      notificationService.notifyDownloadComplete(item.title, item.itemId, item.type).catch(() => {});
       // Notify listeners so UI updates catalog
       this.notify();
     }

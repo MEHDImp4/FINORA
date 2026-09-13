@@ -30,6 +30,9 @@ import {
   getRecommendedForYou,
   getBecauseYouWatched
 } from "../../features/recommendations/recommendationEngine";
+import { useNotificationStore } from "../../stores/notificationStore";
+import { useNotificationSync } from "../../features/notifications/useNotificationSync";
+import { NotificationsModal } from "../../features/notifications/components/NotificationsModal";
 
 function CategoryPillItem({
   label,
@@ -167,6 +170,10 @@ export default function HomeScreen() {
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const [heroIndex, setHeroIndex] = useState(0);
   const lastFocusRef = React.useRef(0);
+
+  const unreadNotifCount = useNotificationStore((state) => state.unreadCount);
+  const [isNotifModalVisible, setIsNotifModalVisible] = useState(false);
+  const { runSync: runNotificationSync } = useNotificationSync();
 
   const onRefresh = useCallback(async () => {
     setIsPullRefreshing(true);
@@ -446,12 +453,15 @@ export default function HomeScreen() {
 
               <Pressable
                 style={styles.headerIconButton}
-                onPress={() => {}}
+                onPress={() => {
+                  hapticService.selection();
+                  setIsNotifModalVisible(true);
+                }}
                 accessibilityRole="button"
-                accessibilityLabel="Notifications"
+                accessibilityLabel={`Notifications${unreadNotifCount > 0 ? `, ${unreadNotifCount} non lues` : ""}`}
               >
                 <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
-                <View style={styles.notificationDot} />
+                {unreadNotifCount > 0 && <View style={styles.notificationDot} />}
               </Pressable>
             </View>
           </View>
@@ -562,6 +572,14 @@ export default function HomeScreen() {
           />
         ))}
       </ScrollView>
+
+      <NotificationsModal
+        visible={isNotifModalVisible}
+        onClose={() => setIsNotifModalVisible(false)}
+        onSelectMedia={(mediaId) =>
+          router.push({ pathname: "/details/[id]", params: { id: mediaId } })
+        }
+      />
     </FinoraScreen>
   );
 }

@@ -1,11 +1,14 @@
 import "react-native-url-polyfill/auto";
 import React, { useEffect } from "react";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { Image } from "expo-image";
+import * as Notifications from "expo-notifications";
 import { useAuthStore } from "../stores/authStore";
+import { useNotificationStore } from "../stores/notificationStore";
+import { notificationService } from "../core/notifications/notificationService";
 import { QueryProvider } from "../providers/QueryProvider";
 import { offlineSyncManager } from "../features/offline/offlineSyncManager";
 import { offlineStorageService } from "../features/offline/offlineStorage";
@@ -14,12 +17,16 @@ export default function RootLayout() {
   const status = useAuthStore((state) => state.status);
   const session = useAuthStore((state) => state.session);
   const restoreSession = useAuthStore((state) => state.restoreSession);
+  const router = useRouter();
   const [minSplashDone, setMinSplashDone] = React.useState(false);
 
   useEffect(() => {
     restoreSession();
     // Auto-cleanup watched downloads older than 48h (2-3 days policy)
     offlineStorageService.cleanupExpiredWatchedMedia(48).catch(() => {});
+    // Initialize notification engine and load stored notifications
+    notificationService.init().catch(() => {});
+    useNotificationStore.getState().loadPersisted().catch(() => {});
 
     // Ensure splash screen remains visible for at least 2 seconds
     const timer = setTimeout(() => {
@@ -28,6 +35,27 @@ export default function RootLayout() {
 
     return () => clearTimeout(timer);
   }, [restoreSession]);
+
+  // Deep linking: when user taps a notification on their device
+  useEffect(() => {
+    let sub: any;
+    try {
+      sub = Notifications.addNotificationResponseReceivedListener((response) => {
+        const data = response?.notification?.request?.content?.data;
+        if (data?.mediaId) {
+          router.push({ pathname: "/details/[id]", params: { id: String(data.mediaId) } });
+        }
+      });
+    } catch {
+      // Safe fallback if notifications listener is not supported on environment
+    }
+
+    return () => {
+      if (sub && typeof sub.remove === "function") {
+        sub.remove();
+      }
+    };
+  }, [router]);
 
   useEffect(() => {
     if (status === "authenticated" && session?.userId) {
