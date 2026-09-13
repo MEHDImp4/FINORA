@@ -156,9 +156,9 @@ export class AuthRepository {
       this.client.setAuthToken(token);
       const clientHttp = httpClient || this.client.getHttpClient();
 
-      // Verify token validity against /System/Info or /Users/{userId}
+      // Verify token validity against /System/Info or /Users/{userId} with fast timeout
       try {
-        await clientHttp.request(`/System/Info`);
+        await clientHttp.request(`/System/Info`, { timeoutMs: 2500, retries: 0 });
       } catch (error) {
         if (error instanceof AuthenticationError) {
           // Token invalid or expired on server (401/403)

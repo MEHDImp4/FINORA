@@ -17,9 +17,18 @@ jest.mock("expo-router", () => ({
   })
 }));
 
+import { useNetworkDiagnostic } from "../../../core/network/networkStatusService";
+
 jest.mock("../../../stores/authStore");
 jest.mock("../../../hooks/useMediaQueries");
 jest.mock("../../../hooks/useUserDataMutations");
+jest.mock("../../../core/network/networkStatusService", () => ({
+  useNetworkDiagnostic: jest.fn(() => ({
+    failureType: null,
+    isChecking: false,
+    runDiagnostic: jest.fn()
+  }))
+}));
 
 describe("HomeScreen", () => {
   let queryClient: QueryClient;
@@ -162,6 +171,63 @@ describe("HomeScreen", () => {
 
     // Hero banner should cycle back to Oppenheimer
     expect(root.findByProps({ accessibilityLabel: "Featured: Oppenheimer" })).toBeDefined();
+
+    ReactTestRenderer.act(() => {
+      component.unmount();
+    });
+  });
+
+  it("renders NetworkFailureStateView when server is unreachable and no content is cached", async () => {
+    (useNetworkDiagnostic as jest.Mock).mockReturnValue({
+      failureType: "server_unreachable",
+      isChecking: false,
+      runDiagnostic: jest.fn()
+    });
+
+    (useResumeItems as jest.Mock).mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: true,
+      refetch: jest.fn()
+    });
+
+    (useRecentlyAdded as jest.Mock).mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: true,
+      refetch: jest.fn()
+    });
+
+    (useLibraries as jest.Mock).mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: true,
+      refetch: jest.fn()
+    });
+
+    (useWatchlistItems as jest.Mock).mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn()
+    });
+
+    let component: any;
+    await ReactTestRenderer.act(async () => {
+      component = ReactTestRenderer.create(
+        <QueryClientProvider client={queryClient}>
+          <HomeScreen />
+        </QueryClientProvider>
+      );
+    });
+
+    const root = component.root;
+    // Should render NetworkFailureStateView with the go-to-downloads button
+    const failureView = root.findByProps({ testID: "network-failure-state-view" });
+    expect(failureView).toBeDefined();
+
+    const downloadsBtn = root.findByProps({ testID: "failure-go-downloads-button" });
+    expect(downloadsBtn).toBeDefined();
 
     ReactTestRenderer.act(() => {
       component.unmount();

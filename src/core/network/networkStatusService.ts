@@ -10,20 +10,21 @@ export interface NetworkDiagnosticResult {
 
 const CONNECTIVITY_TEST_URLS = [
   "https://clients3.google.com/generate_204",
-  "https://1.1.1.1"
+  "https://www.google.com/generate_204",
+  "https://cloudflare.com/cdn-cgi/trace"
 ];
 
 /**
  * Checks if the device has actual internet access by probing public lightweight endpoints.
  */
-export async function checkInternetReachability(timeoutMs: number = 2500): Promise<boolean> {
+export async function checkInternetReachability(timeoutMs: number = 2000): Promise<boolean> {
   for (const url of CONNECTIVITY_TEST_URLS) {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
 
       const response = await fetch(url, {
-        method: "HEAD",
+        method: "GET",
         signal: controller.signal,
         headers: { "Cache-Control": "no-cache" }
       });
@@ -100,42 +101,72 @@ export async function diagnoseNetworkFailure(
   return "unknown";
 }
 
+export interface UseNetworkDiagnosticOptions {
+  isError?: boolean;
+  autoCheck?: boolean;
+}
+
 /**
- * React hook that dynamically detects failure types when errors occur.
+ * React hook that dynamically detects failure types when errors occur or on demand.
  */
-export function useNetworkDiagnostic(serverUrl?: string, isError: boolean = false) {
+export function useNetworkDiagnostic(
+  serverUrl?: string,
+  triggerOrOptions: boolean | UseNetworkDiagnosticOptions = false
+) {
+  const isError =
+    typeof triggerOrOptions === "boolean"
+      ? triggerOrOptions
+      : Boolean(triggerOrOptions?.isError);
+
+  const autoCheck =
+    typeof triggerOrOptions === "object"
+      ? Boolean(triggerOrOptions?.autoCheck)
+      : false;
+
   const [failureType, setFailureType] = useState<NetworkFailureType | null>(null);
   const [isChecking, setIsChecking] = useState<boolean>(false);
   const activeCheckRef = useRef<number>(0);
+  const isMountedRef = useRef<boolean>(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const runDiagnostic = useCallback(async (): Promise<NetworkFailureType> => {
     const checkId = ++activeCheckRef.current;
-    setIsChecking(true);
+    if (isMountedRef.current) {
+      setIsChecking(true);
+    }
     try {
       const result = await diagnoseNetworkFailure(serverUrl);
-      if (activeCheckRef.current === checkId) {
+      if (isMountedRef.current && activeCheckRef.current === checkId) {
         setFailureType(result);
       }
       return result;
     } catch {
-      if (activeCheckRef.current === checkId) {
+      if (isMountedRef.current && activeCheckRef.current === checkId) {
         setFailureType("unknown");
       }
       return "unknown";
     } finally {
-      if (activeCheckRef.current === checkId) {
+      if (isMountedRef.current && activeCheckRef.current === checkId) {
         setIsChecking(false);
       }
     }
   }, [serverUrl]);
 
   useEffect(() => {
-    if (isError) {
+    if (isError || autoCheck) {
       runDiagnostic();
     } else {
-      setFailureType(null);
+      if (isMountedRef.current) {
+        setFailureType(null);
+      }
     }
-  }, [isError, runDiagnostic]);
+  }, [isError, autoCheck, runDiagnostic]);
 
   return {
     failureType,

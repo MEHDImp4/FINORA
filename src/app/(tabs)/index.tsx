@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, StyleSheet, ScrollView, RefreshControl, Pressable } from "react-native";
+import { View, StyleSheet, ScrollView, RefreshControl, Pressable, ActivityIndicator } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -85,16 +85,22 @@ export default function HomeScreen() {
   } = useWatchlistItems(userId);
 
   const isAnyError = Boolean(isResumeError || isRecentError || isLibrariesError);
-  const { failureType, isChecking: isDiagChecking, runDiagnostic } = useNetworkDiagnostic(
-    serverUrl,
-    isAnyError
-  );
 
   const hasAnyContent = Boolean(
     (resumeItems && resumeItems.length > 0) ||
     (recentItems && recentItems.length > 0) ||
     (libraries && libraries.length > 0) ||
     (watchlistItems && watchlistItems.length > 0)
+  );
+
+  const isInitialLoading = !hasAnyContent && (isResumeLoading || isRecentLoading || isLibrariesLoading);
+
+  const { failureType, isChecking: isDiagChecking, runDiagnostic } = useNetworkDiagnostic(
+    serverUrl,
+    {
+      isError: isAnyError,
+      autoCheck: !hasAnyContent
+    }
   );
 
   const toggleFavorite = useToggleFavorite(userId || "");
@@ -130,10 +136,13 @@ export default function HomeScreen() {
         lastFocusRef.current = now;
         queryClient.invalidateQueries({ queryKey: mediaKeys.all, refetchType: "active" });
       }
+      if (!hasAnyContent) {
+        runDiagnostic();
+      }
       return () => {
         isFocusedRef.current = false;
       };
-    }, [queryClient])
+    }, [queryClient, hasAnyContent, runDiagnostic])
   );
 
   // Build candidate pool for the featured hero banner
@@ -205,7 +214,8 @@ export default function HomeScreen() {
     });
   };
 
-  if (!hasAnyContent && (isAnyError || failureType !== null)) {
+  // 1. If server is confirmed unreachable or device is offline and no content is cached
+  if (!hasAnyContent && failureType !== null) {
     return (
       <FinoraScreen safeTop={true} safeBottom={false}>
         <ScrollView
@@ -230,11 +240,55 @@ export default function HomeScreen() {
     );
   }
 
+  // 2. If queries or diagnostic are still checking initially and no content is yet available
+  if (!hasAnyContent && (isInitialLoading || isDiagChecking)) {
+    return (
+      <FinoraScreen safeTop={true} safeBottom={false}>
+        <View style={styles.loadingFullContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <FinoraText
+            variant="body"
+            color="textSecondary"
+            style={{ marginTop: spacing.md, textAlign: "center" }}
+          >
+            Connexion au serveur Jellyfin...
+          </FinoraText>
+        </View>
+      </FinoraScreen>
+    );
+  }
+
+  // 3. If queries failed with error and catalog is empty
+  if (!hasAnyContent && isAnyError) {
+    return (
+      <FinoraScreen safeTop={true} safeBottom={false}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.failureContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={isPullRefreshing || isDiagChecking}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        >
+          <NetworkFailureStateView
+            failureType={failureType || "server_unreachable"}
+            onRetry={onRefresh}
+            isRetrying={isPullRefreshing || isDiagChecking}
+          />
+        </ScrollView>
+      </FinoraScreen>
+    );
+  }
+
   return (
     <FinoraScreen safeTop={false} safeBottom={false}>
       {/* Offline / Server Unreachable Banner if cached content is shown */}
       <OfflineBanner
-        isOffline={Boolean(isAnyError && failureType)}
+        isOffline={Boolean(failureType !== null || (isAnyError && hasAnyContent))}
         message={
           failureType === "no_internet"
             ? "Appareil hors-ligne. Affichage des médias en cache."
@@ -361,6 +415,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: spacing.xxl
+  },
+  loadingFullContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.xl
   },
   categoriesBar: {
     marginVertical: spacing.md
