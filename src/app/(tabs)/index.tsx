@@ -288,7 +288,7 @@ export default function HomeScreen() {
     <FinoraScreen safeTop={false} safeBottom={false}>
       {/* Offline / Server Unreachable Banner if cached content is shown */}
       <OfflineBanner
-        isOffline={Boolean(failureType !== null || (isAnyError && hasAnyContent))}
+        isOffline={Boolean(hasAnyContent && failureType !== null)}
         message={
           failureType === "no_internet"
             ? "Appareil hors-ligne. Affichage des médias en cache."

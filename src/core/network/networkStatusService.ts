@@ -91,11 +91,12 @@ export async function checkServerReachability(
 /**
  * Diagnoses whether a request failure was caused by device offline status
  * or by the Jellyfin server being stopped/unreachable.
+ * Returns null if both internet and server are reachable (no network failure).
  */
 export async function diagnoseNetworkFailure(
   serverUrl?: string,
-  timeoutMs: number = 2500
-): Promise<NetworkFailureType> {
+  timeoutMs: number = 2000
+): Promise<NetworkFailureType | null> {
   const hasInternet = await checkInternetReachability(timeoutMs);
   if (!hasInternet) {
     return "no_internet";
@@ -108,7 +109,8 @@ export async function diagnoseNetworkFailure(
     }
   }
 
-  return "unknown";
+  // If internet is reachable and server is reachable, there is no network failure
+  return null;
 }
 
 export interface UseNetworkDiagnosticOptions {
@@ -145,7 +147,7 @@ export function useNetworkDiagnostic(
     };
   }, []);
 
-  const runDiagnostic = useCallback(async (): Promise<NetworkFailureType> => {
+  const runDiagnostic = useCallback(async (): Promise<NetworkFailureType | null> => {
     const checkId = ++activeCheckRef.current;
     if (isMountedRef.current) {
       setIsChecking(true);
@@ -158,9 +160,9 @@ export function useNetworkDiagnostic(
       return result;
     } catch {
       if (isMountedRef.current && activeCheckRef.current === checkId) {
-        setFailureType("unknown");
+        setFailureType(null);
       }
-      return "unknown";
+      return null;
     } finally {
       if (isMountedRef.current && activeCheckRef.current === checkId) {
         setIsChecking(false);

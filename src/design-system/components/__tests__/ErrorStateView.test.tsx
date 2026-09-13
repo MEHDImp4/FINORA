@@ -48,4 +48,22 @@ describe("ErrorStateView & OfflineBanner", () => {
 
     expect(onlineTree.toJSON()).toBeNull();
   });
+
+  it("dismisses OfflineBanner when close button is pressed", async () => {
+    let tree: any;
+    await act(async () => {
+      tree = ReactTestRenderer.create(
+        <OfflineBanner isOffline={true} message="Server offline" />
+      );
+    });
+
+    const closeBtn = tree.root.findByProps({ accessibilityLabel: "Fermer le message" });
+    expect(closeBtn).toBeTruthy();
+
+    act(() => {
+      closeBtn.props.onPress();
+    });
+
+    expect(tree.toJSON()).toBeNull();
+  });
 });
