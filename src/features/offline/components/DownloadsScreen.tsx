@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { View, FlatList, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { offlineStorageService } from "../offlineStorage";
 import { downloadManager } from "../downloadManager";
@@ -81,9 +81,23 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     setHasOrphans(verified.hasOrphans);
   }, []);
 
+  // Reload catalog whenever user switches to the Downloads tab
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
+
   useEffect(() => {
     loadData();
-    const unsub = downloadManager.subscribe(setActiveDownloads);
+    const unsub = downloadManager.subscribe((downloads) => {
+      setActiveDownloads(downloads);
+      // If any download completed, refresh offline storage catalog automatically
+      const hasCompleted = downloads.some((d) => d.status === "completed");
+      if (hasCompleted) {
+        loadData();
+      }
+    });
     return unsub;
   }, [loadData]);
 

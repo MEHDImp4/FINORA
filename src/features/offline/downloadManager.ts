@@ -386,12 +386,14 @@ export class DownloadManager {
     this.markCompleted(itemId, totalBytes);
     const item = this.downloads.get(itemId);
     if (item) {
+      const finalLocalPath = metadata?.localPath || item.localPath;
+      item.localPath = finalLocalPath;
       const record: OfflineMediaRecord = {
         itemId: item.itemId,
         title: item.title,
         type: item.type,
         year: item.year,
-        localPath: item.localPath,
+        localPath: finalLocalPath,
         fileSizeBytes: totalBytes,
         totalTicks: metadata?.totalTicks || 0,
         playbackPositionTicks: metadata?.playbackPositionTicks || 0,
@@ -404,6 +406,8 @@ export class DownloadManager {
         savedAt: Date.now()
       };
       await offlineStorageService.saveOfflineMedia(record);
+      // Notify listeners so UI updates catalog
+      this.notify();
     }
     this.processQueue();
   }

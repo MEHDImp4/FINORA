@@ -15,7 +15,8 @@ const mockPush = jest.fn();
 jest.mock("expo-router", () => ({
   useRouter: () => ({
     push: mockPush
-  })
+  }),
+  useFocusEffect: (cb: any) => cb()
 }));
 
 describe("DownloadsScreen & OfflineSyncManager", () => {
@@ -34,6 +35,12 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(offlineStorageService, "getAllOfflineMedia").mockResolvedValue([mockRecord]);
+    jest.spyOn(offlineStorageService, "getVerifiedOfflineMedia").mockResolvedValue({
+      items: [{ ...mockRecord, fileExists: true, actualBytes: mockRecord.fileSizeBytes }],
+      totalPhysicalBytes: mockRecord.fileSizeBytes,
+      hasOrphans: false
+    });
+    jest.spyOn(offlineStorageService, "cleanupExpiredWatchedMedia").mockResolvedValue([]);
     jest.spyOn(offlineStorageService, "deleteOfflineMedia").mockResolvedValue();
     jest.spyOn(downloadManager, "subscribe").mockImplementation((listener) => {
       listener([]);
@@ -97,5 +104,41 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     });
 
     expect(offlineStorageService.deleteOfflineMedia).toHaveBeenCalledWith("movie-offline-1");
+  });
+
+  it("automatically reloads catalog when a download completes", async () => {
+    let capturedListener: ((downloads: any[]) => void) | undefined;
+    jest.spyOn(downloadManager, "subscribe").mockImplementation((listener) => {
+      capturedListener = listener;
+      listener([]);
+      return () => {};
+    });
+
+    const getVerifiedSpy = jest.spyOn(offlineStorageService, "getVerifiedOfflineMedia");
+
+    await act(async () => {
+      ReactTestRenderer.create(<DownloadsScreen />);
+    });
+
+    const callCountBefore = getVerifiedSpy.mock.calls.length;
+
+    // Simulate download completing
+    await act(async () => {
+      if (capturedListener) {
+        capturedListener([
+          {
+            itemId: "movie-new",
+            title: "New Movie",
+            type: "Movie",
+            status: "completed",
+            progress: 1.0,
+            bytesDownloaded: 500000,
+            totalBytes: 500000
+          }
+        ]);
+      }
+    });
+
+    expect(getVerifiedSpy.mock.calls.length).toBeGreaterThan(callCountBefore);
   });
 });
