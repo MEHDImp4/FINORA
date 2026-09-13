@@ -652,17 +652,23 @@ const styles = StyleSheet.create({
   },
   categoryPill: {
     paddingHorizontal: 4,
-    paddingVertical: 7,
+    paddingVertical: 7.5,
     borderRadius: 18,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: "rgba(255, 255, 255, 0.09)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderColor: "rgba(255, 255, 255, 0.16)",
+    borderTopColor: "rgba(255, 255, 255, 0.28)",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6
   },
   categoryPillText: {
     fontSize: 12,
+    fontWeight: "600",
     letterSpacing: -0.2
   },
   pillIcon: {

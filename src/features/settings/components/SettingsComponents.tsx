@@ -184,11 +184,16 @@ const styles = StyleSheet.create({
     lineHeight: 18
   },
   card: {
-    backgroundColor: "#14141A",
+    backgroundColor: "rgba(20, 20, 28, 0.72)",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#22222E",
-    overflow: "hidden"
+    borderColor: "rgba(255, 255, 255, 0.09)",
+    borderTopColor: "rgba(255, 255, 255, 0.20)",
+    overflow: "hidden",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10
   },
   rowContainer: {
     flexDirection: "row",

@@ -313,16 +313,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(22, 22, 30, 0.88)",
-    borderColor: "rgba(255, 255, 255, 0.28)",
+    backgroundColor: "rgba(22, 22, 30, 0.72)",
+    borderColor: "rgba(255, 255, 255, 0.20)",
+    borderTopColor: "rgba(255, 255, 255, 0.35)",
     borderWidth: 1,
     paddingVertical: 5,
     paddingHorizontal: 11,
-    borderRadius: 8
+    borderRadius: 8,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4
   },
   ratingBadge: {
-    backgroundColor: "rgba(45, 35, 10, 0.92)",
+    backgroundColor: "rgba(45, 35, 10, 0.85)",
     borderColor: "rgba(255, 184, 0, 0.85)",
+    borderTopColor: "rgba(255, 215, 0, 0.95)",
     borderWidth: 1.2
   },
   starIcon: {
@@ -342,10 +348,25 @@ const styles = StyleSheet.create({
   },
   playButton: {
     minWidth: 130,
-    paddingHorizontal: 20
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.28)",
+    borderTopColor: "rgba(255, 255, 255, 0.45)",
+    shadowColor: "#E50914",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10
   },
   watchlistButton: {
     minWidth: 175,
-    paddingHorizontal: 16
+    paddingHorizontal: 16,
+    backgroundColor: "rgba(30, 30, 42, 0.75)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.18)",
+    borderTopColor: "rgba(255, 255, 255, 0.32)",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8
   }
 });

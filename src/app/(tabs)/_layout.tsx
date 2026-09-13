@@ -41,7 +41,7 @@ function FinoraPillTabBar({ state, descriptors, navigation, insets }: any) {
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel || label}
               onPress={onPress}
-              style={styles.tabItem}
+              style={[styles.tabItem, isFocused && styles.tabItemActive]}
               hitSlop={6}
             >
               {options.tabBarIcon?.({
@@ -144,24 +144,32 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(18, 18, 24, 0.94)",
-    height: 58,
-    borderRadius: 29,
-    paddingHorizontal: 20,
-    gap: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
-    elevation: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 12
+    backgroundColor: "rgba(18, 18, 26, 0.78)",
+    height: 60,
+    borderRadius: 30,
+    paddingHorizontal: 16,
+    gap: 12,
+    borderWidth: 1.2,
+    borderColor: "rgba(255, 255, 255, 0.18)",
+    borderTopColor: "rgba(255, 255, 255, 0.32)",
+    elevation: 16,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.55,
+    shadowRadius: 18
   },
   tabItem: {
-    width: 84,
+    width: 86,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 4
+  },
+  tabItemActive: {
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)"
   },
   tabLabel: {
     fontSize: 10.5,
