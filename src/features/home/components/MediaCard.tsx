@@ -19,7 +19,6 @@ interface MediaCardProps {
   variant?: CardVariant;
   cardWidth?: number;
   cardHeight?: number;
-  matchScore?: number;
   style?: StyleProp<ViewStyle>;
   onPress?: (item: MediaItem) => void;
 }
@@ -37,7 +36,6 @@ export const MediaCard = React.memo(
     variant = "poster",
     cardWidth,
     cardHeight,
-    matchScore,
     style,
     onPress
   }: MediaCardProps) {
@@ -170,16 +168,7 @@ export const MediaCard = React.memo(
           </FinoraText>
 
           <View style={styles.subrow}>
-            {matchScore !== undefined ? (
-              <FinoraText
-                variant="caption"
-                style={styles.matchScoreText}
-                weight="700"
-                numberOfLines={1}
-              >
-                {matchScore}% Match
-              </FinoraText>
-            ) : subTitle ? (
+            {subTitle ? (
               <FinoraText
                 variant="caption"
                 color="textMuted"
@@ -191,7 +180,7 @@ export const MediaCard = React.memo(
               </FinoraText>
             ) : null}
 
-            {matchScore === undefined && !isEpisode && item.communityRating ? (
+            {!isEpisode && item.communityRating ? (
               <View style={styles.ratingRow}>
                 <Ionicons name="star" size={10} color={colors.accent} style={styles.starIcon} />
                 <FinoraText variant="caption" color="accent" weight="700">
@@ -212,8 +201,7 @@ export const MediaCard = React.memo(
     prev.serverUrl === next.serverUrl &&
     prev.variant === next.variant &&
     prev.cardWidth === next.cardWidth &&
-    prev.cardHeight === next.cardHeight &&
-    prev.matchScore === next.matchScore
+    prev.cardHeight === next.cardHeight
 );
 
 const styles = StyleSheet.create({
@@ -280,9 +268,5 @@ const styles = StyleSheet.create({
   },
   starIcon: {
     marginRight: 2
-  },
-  matchScoreText: {
-    color: "#46D369",
-    fontSize: 12
   }
 });

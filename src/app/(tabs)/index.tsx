@@ -210,29 +210,12 @@ export default function HomeScreen() {
     return recommendedItems.map((r) => r.item);
   }, [recommendedItems]);
 
-  const recommendedMatchScores = useMemo(() => {
-    const scores: Record<string, number> = {};
-    for (const r of recommendedItems) {
-      scores[r.item.id] = r.matchScore;
-    }
-    return scores;
-  }, [recommendedItems]);
-
   const becauseYouWatched = useMemo(() => {
     return getBecauseYouWatched(resumeItems || [], recentItems || [], 12);
   }, [resumeItems, recentItems]);
 
   const becauseYouWatchedItems = useMemo(() => {
     return becauseYouWatched ? becauseYouWatched.items.map((r) => r.item) : [];
-  }, [becauseYouWatched]);
-
-  const becauseYouWatchedScores = useMemo(() => {
-    if (!becauseYouWatched) return {};
-    const scores: Record<string, number> = {};
-    for (const r of becauseYouWatched.items) {
-      scores[r.item.id] = r.matchScore;
-    }
-    return scores;
   }, [becauseYouWatched]);
 
   const handlePlay = (item: MediaItem) => {
@@ -418,7 +401,6 @@ export default function HomeScreen() {
             items={recommendedItemsList}
             serverUrl={serverUrl}
             variant="poster"
-            matchScores={recommendedMatchScores}
             onItemPress={handleItemPress}
           />
         ) : null}
@@ -430,7 +412,6 @@ export default function HomeScreen() {
             items={becauseYouWatchedItems}
             serverUrl={serverUrl}
             variant="poster"
-            matchScores={becauseYouWatchedScores}
             onItemPress={handleItemPress}
           />
         ) : null}
