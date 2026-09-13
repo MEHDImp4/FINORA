@@ -18,6 +18,7 @@ import {
   DownloadQuality,
   DOWNLOAD_QUALITIES
 } from "../../offline/downloadQuality";
+import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
 
 export interface DownloadSeriesModalProps {
   visible: boolean;
@@ -38,8 +39,16 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
   userId,
   onConfirmDownload
 }) => {
+  const defaultDownloadQuality =
+    usePlaybackPreferencesStore((s) => s.preferences.defaultDownloadQuality) || "original";
   const [mode, setMode] = useState<SelectionMode>("seasons");
-  const [selectedQuality, setSelectedQuality] = useState<DownloadQuality>("original");
+  const [selectedQuality, setSelectedQuality] = useState<DownloadQuality>(defaultDownloadQuality);
+
+  useEffect(() => {
+    if (visible) {
+      setSelectedQuality(defaultDownloadQuality);
+    }
+  }, [visible, defaultDownloadQuality]);
   const [selectedSeasonIds, setSelectedSeasonIds] = useState<Set<string>>(new Set());
   const [episodeCountLimit, setEpisodeCountLimit] = useState<number>(3);
   const [allEpisodes, setAllEpisodes] = useState<MediaItem[]>([]);

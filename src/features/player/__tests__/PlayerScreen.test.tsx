@@ -105,4 +105,33 @@ describe("PlayerScreen", () => {
       root.unmount();
     });
   });
+
+  it("applies preferred playback speed from preferences store", async () => {
+    const { usePlaybackPreferencesStore } = require("../../../stores/playbackPreferencesStore");
+    await usePlaybackPreferencesStore.getState().setPlaybackSpeed(1.5);
+
+    const mockRepo = createMockRepo();
+    let root: any;
+    act(() => {
+      root = renderer.create(
+        <QueryClientProvider client={queryClient}>
+          <PlayerScreen
+            item={mockItem}
+            serverUrl="https://demo.jellyfin.org"
+            token="test-token"
+            onBack={jest.fn()}
+            playbackRepository={mockRepo}
+            overlayAutoHideMs={0}
+          />
+        </QueryClientProvider>
+      );
+    });
+
+    const videoView = root.root.findByProps({ testID: "expo-video-view" });
+    expect(videoView.props.player.playbackRate).toBe(1.5);
+
+    act(() => {
+      root.unmount();
+    });
+  });
 });

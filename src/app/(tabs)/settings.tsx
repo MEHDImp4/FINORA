@@ -34,6 +34,8 @@ import { ServerDiagnosticsModal } from "../../features/settings/components/Serve
 import { hapticService } from "../../core/feedback/hapticService";
 import { useNotificationStore } from "../../stores/notificationStore";
 import { notificationService } from "../../core/notifications/notificationService";
+import { useQueryClient } from "@tanstack/react-query";
+import { cacheService } from "../../core/cache/cacheService";
 
 // Options de langues audio (Strictement sans emojis)
 const AUDIO_LANG_OPTIONS: SelectionOption<string>[] = [
@@ -107,6 +109,7 @@ const PLAYBACK_SPEED_OPTIONS: SelectionOption<number>[] = [
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   // Stores
   const session = useAuthStore((state) => state.session);
@@ -172,9 +175,19 @@ export default function SettingsScreen() {
         {
           text: "Vider",
           style: "destructive",
-          onPress: () => {
+          onPress: async () => {
             hapticService.impactHeavy();
-            Alert.alert("Cache libéré", "Le cache temporaire a été vidé.");
+            try {
+              const result = await cacheService.clearAllCaches(queryClient);
+              Alert.alert(
+                "Cache libéré",
+                result.tempFilesCleared > 0
+                  ? `Le cache temporaire a été vidé avec succès (${result.tempFilesCleared} fichier${result.tempFilesCleared > 1 ? "s" : ""} supprimé${result.tempFilesCleared > 1 ? "s" : ""}).`
+                  : "Le cache temporaire et les miniatures ont été vidés avec succès."
+              );
+            } catch {
+              Alert.alert("Erreur", "Impossible de vider complètement le cache.");
+            }
           }
         }
       ]

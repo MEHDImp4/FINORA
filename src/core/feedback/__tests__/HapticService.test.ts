@@ -43,4 +43,21 @@ describe("HapticService", () => {
       service.impactLight();
     }).not.toThrow();
   });
+
+  it("respects dynamic preference getter to suppress vibrations", () => {
+    let prefEnabled = true;
+    service.registerPreferenceGetter(() => prefEnabled);
+
+    expect(service.isEnabled()).toBe(true);
+    service.impactLight();
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+
+    prefEnabled = false;
+    expect(service.isEnabled()).toBe(false);
+    service.impactLight();
+    service.impactMedium();
+    service.impactHeavy();
+    service.selection();
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1); // Still 1, no new vibrations
+  });
 });

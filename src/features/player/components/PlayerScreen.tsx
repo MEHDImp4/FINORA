@@ -61,6 +61,7 @@ export function PlayerScreen({
   const resolveBestTracks = usePlaybackPreferencesStore((state) => state.resolveBestTracks);
   const setSeriesPreference = usePlaybackPreferencesStore((state) => state.setSeriesPreference);
   const autoSkipIntro = usePlaybackPreferencesStore((state) => state.preferences.autoSkipIntro);
+  const preferredPlaybackSpeed = usePlaybackPreferencesStore((state) => state.preferences.playbackSpeed) || 1.0;
   const [hasAutoSkipped, setHasAutoSkipped] = useState(false);
 
   // Compute best initial audio and subtitle stream index according to user / series preferences
@@ -198,8 +199,16 @@ export function PlayerScreen({
     headers: playerHeaders,
     initialPositionSeconds,
     initialDurationSeconds,
-    autoPlay: true
+    autoPlay: true,
+    initialPlaybackRate: preferredPlaybackSpeed
   });
+
+  // Sync preferred speed if changed
+  useEffect(() => {
+    if (preferredPlaybackSpeed) {
+      controls.setRate(preferredPlaybackSpeed);
+    }
+  }, [preferredPlaybackSpeed, controls]);
 
   // Jellyfin Playback Session Reporting Hook
   const { stopSession } = usePlaybackSession({
@@ -394,7 +403,7 @@ export function PlayerScreen({
         onDoubleTapRight={() => controls.seekBy(10)}
         onSingleTap={handleToggleControls}
         onLongPressStart={() => controls.setRate(2.0)}
-        onLongPressEnd={() => controls.setRate(1.0)}
+        onLongPressEnd={() => controls.setRate(preferredPlaybackSpeed)}
       >
         {/* Native Video Surface */}
         <VideoView

@@ -264,5 +264,10 @@ export const usePlaybackPreferencesStore = create<PlaybackPreferencesState>((set
   }
 }));
 
+// Wire dynamic preference resolver to hapticService
+hapticService.registerPreferenceGetter(
+  () => usePlaybackPreferencesStore.getState().preferences.hapticsEnabled
+);
+
 // Automatically trigger load upon module import
 usePlaybackPreferencesStore.getState().loadPreferences();

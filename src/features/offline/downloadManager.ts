@@ -3,6 +3,8 @@ import { offlineStorageService } from "./offlineStorage";
 import * as FileSystem from "expo-file-system/legacy";
 import { logger } from "../../core/network/logger";
 import { notificationService } from "../../core/notifications/notificationService";
+import { isWifiConnected } from "../../core/network/networkStatusService";
+import { usePlaybackPreferencesStore } from "../../stores/playbackPreferencesStore";
 
 export type DownloadListener = (downloads: DownloadItem[]) => void;
 
@@ -94,6 +96,28 @@ export class DownloadManager {
       }
     }
 
+    const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
+    if (wifiOnly) {
+      const isWifi = await isWifiConnected();
+      if (!isWifi) {
+        const errorMsg = "Connexion Wi-Fi requise (mode Wi-Fi uniquement activé)";
+        logger.warn(`[DownloadManager] Download blocked for ${item.title}: ${errorMsg}`);
+        const downloadItem: DownloadItem = {
+          ...item,
+          localPath,
+          status: "failed",
+          progress: 0,
+          bytesDownloaded: 0,
+          totalBytes: 0,
+          error: errorMsg,
+          startedAt: Date.now()
+        };
+        this.downloads.set(item.itemId, downloadItem);
+        this.notify();
+        return downloadItem;
+      }
+    }
+
     const activeCount = Array.from(this.downloads.values()).filter(
       (d) => d.status === "downloading"
     ).length;
@@ -127,10 +151,21 @@ export class DownloadManager {
     return downloadItem;
   }
 
-  private executeDownload(itemId: string): void {
+  private async executeDownload(itemId: string): Promise<void> {
     const downloadItem = this.downloads.get(itemId);
     const config = this.downloadConfigs.get(itemId);
     if (!downloadItem || !config) return;
+
+    const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
+    if (wifiOnly) {
+      const isWifi = await isWifiConnected();
+      if (!isWifi) {
+        const errorMsg = "Connexion Wi-Fi requise (mode Wi-Fi uniquement activé)";
+        logger.warn(`[DownloadManager] Execution halted for ${downloadItem.title}: ${errorMsg}`);
+        this.markFailed(itemId, errorMsg);
+        return;
+      }
+    }
 
     const { item, metadata, options } = config;
     const localPath = downloadItem.localPath;
@@ -310,6 +345,15 @@ export class DownloadManager {
   public async resumeDownload(itemId: string): Promise<void> {
     const item = this.downloads.get(itemId);
     if (!item || item.status !== "paused") return;
+
+    const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
+    if (wifiOnly) {
+      const isWifi = await isWifiConnected();
+      if (!isWifi) {
+        this.markFailed(itemId, "Connexion Wi-Fi requise (mode Wi-Fi uniquement activé)");
+        return;
+      }
+    }
 
     const activeCount = Array.from(this.downloads.values()).filter(
       (d) => d.status === "downloading"

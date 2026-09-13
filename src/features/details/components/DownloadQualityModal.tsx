@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal, View, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MediaItem } from "../../../types/media";
@@ -10,6 +10,7 @@ import { FinoraText } from "../../../design-system/components/FinoraText";
 import { FinoraButton } from "../../../design-system/components/FinoraButton";
 import { colors, spacing } from "../../../design-system/tokens";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
 
 export interface DownloadQualityModalProps {
   visible: boolean;
@@ -24,7 +25,15 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
   item,
   onConfirmDownload
 }) => {
-  const [selectedQuality, setSelectedQuality] = useState<DownloadQuality>("original");
+  const defaultDownloadQuality =
+    usePlaybackPreferencesStore((s) => s.preferences.defaultDownloadQuality) || "original";
+  const [selectedQuality, setSelectedQuality] = useState<DownloadQuality>(defaultDownloadQuality);
+
+  useEffect(() => {
+    if (visible) {
+      setSelectedQuality(defaultDownloadQuality);
+    }
+  }, [visible, defaultDownloadQuality]);
 
   const handleConfirm = () => {
     hapticService.impactMedium();

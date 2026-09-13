@@ -2,12 +2,27 @@ import { Vibration, Platform } from "react-native";
 
 export class HapticService {
   private enabled: boolean = true;
+  private preferenceGetter?: () => boolean;
 
   public setEnabled(enabled: boolean): void {
     this.enabled = enabled;
   }
 
+  public registerPreferenceGetter(getter: () => boolean): void {
+    this.preferenceGetter = getter;
+  }
+
   public isEnabled(): boolean {
+    if (this.preferenceGetter) {
+      try {
+        const prefVal = this.preferenceGetter();
+        if (typeof prefVal === "boolean") {
+          return prefVal && this.enabled;
+        }
+      } catch {
+        // Safe fallback
+      }
+    }
     return this.enabled;
   }
 
@@ -15,7 +30,7 @@ export class HapticService {
    * Subtle light tap for regular button presses and card taps.
    */
   public impactLight(): void {
-    if (!this.enabled) return;
+    if (!this.isEnabled()) return;
     try {
       if (Platform.OS === "android") {
         Vibration.vibrate(25);
@@ -31,7 +46,7 @@ export class HapticService {
    * Medium impact for primary actions like Play, Pause, or Toggle Favorite.
    */
   public impactMedium(): void {
-    if (!this.enabled) return;
+    if (!this.isEnabled()) return;
     try {
       if (Platform.OS === "android") {
         Vibration.vibrate(50);
@@ -47,7 +62,7 @@ export class HapticService {
    * Heavy impact for destructive actions or important milestones.
    */
   public impactHeavy(): void {
-    if (!this.enabled) return;
+    if (!this.isEnabled()) return;
     try {
       if (Platform.OS === "android") {
         Vibration.vibrate(40);
@@ -63,7 +78,7 @@ export class HapticService {
    * Tick feedback for scrubbers and carousel item selection changes.
    */
   public selection(): void {
-    if (!this.enabled) return;
+    if (!this.isEnabled()) return;
     try {
       if (Platform.OS === "android") {
         Vibration.vibrate(5);
@@ -79,7 +94,7 @@ export class HapticService {
    * Success notification pulse.
    */
   public notificationSuccess(): void {
-    if (!this.enabled) return;
+    if (!this.isEnabled()) return;
     try {
       if (Platform.OS === "android") {
         Vibration.vibrate([0, 15, 50, 20]);
@@ -95,7 +110,7 @@ export class HapticService {
    * Error notification vibration pattern.
    */
   public notificationError(): void {
-    if (!this.enabled) return;
+    if (!this.isEnabled()) return;
     try {
       if (Platform.OS === "android") {
         Vibration.vibrate([0, 30, 80, 30]);

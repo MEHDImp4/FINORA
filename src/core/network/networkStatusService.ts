@@ -1,4 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import * as Network from "expo-network";
+
+/**
+ * Checks whether the device is currently connected to a Wi-Fi network.
+ * Falls back to true in test environments or if native module is unavailable.
+ */
+export async function isWifiConnected(): Promise<boolean> {
+  try {
+    const state = await Network.getNetworkStateAsync();
+    return state.type === Network.NetworkStateType.WIFI;
+  } catch {
+    return true;
+  }
+}
 
 export type NetworkFailureType = "no_internet" | "server_unreachable" | "unknown";
 

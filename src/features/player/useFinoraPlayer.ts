@@ -10,6 +10,7 @@ export interface UseFinoraPlayerOptions {
   initialPositionSeconds?: number;
   initialDurationSeconds?: number;
   autoPlay?: boolean;
+  initialPlaybackRate?: number;
 }
 
 export interface UseFinoraPlayerResult {
@@ -24,7 +25,8 @@ export function useFinoraPlayer({
   headers,
   initialPositionSeconds = 0,
   initialDurationSeconds = 0,
-  autoPlay = false
+  autoPlay = false,
+  initialPlaybackRate
 }: UseFinoraPlayerOptions = {}): UseFinoraPlayerResult {
   const engineRef = useRef<FinoraPlayerEngine | null>(null);
 
@@ -48,6 +50,13 @@ export function useFinoraPlayer({
 
   // Initialize native expo-video player
   const player = useVideoPlayer(videoSource, (p) => {
+    if (initialPlaybackRate && initialPlaybackRate !== 1.0) {
+      try {
+        p.playbackRate = initialPlaybackRate;
+      } catch {
+        // Safe fallback
+      }
+    }
     if (autoPlay) {
       p.play();
     }
@@ -57,8 +66,11 @@ export function useFinoraPlayer({
   useEffect(() => {
     if (player) {
       engine.attachPlayer(player, initialPositionSeconds);
+      if (initialPlaybackRate && initialPlaybackRate !== 1.0) {
+        engine.setRate(initialPlaybackRate);
+      }
     }
-  }, [player, engine, initialPositionSeconds]);
+  }, [player, engine, initialPositionSeconds, initialPlaybackRate]);
 
   const pendingSeekPositionRef = useRef<number | null>(null);
   const pendingPlayRef = useRef<boolean>(false);
