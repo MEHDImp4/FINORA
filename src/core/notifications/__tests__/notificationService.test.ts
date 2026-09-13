@@ -117,4 +117,30 @@ describe("NotificationService", () => {
     expect(notifs).toHaveLength(1);
     expect(notifs[0].type).toBe("test");
   });
+
+  it("handles Android Expo Go gracefully without throwing or calling native scheduler", async () => {
+    // Simulate Android Expo Go environment
+    const Constants = require("expo-constants");
+    Constants.default.appOwnership = "expo";
+    const originalOS = require("react-native").Platform.OS;
+    require("react-native").Platform.OS = "android";
+
+    try {
+      await expect(notificationService.init()).resolves.toBeUndefined();
+
+      const notifId = await notificationService.notifyNewEpisode({
+        seriesName: "Dark",
+        episodeTitle: "Secrets",
+        episodeId: "dark-ep-1"
+      });
+
+      // Still added to in-app store
+      expect(notifId).toBeTruthy();
+      const notifs = useNotificationStore.getState().notifications;
+      expect(notifs.some((n) => n.title === "Nouvel épisode disponible")).toBe(true);
+    } finally {
+      Constants.default.appOwnership = null;
+      require("react-native").Platform.OS = originalOS;
+    }
+  });
 });

@@ -1,9 +1,21 @@
 import { Platform } from "react-native";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { useNotificationStore, NotificationType } from "../../stores/notificationStore";
 import { logger } from "../network/logger";
 
 let ExpoNotifications: typeof import("expo-notifications") | null = null;
 let isNativeSupported = true;
+
+function isAndroidExpoGo(): boolean {
+  if (Platform.OS !== "android") {
+    return false;
+  }
+  // Detect Expo Go via appOwnership or ExecutionEnvironment
+  const appOwnership = Constants?.appOwnership;
+  const executionEnv = Constants?.executionEnvironment;
+  const storeClient = ExecutionEnvironment?.StoreClient || "storeClient";
+  return appOwnership === "expo" || executionEnv === storeClient;
+}
 
 function getExpoNotifications(): typeof import("expo-notifications") | null {
   if (ExpoNotifications !== null) {
@@ -13,14 +25,23 @@ function getExpoNotifications(): typeof import("expo-notifications") | null {
     return null;
   }
 
+  // Under Android in Expo Go, expo-notifications throws an uncaught error at module load time
+  // because push notifications were removed in Expo Go SDK 53.
+  if (isAndroidExpoGo()) {
+    isNativeSupported = false;
+    logger.info(
+      "[NotificationService] Android Expo Go detected: native push/local banners disabled. FINORA in-app notification center is active."
+    );
+    return null;
+  }
+
   try {
-    // Dynamic require prevents crashes in environments where native push is disabled (e.g. Expo Go on Android)
     ExpoNotifications = require("expo-notifications");
     return ExpoNotifications;
   } catch (err: any) {
     isNativeSupported = false;
     logger.warn(
-      "[NotificationService] Native notifications not supported in current environment (e.g. Expo Go Android). In-app notifications active.",
+      "[NotificationService] Native notifications not supported in current environment. In-app notifications active.",
       err?.message || err
     );
     return null;
