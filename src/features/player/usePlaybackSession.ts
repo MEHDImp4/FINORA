@@ -13,6 +13,7 @@ export interface UsePlaybackSessionOptions {
   snapshot: FinoraPlayerSnapshot;
   repository?: PlaybackRepository;
   throttleIntervalMs?: number;
+  isOffline?: boolean;
 }
 
 export function usePlaybackSession({
@@ -22,7 +23,8 @@ export function usePlaybackSession({
   engine,
   snapshot,
   repository = playbackRepository,
-  throttleIntervalMs = 8000
+  throttleIntervalMs = 8000,
+  isOffline = false
 }: UsePlaybackSessionOptions): void {
   const hasStartedRef = useRef(false);
   const snapshotRef = useRef(snapshot);
@@ -54,14 +56,16 @@ export function usePlaybackSession({
 
     if (snapshot.state === "playing" && !hasStartedRef.current) {
       hasStartedRef.current = true;
-      repository.reportPlaybackStart({
-        itemId,
-        mediaSourceId: mediaSourceId || itemId,
-        positionTicks: secondsToTicks(snapshot.currentTimeSeconds),
-        playMethod: mapPlayMethod(playMethod)
-      });
+      if (!isOffline) {
+        repository.reportPlaybackStart({
+          itemId,
+          mediaSourceId: mediaSourceId || itemId,
+          positionTicks: secondsToTicks(snapshot.currentTimeSeconds),
+          playMethod: mapPlayMethod(playMethod)
+        });
+      }
     }
-  }, [snapshot.state, itemId, mediaSourceId, playMethod, repository]);
+  }, [snapshot.state, itemId, mediaSourceId, playMethod, repository, isOffline]);
 
   // Periodic throttled progress reporting + state change reporting
   useEffect(() => {
@@ -74,13 +78,15 @@ export function usePlaybackSession({
       const isPlayed = totalTicks > 0 && posTicks / totalTicks >= 0.9;
 
       // Online Jellyfin session reporting
-      repository.reportPlaybackProgress({
-        itemId,
-        mediaSourceId: mediaSourceId || itemId,
-        positionTicks: posTicks,
-        isPaused,
-        eventName
-      });
+      if (!isOffline) {
+        repository.reportPlaybackProgress({
+          itemId,
+          mediaSourceId: mediaSourceId || itemId,
+          positionTicks: posTicks,
+          isPaused,
+          eventName
+        });
+      }
 
       // Offline persistent tracking & sync queue
       offlineStorageService.updateLocalPlaybackPosition(itemId, posTicks, totalTicks).catch(() => {});
@@ -109,7 +115,7 @@ export function usePlaybackSession({
         timerRef.current = null;
       }
     };
-  }, [snapshot.state, itemId, mediaSourceId, repository, throttleIntervalMs]);
+  }, [snapshot.state, itemId, mediaSourceId, repository, throttleIntervalMs, isOffline]);
 
   // Listen to AppState (background / active)
   useEffect(() => {
@@ -118,7 +124,7 @@ export function usePlaybackSession({
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState.match(/inactive|background/)) {
         // App moving to background: send immediate progress
-        if (hasStartedRef.current) {
+        if (hasStartedRef.current && !isOffline) {
           repository.reportPlaybackProgress({
             itemId,
             mediaSourceId: mediaSourceId || itemId,
@@ -134,7 +140,7 @@ export function usePlaybackSession({
     return () => {
       subscription.remove();
     };
-  }, [itemId, mediaSourceId, repository]);
+  }, [itemId, mediaSourceId, repository, isOffline]);
 
   // Report stopped on unmount or ended
   useEffect(() => {
@@ -144,11 +150,13 @@ export function usePlaybackSession({
         const totalTicks = secondsToTicks(snapshotRef.current.durationSeconds);
         const isPlayed = totalTicks > 0 && posTicks / totalTicks >= 0.9;
 
-        repository.reportPlaybackStopped({
-          itemId,
-          mediaSourceId: mediaSourceId || itemId,
-          positionTicks: posTicks
-        });
+        if (!isOffline) {
+          repository.reportPlaybackStopped({
+            itemId,
+            mediaSourceId: mediaSourceId || itemId,
+            positionTicks: posTicks
+          });
+        }
 
         offlineStorageService.updateLocalPlaybackPosition(itemId, posTicks, totalTicks).catch(() => {});
         offlineStorageService.enqueueProgressSync(itemId, posTicks, isPlayed).catch(() => {});
@@ -157,5 +165,5 @@ export function usePlaybackSession({
         }
       }
     };
-  }, [itemId, mediaSourceId, repository]);
+  }, [itemId, mediaSourceId, repository, isOffline]);
 }

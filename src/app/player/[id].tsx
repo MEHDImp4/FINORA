@@ -16,17 +16,12 @@ import { mediaKeys } from "../../hooks/useMediaQueries";
 
 export default function PlayerRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const rawId = Array.isArray(id) ? id[0] : (id ?? "");
   const router = useRouter();
   const queryClient = useQueryClient();
   const session = useAuthStore((state) => state.session);
   const authStatus = useAuthStore((state) => state.status);
   const restoreSession = useAuthStore((state) => state.restoreSession);
-
-  useEffect(() => {
-    if (!session && (authStatus === "idle" || authStatus === "unauthenticated")) {
-      restoreSession().catch(() => {});
-    }
-  }, [session, authStatus, restoreSession]);
 
   const userId = session?.userId || "";
   const serverUrl = session?.serverUrl || jellyfinClient.getServerUrl() || "";
@@ -37,14 +32,19 @@ export default function PlayerRoute() {
 
   useEffect(() => {
     let active = true;
-    if (id) {
+    if (rawId) {
       offlineStorageService
-        .getOfflineMedia(id)
-        .then((record) => {
-          if (active) {
+        .getOfflineMedia(rawId)
+        .then(async (record) => {
+          if (!active) return;
+          if (record) {
+            const resolvedUri = await offlineStorageService.resolveLocalUri(record);
+            if (resolvedUri) {
+              record.localPath = resolvedUri;
+            }
             setOfflineRecord(record);
-            setCheckingOffline(false);
           }
+          setCheckingOffline(false);
         })
         .catch(() => {
           if (active) setCheckingOffline(false);
@@ -55,16 +55,33 @@ export default function PlayerRoute() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [rawId]);
 
-  const { data: item, isLoading, isError } = useItemDetails(userId, id);
+  const isOfflineMode = Boolean(offlineRecord);
+
+  // Only trigger session restoration if we are online and not checking offline storage
+  useEffect(() => {
+    if (!checkingOffline && !isOfflineMode) {
+      if (!session && (authStatus === "idle" || authStatus === "unauthenticated")) {
+        restoreSession().catch(() => {});
+      }
+    }
+  }, [checkingOffline, isOfflineMode, session, authStatus, restoreSession]);
+
+  // Only fetch details from server if we are online and finished checking offline storage
+  const shouldFetchOnline = !checkingOffline && !isOfflineMode && Boolean(userId && rawId);
+  const { data: item, isLoading, isError } = useItemDetails(
+    shouldFetchOnline ? userId : undefined,
+    shouldFetchOnline ? rawId : undefined
+  );
 
   useEffect(() => {
-    if (isError || (item && (item.isMissing || item.locationType === "Virtual"))) {
+    // Only invalidate if we are in online mode and the server returned an error/missing item
+    if (shouldFetchOnline && (isError || (item && (item.isMissing || item.locationType === "Virtual")))) {
       try {
         queryClient.setQueriesData({ queryKey: mediaKeys.all }, (oldData: any) => {
           if (Array.isArray(oldData)) {
-            return oldData.filter((i: any) => i?.id !== id && i?.seriesId !== id);
+            return oldData.filter((i: any) => i?.id !== rawId && i?.seriesId !== rawId);
           }
           return oldData;
         });
@@ -73,9 +90,18 @@ export default function PlayerRoute() {
         // Ignored
       }
     }
-  }, [isError, item, id, queryClient]);
+  }, [shouldFetchOnline, isError, item, rawId, queryClient]);
 
-  if (isLoading || checkingOffline || authStatus === "restoring" || authStatus === "authenticating") {
+  if (checkingOffline) {
+    return (
+      <View style={styles.centerContainer} testID="player-route-loading">
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  // If online streaming, wait for server details and auth restoration
+  if (!isOfflineMode && (isLoading || authStatus === "restoring" || authStatus === "authenticating")) {
     return (
       <View style={styles.centerContainer} testID="player-route-loading">
         <ActivityIndicator size="large" color={colors.primary} />
@@ -98,7 +124,6 @@ export default function PlayerRoute() {
   }
 
   const effectiveItem: MediaItem | null =
-    item ||
     (offlineRecord
       ? {
           id: offlineRecord.itemId,
@@ -115,9 +140,13 @@ export default function PlayerRoute() {
               : 0,
           isFavorite: false,
           isPlayed: false,
+          seriesId: offlineRecord.seriesId,
+          seriesName: offlineRecord.seriesName,
+          seasonIndex: offlineRecord.seasonIndex,
+          episodeIndex: offlineRecord.episodeIndex,
           mediaStreams: []
         }
-      : null);
+      : item) || null;
 
   if (
     !effectiveItem ||
@@ -130,13 +159,15 @@ export default function PlayerRoute() {
     return (
       <View style={styles.centerContainer} testID="player-route-error">
         <FinoraText variant="title" style={styles.errorTitle}>
-          Video unavailable
+          {isOfflineMode ? "Fichier introuvable" : "Video unavailable"}
         </FinoraText>
         <FinoraText
           variant="caption"
           style={{ color: colors.textSecondary, marginBottom: spacing.md, textAlign: "center" }}
         >
-          This media file is not present on the server.
+          {isOfflineMode
+            ? "Le fichier téléchargé ne se trouve plus sur l'appareil."
+            : "This media file is not present on the server."}
         </FinoraText>
         <FinoraButton label="Go Back" variant="secondary" onPress={() => router.back()} />
       </View>

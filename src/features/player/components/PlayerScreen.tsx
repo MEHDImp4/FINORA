@@ -146,15 +146,16 @@ export function PlayerScreen({
     return 0;
   }, [item.playbackPositionTicks, item.playedPercentage]);
 
-  // Auth headers for video engine (ExoPlayer sends these to master.m3u8, main.m3u8, and all segments)
+  // Auth headers for video engine (ExoPlayer sends these to master.m3u8, main.m3u8, and all segments).
+  // Do NOT pass headers for local offline files ("file://") as local files don't require network headers.
   const playerHeaders = useMemo(() => {
-    if (!token) return undefined;
+    if (localPath || !token) return undefined;
     return {
       Authorization: formatAuthorizationHeader("finora-mobile", token),
       "X-Emby-Token": token,
       "X-MediaBrowser-Token": token
     };
-  }, [token]);
+  }, [token, localPath]);
 
   // Player Engine Hook
   const { engine, player, snapshot, controls } = useFinoraPlayer({
@@ -171,7 +172,8 @@ export function PlayerScreen({
     playMethod: plan.mode,
     engine,
     snapshot,
-    repository: customPlaybackRepo
+    repository: customPlaybackRepo,
+    isOffline: Boolean(localPath)
   });
 
   // Track and synchronize native audio tracks from expo-video
@@ -264,7 +266,8 @@ export function PlayerScreen({
   const isBufferingOrLoading = snapshot.state === "loading" || snapshot.state === "buffering";
 
   useEffect(() => {
-    if (snapshot.state === "error") {
+    // Only invalidate online library queries if an error occurs while streaming from server
+    if (!localPath && snapshot.state === "error") {
       try {
         queryClient.setQueriesData({ queryKey: mediaKeys.all }, (oldData: any) => {
           if (Array.isArray(oldData)) {
@@ -277,7 +280,7 @@ export function PlayerScreen({
         // Ignored
       }
     }
-  }, [snapshot.state, item.id, queryClient]);
+  }, [localPath, snapshot.state, item.id, queryClient]);
 
   return (
     <View style={styles.container} testID="player-screen">
@@ -313,7 +316,7 @@ export function PlayerScreen({
         itemId={item.id}
         previewSeconds={scrubPositionSeconds}
         scrubPositionPercent={scrubPositionPercent}
-        visible={isScrubbing}
+        visible={!localPath && isScrubbing}
       />
 
       {/* Skip Intro & Skip Credits dynamic markers */}
@@ -449,7 +452,9 @@ export function PlayerScreen({
             Lecture impossible
           </FinoraText>
           <FinoraText variant="caption" style={styles.errorSubtext}>
-            {snapshot.errorMessage?.includes("500") || snapshot.errorMessage?.includes("source")
+            {localPath
+              ? "Le fichier téléchargé ne peut pas être lu ou est endommagé."
+              : snapshot.errorMessage?.includes("500") || snapshot.errorMessage?.includes("source")
               ? "Ce média n'est plus accessible sur le serveur Jellyfin."
               : snapshot.errorMessage || "Impossible de lire ce flux vidéo."}
           </FinoraText>

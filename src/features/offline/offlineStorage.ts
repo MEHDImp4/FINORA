@@ -269,6 +269,63 @@ export class OfflineStorageService {
 
     return orphanCount;
   }
+
+  /**
+   * Resolves the actual physical local filesystem URI for an offline media record.
+   * Handles relative paths, changed documentDirectory sandbox GUIDs across app launches,
+   * and verifies physical file presence.
+   */
+  public async resolveLocalUri(record: OfflineMediaRecord): Promise<string | null> {
+    if (!record) return null;
+
+    // 1. Direct check on recorded localPath
+    if (record.localPath && typeof FileSystem.getInfoAsync === "function") {
+      try {
+        const info = await FileSystem.getInfoAsync(record.localPath);
+        if (info && info.exists) {
+          return record.localPath;
+        }
+      } catch {
+        // Fallback to searching in current documentDirectory
+      }
+    }
+
+    // 2. Fallback check inside current FileSystem.documentDirectory
+    if (FileSystem.documentDirectory && typeof FileSystem.getInfoAsync === "function") {
+      const candidates: string[] = [
+        `${FileSystem.documentDirectory}finora_downloads/${record.itemId}.mp4`,
+        `${FileSystem.documentDirectory}finora_downloads/ep_${record.itemId}.mp4`,
+        `${FileSystem.documentDirectory}finora_downloads/movie_${record.itemId}.mp4`
+      ];
+
+      if (record.localPath) {
+        const filename = record.localPath.split("/").pop();
+        if (filename) {
+          candidates.unshift(`${FileSystem.documentDirectory}finora_downloads/${filename}`);
+        }
+      }
+
+      for (const candidate of candidates) {
+        try {
+          const info = await FileSystem.getInfoAsync(candidate);
+          if (info && info.exists) {
+            return candidate;
+          }
+        } catch {
+          // Check next candidate
+        }
+      }
+    }
+
+    // 3. If file exists check was not conclusive, ensure file:// scheme is present
+    if (record.localPath) {
+      return record.localPath.startsWith("file://")
+        ? record.localPath
+        : `file://${record.localPath}`;
+    }
+
+    return null;
+  }
 }
 
 export const offlineStorageService = new OfflineStorageService();
