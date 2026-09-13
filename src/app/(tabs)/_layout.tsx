@@ -1,12 +1,15 @@
 import React from "react";
 import { Tabs } from "expo-router";
-import { StyleSheet, Platform } from "react-native";
+import { StyleSheet, Platform, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const bottomInset = Platform.OS === "ios" ? insets.bottom + 4 : 12;
+  const tabWidth = 230;
+  const leftInset = Math.max(16, Math.round((width - tabWidth) / 2));
 
   return (
     <Tabs
@@ -17,7 +20,9 @@ export default function TabsLayout() {
         tabBarStyle: [
           styles.floatingTabBar,
           {
-            bottom: bottomInset
+            bottom: bottomInset,
+            left: leftInset,
+            width: tabWidth
           }
         ],
         tabBarItemStyle: styles.tabBarItem,
@@ -82,8 +87,6 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   floatingTabBar: {
     position: "absolute",
-    left: 40,
-    right: 40,
     height: 48,
     borderRadius: 24,
     backgroundColor: "rgba(18, 18, 24, 0.94)",
