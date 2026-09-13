@@ -12,11 +12,15 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
   private isDestroyed: boolean = false;
   private snapshot: FinoraPlayerSnapshot;
 
-  constructor(player?: VideoPlayer | null, initialPositionSeconds: number = 0) {
+  constructor(
+    player?: VideoPlayer | null,
+    initialPositionSeconds: number = 0,
+    initialDurationSeconds: number = 0
+  ) {
     this.snapshot = {
       state: "idle",
       currentTimeSeconds: initialPositionSeconds,
-      durationSeconds: 0,
+      durationSeconds: initialDurationSeconds > 0 ? initialDurationSeconds : 0,
       bufferedPositionSeconds: 0,
       volume: 1.0,
       playbackRate: 1.0,
@@ -101,10 +105,15 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
       state = "paused";
     }
 
+    const effectiveDuration =
+      this.player.duration && this.player.duration > 0
+        ? this.player.duration
+        : this.snapshot.durationSeconds;
+
     this.updateSnapshot({
       state,
       currentTimeSeconds: this.player.currentTime || this.snapshot.currentTimeSeconds,
-      durationSeconds: this.player.duration || 0,
+      durationSeconds: effectiveDuration,
       bufferedPositionSeconds: this.player.bufferedPosition || 0,
       volume: this.player.volume ?? 1.0,
       playbackRate: this.player.playbackRate ?? 1.0,
@@ -124,10 +133,15 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
       state = "idle";
     }
 
+    const effectiveDuration =
+      this.player?.duration && this.player.duration > 0
+        ? this.player.duration
+        : this.snapshot.durationSeconds;
+
     this.updateSnapshot({
       state,
       errorMessage: errorMessage || (status === "error" ? "Playback error occurred" : undefined),
-      durationSeconds: this.player?.duration || this.snapshot.durationSeconds
+      durationSeconds: effectiveDuration
     });
   }
 
@@ -140,11 +154,16 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
   }
 
   private handleTimeUpdate(currentTime: number, bufferedPosition?: number): void {
+    const effectiveDuration =
+      this.player?.duration && this.player.duration > 0
+        ? this.player.duration
+        : this.snapshot.durationSeconds;
+
     this.updateSnapshot({
       currentTimeSeconds: currentTime,
       bufferedPositionSeconds:
         bufferedPosition !== undefined ? bufferedPosition : this.snapshot.bufferedPositionSeconds,
-      durationSeconds: this.player?.duration || this.snapshot.durationSeconds
+      durationSeconds: effectiveDuration
     });
   }
 
@@ -202,17 +221,24 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
   }
 
   public seekTo(positionSeconds: number): void {
+    const dur = this.snapshot.durationSeconds;
+    const clamped = Math.max(0, dur > 0 ? Math.min(positionSeconds, dur) : positionSeconds);
+
+    // Immediate optimistic update of currentTimeSeconds so that repeated seekBy (+10s) and timeline slider update without delay
+    this.updateSnapshot({ currentTimeSeconds: clamped });
+
     if (this.player && !this.isDestroyed) {
-      const clamped = Math.max(0, positionSeconds);
-      this.player.currentTime = clamped;
-    } else {
-      this.updateSnapshot({ currentTimeSeconds: Math.max(0, positionSeconds) });
+      try {
+        this.player.currentTime = clamped;
+      } catch {
+        // Ignored
+      }
     }
   }
 
   public seekBy(deltaSeconds: number): void {
-    const target = (this.snapshot.currentTimeSeconds || 0) + deltaSeconds;
-    this.seekTo(target);
+    const current = this.snapshot.currentTimeSeconds || 0;
+    this.seekTo(current + deltaSeconds);
   }
 
   public setVolume(volume: number): void {

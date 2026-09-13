@@ -65,6 +65,9 @@ export function TimelineScrubber({
   const durationRef = useRef(durationSeconds);
   durationRef.current = durationSeconds;
 
+  const initialTouchXRef = useRef(0);
+  const scrubPositionRef = useRef(0);
+
   const effectiveSeconds = isScrubbing ? scrubPosition : currentTimeSeconds;
   const progressPercent = durationSeconds > 0 ? Math.min(1, Math.max(0, effectiveSeconds / durationSeconds)) : 0;
   const bufferPercent = durationSeconds > 0 ? Math.min(1, Math.max(0, bufferedSeconds / durationSeconds)) : 0;
@@ -75,10 +78,11 @@ export function TimelineScrubber({
     trackWidthRef.current = width;
   };
 
-  const calculateSecondsFromLocation = useCallback((locationX: number): { seconds: number; percent: number } => {
+  const calculateSecondsFromTouch = useCallback((touchX: number): { seconds: number; percent: number } => {
     const width = trackWidthRef.current;
     if (width <= 0) return { seconds: 0, percent: 0 };
-    const percent = Math.min(1, Math.max(0, locationX / width));
+    const clampedX = Math.max(0, Math.min(width, touchX));
+    const percent = clampedX / width;
     const seconds = percent * durationRef.current;
     return { seconds, percent };
   }, []);
@@ -92,22 +96,32 @@ export function TimelineScrubber({
         setIsScrubbing(true);
         onScrubbingChange?.(true);
 
-        const { seconds, percent } = calculateSecondsFromLocation(evt.nativeEvent.locationX);
+        const startX = evt.nativeEvent.locationX;
+        initialTouchXRef.current = startX;
+
+        const { seconds, percent } = calculateSecondsFromTouch(startX);
+        scrubPositionRef.current = seconds;
         setScrubPosition(seconds);
         onScrubMove?.(seconds, percent);
         hapticService.selection();
       },
       onPanResponderMove: (evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
-        const { seconds, percent } = calculateSecondsFromLocation(evt.nativeEvent.locationX);
+        // Calculate new position using initial touch location + accumulated gesture delta dx
+        const currentX = initialTouchXRef.current + gestureState.dx;
+        const { seconds, percent } = calculateSecondsFromTouch(currentX);
+
+        scrubPositionRef.current = seconds;
         setScrubPosition(seconds);
         onScrubMove?.(seconds, percent);
       },
-      onPanResponderRelease: (evt: GestureResponderEvent) => {
+      onPanResponderRelease: (evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
         isScrubbingRef.current = false;
         setIsScrubbing(false);
         onScrubbingChange?.(false);
 
-        const { seconds } = calculateSecondsFromLocation(evt.nativeEvent.locationX);
+        const currentX = initialTouchXRef.current + gestureState.dx;
+        const { seconds } = calculateSecondsFromTouch(currentX);
+
         hapticService.impactLight();
         onSeek(seconds);
       },
@@ -149,7 +163,7 @@ export function TimelineScrubber({
         {...panResponder.panHandlers}
         testID="scrubber-touch-area"
       >
-        <View style={styles.trackBackground}>
+        <View style={styles.trackBackground} pointerEvents="none">
           {/* Buffer Track */}
           <View
             style={[styles.bufferTrack, { width: `${bufferPercent * 100}%` }]}
@@ -172,6 +186,7 @@ export function TimelineScrubber({
                 transform: [{ scale: isScrubbing ? 1.4 : 1 }]
               }
             ]}
+            pointerEvents="none"
             testID="scrubber-thumb"
           />
         )}

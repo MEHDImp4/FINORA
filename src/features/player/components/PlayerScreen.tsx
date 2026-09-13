@@ -146,6 +146,14 @@ export function PlayerScreen({
     return 0;
   }, [item.playbackPositionTicks, item.playedPercentage]);
 
+  // Initial metadata duration in seconds (fallback for offline or before metadata arrives)
+  const initialDurationSeconds = useMemo(() => {
+    if (item.totalTicks && item.totalTicks > 0) {
+      return item.totalTicks / 10000000;
+    }
+    return 0;
+  }, [item.totalTicks]);
+
   // Auth headers for video engine (ExoPlayer sends these to master.m3u8, main.m3u8, and all segments).
   // Do NOT pass headers for local offline files ("file://") as local files don't require network headers.
   const playerHeaders = useMemo(() => {
@@ -162,6 +170,7 @@ export function PlayerScreen({
     sourceUrl: plan.url,
     headers: playerHeaders,
     initialPositionSeconds,
+    initialDurationSeconds,
     autoPlay: true
   });
 
@@ -335,8 +344,8 @@ export function PlayerScreen({
         seriesTitle={item.seriesName ? `${item.seriesName} · S${item.seasonIndex || 1} E${item.episodeIndex || 1}` : undefined}
         isPlaying={snapshot.state === "playing"}
         currentTimeSeconds={snapshot.currentTimeSeconds}
-        durationSeconds={snapshot.durationSeconds}
-        bufferedSeconds={snapshot.bufferedPositionSeconds}
+        durationSeconds={snapshot.durationSeconds > 0 ? snapshot.durationSeconds : initialDurationSeconds}
+        bufferedSeconds={localPath ? (snapshot.durationSeconds || initialDurationSeconds) : snapshot.bufferedPositionSeconds}
         onPlayPause={() => {
           if (snapshot.state === "playing") {
             controls.pause();

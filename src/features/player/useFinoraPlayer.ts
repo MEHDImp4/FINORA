@@ -8,6 +8,7 @@ export interface UseFinoraPlayerOptions {
   sourceUrl?: string;
   headers?: Record<string, string>;
   initialPositionSeconds?: number;
+  initialDurationSeconds?: number;
   autoPlay?: boolean;
 }
 
@@ -22,12 +23,13 @@ export function useFinoraPlayer({
   sourceUrl,
   headers,
   initialPositionSeconds = 0,
+  initialDurationSeconds = 0,
   autoPlay = false
 }: UseFinoraPlayerOptions = {}): UseFinoraPlayerResult {
   const engineRef = useRef<FinoraPlayerEngine | null>(null);
 
   if (!engineRef.current) {
-    engineRef.current = new FinoraPlayerEngine(null, initialPositionSeconds);
+    engineRef.current = new FinoraPlayerEngine(null, initialPositionSeconds, initialDurationSeconds);
   }
 
   const engine = engineRef.current;
