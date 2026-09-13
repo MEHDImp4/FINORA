@@ -9,7 +9,7 @@ export default function TabsLayout() {
   const { width } = useWindowDimensions();
   const bottomInset = Platform.OS === "ios" ? insets.bottom + 4 : 12;
   const tabWidth = 230;
-  const leftInset = Math.max(16, Math.round((width - tabWidth) / 2));
+  const horizontalMargin = Math.max(16, Math.round((width - tabWidth) / 2));
 
   return (
     <Tabs
@@ -21,8 +21,8 @@ export default function TabsLayout() {
           styles.floatingTabBar,
           {
             bottom: bottomInset,
-            left: leftInset,
-            width: tabWidth
+            left: horizontalMargin,
+            right: horizontalMargin
           }
         ],
         tabBarItemStyle: styles.tabBarItem,
