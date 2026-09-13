@@ -136,4 +136,34 @@ describe("OnboardingScreen", () => {
     expect(useOnboardingStore.getState().isCompleted).toBe(true);
     expect(onCompletedMock).toHaveBeenCalled();
   });
+
+  it("renders active session card and allows continuing when already authenticated", async () => {
+    const onCompletedMock = jest.fn();
+    useAuthStore.setState({
+      status: "authenticated",
+      session: {
+        token: "tok-abc",
+        userId: "user-1",
+        userName: "Bastoz",
+        serverId: "srv-1",
+        serverUrl: "https://azeur-jelly-web.smp4.xyz"
+      }
+    });
+
+    let component: ReactTestRenderer.ReactTestRenderer;
+    ReactTestRenderer.act(() => {
+      component = ReactTestRenderer.create(<OnboardingScreen onCompleted={onCompletedMock} />);
+    });
+
+    const root = component!.root;
+    expect(root.findByProps({ children: "Bienvenue, Bastoz !" })).toBeDefined();
+
+    const enterBtn = root.findByProps({ label: "Accéder à FINORA" });
+    await ReactTestRenderer.act(async () => {
+      enterBtn.props.onPress();
+    });
+
+    expect(useOnboardingStore.getState().isCompleted).toBe(true);
+    expect(onCompletedMock).toHaveBeenCalled();
+  });
 });

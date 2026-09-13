@@ -45,9 +45,12 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
   const [serverError, setServerError] = useState<string | null>(null);
 
   // Auth & Onboarding stores
+  const status = useAuthStore((state) => state.status);
+  const session = useAuthStore((state) => state.session);
   const login = useAuthStore((state) => state.login);
   const completeOnboarding = useOnboardingStore((state) => state.completeOnboarding);
   const loadSavedAccounts = useServerStore((state) => state.loadSavedAccounts);
+  const [showSwitchAccount, setShowSwitchAccount] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -269,123 +272,184 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                 <Text style={styles.badgeText}>Connexion au Serveur</Text>
               </View>
 
-              <Text style={styles.connectionTitle}>Connectez votre Jellyfin</Text>
-              <Text style={styles.connectionSubtitle}>
-                Le serveur par défaut est pré-rempli. Saisissez vos identifiants pour démarrer.
-              </Text>
-
-              {/* Server URL Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Serveur Jellyfin</Text>
-                <View style={styles.inputFieldContainer}>
-                  <Ionicons name="globe-outline" size={18} color="#8A8A9E" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.textInput}
-                    value={serverUrl}
-                    onChangeText={(val) => {
-                      setServerUrl(val);
-                      setServerStatus("idle");
-                      setServerError(null);
-                    }}
-                    placeholder="https://votre-serveur.com"
-                    placeholderTextColor="#666680"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="url"
-                  />
-                  <Pressable
-                    style={styles.testServerButton}
-                    onPress={handleTestServer}
-                    disabled={isTestingServer || !serverUrl.trim()}
-                  >
-                    {isTestingServer ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.testServerText}>Tester</Text>
-                    )}
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Server Test Feedback */}
-              {serverStatus === "success" && (
-                <View style={styles.serverSuccessBanner}>
-                  <Ionicons name="checkmark-circle" size={16} color="#34C759" style={{ marginRight: 6 }} />
-                  <Text style={styles.serverSuccessText}>
-                    {`Serveur en ligne : ${serverName || "Jellyfin OK"}`}
+              {status === "authenticated" && session && !showSwitchAccount ? (
+                <>
+                  <Text style={styles.connectionTitle}>
+                    {`Bienvenue, ${session.userName || "Cinéphile"} !`}
                   </Text>
-                </View>
-              )}
-              {serverStatus === "error" && (
-                <View style={styles.serverErrorBanner}>
-                  <Ionicons name="alert-circle" size={16} color="#FF3B30" style={{ marginRight: 6 }} />
-                  <Text style={styles.serverErrorText}>{serverError}</Text>
-                </View>
-              )}
+                  <Text style={styles.connectionSubtitle}>
+                    Votre compte Jellyfin est déjà configuré et prêt à l'emploi.
+                  </Text>
 
-              {/* Username Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Nom d'utilisateur</Text>
-                <View style={styles.inputFieldContainer}>
-                  <Ionicons name="person-outline" size={18} color="#8A8A9E" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.textInput}
-                    value={username}
-                    onChangeText={setUsername}
-                    placeholder="Votre identifiant"
-                    placeholderTextColor="#666680"
-                    autoCapitalize="none"
-                    autoCorrect={false}
+                  <View style={styles.activeSessionCard}>
+                    <View style={styles.activeSessionRow}>
+                      <View style={styles.activeSessionAvatar}>
+                        <Ionicons name="person" size={22} color="#FFFFFF" />
+                      </View>
+                      <View style={styles.activeSessionTexts}>
+                        <Text style={styles.activeSessionUser}>
+                          {session.userName || "Utilisateur FINORA"}
+                        </Text>
+                        <Text style={styles.activeSessionServer} numberOfLines={1}>
+                          {session.serverUrl}
+                        </Text>
+                      </View>
+                      <Ionicons name="checkmark-circle" size={22} color="#34C759" />
+                    </View>
+                  </View>
+
+                  <FinoraButton
+                    label="Accéder à FINORA"
+                    variant="primary"
+                    size="lg"
+                    onPress={handleFinishWithoutAccount}
+                    style={styles.loginButton}
                   />
-                </View>
-              </View>
 
-              {/* Password Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Mot de passe</Text>
-                <View style={styles.inputFieldContainer}>
-                  <Ionicons name="lock-closed-outline" size={18} color="#8A8A9E" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.textInput}
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="Mot de passe (si configuré)"
-                    placeholderTextColor="#666680"
-                    secureTextEntry
-                    autoCapitalize="none"
-                    autoCorrect={false}
+                  <Pressable
+                    style={styles.guestButton}
+                    onPress={() => setShowSwitchAccount(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Changer de compte ou de serveur"
+                  >
+                    <Text style={styles.guestButtonText}>Changer de compte ou de serveur</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.connectionTitle}>Connectez votre Jellyfin</Text>
+                  <Text style={styles.connectionSubtitle}>
+                    Le serveur par défaut est pré-rempli. Saisissez vos identifiants pour démarrer.
+                  </Text>
+
+                  {session && (
+                    <Pressable
+                      style={styles.returnSessionButton}
+                      onPress={() => setShowSwitchAccount(false)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Retourner au compte connecté"
+                    >
+                      <Ionicons name="arrow-back" size={16} color="#4F8EF7" />
+                      <Text style={styles.returnSessionText}>
+                        {`Conserver le compte ${session.userName}`}
+                      </Text>
+                    </Pressable>
+                  )}
+
+                  {/* Server URL Input */}
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Serveur Jellyfin</Text>
+                    <View style={styles.inputFieldContainer}>
+                      <Ionicons name="globe-outline" size={18} color="#8A8A9E" style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.textInput}
+                        value={serverUrl}
+                        onChangeText={(val) => {
+                          setServerUrl(val);
+                          setServerStatus("idle");
+                          setServerError(null);
+                        }}
+                        placeholder="https://votre-serveur.com"
+                        placeholderTextColor="#666680"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                      />
+                      <Pressable
+                        style={styles.testServerButton}
+                        onPress={handleTestServer}
+                        disabled={isTestingServer || !serverUrl.trim()}
+                      >
+                        {isTestingServer ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text style={styles.testServerText}>Tester</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  {/* Server Test Feedback */}
+                  {serverStatus === "success" && (
+                    <View style={styles.serverSuccessBanner}>
+                      <Ionicons name="checkmark-circle" size={16} color="#34C759" style={{ marginRight: 6 }} />
+                      <Text style={styles.serverSuccessText}>
+                        {`Serveur en ligne : ${serverName || "Jellyfin OK"}`}
+                      </Text>
+                    </View>
+                  )}
+                  {serverStatus === "error" && (
+                    <View style={styles.serverErrorBanner}>
+                      <Ionicons name="alert-circle" size={16} color="#FF3B30" style={{ marginRight: 6 }} />
+                      <Text style={styles.serverErrorText}>{serverError}</Text>
+                    </View>
+                  )}
+
+                  {/* Username Input */}
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Nom d'utilisateur</Text>
+                    <View style={styles.inputFieldContainer}>
+                      <Ionicons name="person-outline" size={18} color="#8A8A9E" style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.textInput}
+                        value={username}
+                        onChangeText={setUsername}
+                        placeholder="Votre identifiant"
+                        placeholderTextColor="#666680"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Password Input */}
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Mot de passe</Text>
+                    <View style={styles.inputFieldContainer}>
+                      <Ionicons name="lock-closed-outline" size={18} color="#8A8A9E" style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.textInput}
+                        value={password}
+                        onChangeText={setPassword}
+                        placeholder="Mot de passe (si configuré)"
+                        placeholderTextColor="#666680"
+                        secureTextEntry
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Login Error Banner */}
+                  {loginError && (
+                    <View style={styles.loginErrorBanner}>
+                      <Ionicons name="close-circle" size={16} color="#FF3B30" style={{ marginRight: 6 }} />
+                      <Text style={styles.loginErrorText}>{loginError}</Text>
+                    </View>
+                  )}
+
+                  {/* Submit Button */}
+                  <FinoraButton
+                    label="Se connecter et commencer"
+                    variant="primary"
+                    size="lg"
+                    loading={isSubmitting}
+                    disabled={isSubmitting}
+                    onPress={handleLoginAndComplete}
+                    style={styles.loginButton}
                   />
-                </View>
-              </View>
 
-              {/* Login Error Banner */}
-              {loginError && (
-                <View style={styles.loginErrorBanner}>
-                  <Ionicons name="close-circle" size={16} color="#FF3B30" style={{ marginRight: 6 }} />
-                  <Text style={styles.loginErrorText}>{loginError}</Text>
-                </View>
+                  {/* Skip / Guest button */}
+                  <Pressable
+                    style={styles.guestButton}
+                    onPress={handleFinishWithoutAccount}
+                    accessibilityRole="button"
+                    accessibilityLabel="Explorer sans compte"
+                  >
+                    <Text style={styles.guestButtonText}>Explorer sans se connecter</Text>
+                  </Pressable>
+                </>
               )}
-
-              {/* Submit Button */}
-              <FinoraButton
-                label="Se connecter et commencer"
-                variant="primary"
-                size="lg"
-                loading={isSubmitting}
-                disabled={isSubmitting}
-                onPress={handleLoginAndComplete}
-                style={styles.loginButton}
-              />
-
-              {/* Skip / Guest button */}
-              <Pressable
-                style={styles.guestButton}
-                onPress={handleFinishWithoutAccount}
-                accessibilityRole="button"
-                accessibilityLabel="Explorer sans compte"
-              >
-                <Text style={styles.guestButtonText}>Explorer sans se connecter</Text>
-              </Pressable>
             </ScrollView>
           </KeyboardAvoidingView>
         </View>
@@ -695,6 +759,53 @@ const styles = StyleSheet.create({
   guestButtonText: {
     color: "#8A8A9E",
     fontSize: 14,
+    fontWeight: "600"
+  },
+  activeSessionCard: {
+    backgroundColor: "rgba(24, 24, 34, 0.75)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20
+  },
+  activeSessionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14
+  },
+  activeSessionAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(229, 9, 20, 0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(229, 9, 20, 0.4)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  activeSessionTexts: {
+    flex: 1
+  },
+  activeSessionUser: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 2
+  },
+  activeSessionServer: {
+    color: "#8A8A9E",
+    fontSize: 13
+  },
+  returnSessionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 16
+  },
+  returnSessionText: {
+    color: "#4F8EF7",
+    fontSize: 13,
     fontWeight: "600"
   },
   bottomBar: {

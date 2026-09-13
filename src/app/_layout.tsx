@@ -60,7 +60,7 @@ export default function RootLayout() {
   }, [status, session?.userId]);
 
   const showSplash = !minSplashDone || status === "idle" || status === "restoring" || !isOnboardingLoaded;
-  const showOnboarding = !showSplash && !isOnboardingCompleted && status !== "authenticated";
+  const showOnboarding = !showSplash && !isOnboardingCompleted;
 
   return (
     <SafeAreaProvider>
