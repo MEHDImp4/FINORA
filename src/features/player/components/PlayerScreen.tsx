@@ -26,6 +26,9 @@ import { findMatchingAudioTrack, findMatchingSubtitleTrack } from "../trackUtils
 import { logger } from "../../../core/network/logger";
 import { useQueryClient } from "@tanstack/react-query";
 import { mediaKeys } from "../../../hooks/useMediaQueries";
+import { FinoraSubtitleOverlay } from "./FinoraSubtitleOverlay";
+import { SubtitleStyleModal } from "./SubtitleStyleModal";
+import { useSubtitleCues } from "../useSubtitleCues";
 
 export interface PlayerScreenProps {
   item: MediaItem;
@@ -66,6 +69,17 @@ export function PlayerScreen({
   const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState<number | null>(null);
   const [selectedQuality, setSelectedQuality] = useState<string>("auto");
   const [isLandscape, setIsLandscape] = useState(false);
+  const [showSubtitleStyleModal, setShowSubtitleStyleModal] = useState(false);
+
+  // High-fidelity custom subtitle cues
+  const { cues, isCustomSubtitleActive } = useSubtitleCues({
+    itemId: item.id,
+    mediaSourceId: item.mediaSourceId,
+    subtitleStreamIndex: selectedSubtitleIndex,
+    serverUrl,
+    token,
+    localPath
+  });
 
   // Server stream states (ONLY updated when native track switching cannot be performed and server stream must be replaced)
   const [serverAudioIndex, setServerAudioIndex] = useState<number | undefined>(undefined);
@@ -224,6 +238,18 @@ export function PlayerScreen({
     if (!player) return;
 
     const syncSubtitleTrack = (tracks: any[]) => {
+      // If high-fidelity custom subtitles are active, mute native system subtitles to avoid YouTube-2014 style double captions
+      if (isCustomSubtitleActive) {
+        if (player.subtitleTrack !== null) {
+          try {
+            player.subtitleTrack = null;
+          } catch {
+            // Ignored
+          }
+        }
+        return;
+      }
+
       if (selectedSubtitleIndex === null) {
         if (player.subtitleTrack !== null) {
           try {
@@ -260,7 +286,17 @@ export function PlayerScreen({
     return () => {
       subTrackSub?.remove?.();
     };
-  }, [player, selectedSubtitleIndex, item.mediaStreams]);
+  }, [player, selectedSubtitleIndex, item.mediaStreams, isCustomSubtitleActive]);
+
+  useEffect(() => {
+    if (isCustomSubtitleActive && player && player.subtitleTrack !== null) {
+      try {
+        player.subtitleTrack = null;
+      } catch {
+        // Ignored
+      }
+    }
+  }, [isCustomSubtitleActive, player]);
 
   const handleBack = () => {
     controls.pause();
@@ -311,6 +347,15 @@ export function PlayerScreen({
           nativeControls={false}
         />
       </PlayerGestures>
+
+      {/* Custom High-Fidelity Netflix-Style Subtitles */}
+      {isCustomSubtitleActive && (
+        <FinoraSubtitleOverlay
+          cues={cues}
+          currentTimeSeconds={snapshot.currentTimeSeconds}
+          extraBottomOffset={controlsVisible ? 36 : 0}
+        />
+      )}
 
       {/* Buffering Indicator */}
       {isBufferingOrLoading && (
@@ -437,6 +482,13 @@ export function PlayerScreen({
           setSelectedQuality(q);
           setTracksModalVisible(false);
         }}
+        onOpenSubtitleStyle={() => setShowSubtitleStyleModal(true)}
+      />
+
+      {/* Subtitle Customization Kit Modal */}
+      <SubtitleStyleModal
+        visible={showSubtitleStyleModal}
+        onClose={() => setShowSubtitleStyleModal(false)}
       />
 
       {/* Stats for Nerds Technical Diagnostic Modal */}

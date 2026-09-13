@@ -25,6 +25,7 @@ export interface TrackSelectionModalProps {
   onSelectAudio: (index: number) => void;
   onSelectSubtitle: (index: number | null) => void;
   onSelectQuality: (quality: string) => void;
+  onOpenSubtitleStyle?: () => void;
 }
 
 export type TabKey = "audio" | "subtitles" | "quality";
@@ -47,7 +48,8 @@ export function TrackSelectionModal({
   availableSubtitleTracks = [],
   onSelectAudio,
   onSelectSubtitle,
-  onSelectQuality
+  onSelectQuality,
+  onOpenSubtitleStyle
 }: TrackSelectionModalProps) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>("audio");
@@ -211,6 +213,25 @@ export function TrackSelectionModal({
             {/* Subtitles Tab */}
             {activeTab === "subtitles" && (
               <View testID="subtitles-list">
+                {onOpenSubtitleStyle && (
+                  <Pressable
+                    style={styles.subtitleStyleButton}
+                    onPress={onOpenSubtitleStyle}
+                    testID="open-subtitle-style-button"
+                  >
+                    <Ionicons name="color-palette-outline" size={18} color={colors.primary} />
+                    <FinoraText variant="body" weight="700" color="primary" style={{ marginLeft: 8 }}>
+                      Personnaliser l'apparence des sous-titres
+                    </FinoraText>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={16}
+                      color={colors.primary}
+                      style={{ marginLeft: "auto" }}
+                    />
+                  </Pressable>
+                )}
+
                 {/* Off Option */}
                 <Pressable
                   style={[
@@ -415,5 +436,16 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: "center",
     paddingVertical: spacing.xl
+  },
+  subtitleStyleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: "rgba(229, 9, 20, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(229, 9, 20, 0.3)",
+    marginBottom: 12
   }
 });

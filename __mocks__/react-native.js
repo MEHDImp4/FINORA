@@ -26,6 +26,11 @@ const ScrollView = React.forwardRef((props, ref) =>
 );
 ScrollView.displayName = "ScrollView";
 
+const TouchableOpacity = React.forwardRef((props, ref) =>
+  React.createElement("TouchableOpacity", { ...props, ref }, props.children)
+);
+TouchableOpacity.displayName = "TouchableOpacity";
+
 const RefreshControl = (props) => React.createElement("RefreshControl", props);
 RefreshControl.displayName = "RefreshControl";
 
@@ -170,6 +175,7 @@ module.exports = {
   TextInput,
   Keyboard,
   Pressable,
+  TouchableOpacity,
   ScrollView,
   RefreshControl,
   FlatList,

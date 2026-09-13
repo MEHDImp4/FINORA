@@ -1,0 +1,575 @@
+import React, { useState } from "react";
+import {
+  View,
+  StyleSheet,
+  Modal,
+  ScrollView,
+  Pressable,
+  TouchableOpacity
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { FinoraText } from "../../../design-system/components/FinoraText";
+import { FinoraIconButton } from "../../../design-system/components/FinoraIconButton";
+import { colors, spacing } from "../../../design-system/tokens";
+import { hapticService } from "../../../core/feedback/hapticService";
+import {
+  useSubtitleSettingsStore,
+  SubtitleSize,
+  SubtitleColor,
+  SubtitleBackground,
+  SubtitleShadow,
+  SubtitlePosition,
+  SubtitlePreset,
+  SUBTITLE_SIZE_VALUES
+} from "../../../stores/subtitleSettingsStore";
+
+interface SubtitleStyleModalProps {
+  visible: boolean;
+  onClose: () => void;
+}
+
+const COLOR_OPTIONS: { label: string; value: SubtitleColor; hex: string }[] = [
+  { label: "Blanc", value: "#FFFFFF", hex: "#FFFFFF" },
+  { label: "Jaune", value: "#FFE600", hex: "#FFE600" },
+  { label: "Cyan", value: "#00E5FF", hex: "#00E5FF" },
+  { label: "Vert", value: "#A7F3D0", hex: "#A7F3D0" }
+];
+
+const SIZE_OPTIONS: { label: string; value: SubtitleSize; sizeLabel: string }[] = [
+  { label: "Petite", value: "small", sizeLabel: "16px" },
+  { label: "Moyenne", value: "medium", sizeLabel: "20px" },
+  { label: "Grande", value: "large", sizeLabel: "26px" },
+  { label: "Très grande", value: "extraLarge", sizeLabel: "32px" }
+];
+
+const BACKGROUND_OPTIONS: { label: string; value: SubtitleBackground; icon: string }[] = [
+  { label: "Aucun", value: "none", icon: "ban-outline" },
+  { label: "Encart semi-noir", value: "semi_black", icon: "square-outline" },
+  { label: "Carré opaque", value: "solid_black", icon: "square" },
+  { label: "Bulle moderne", value: "pill", icon: "ellipse-outline" }
+];
+
+const SHADOW_OPTIONS: { label: string; value: SubtitleShadow }[] = [
+  { label: "Ombre Netflix", value: "netflix_shadow" },
+  { label: "Contour fort", value: "thick_outline" },
+  { label: "Sans ombre", value: "none" }
+];
+
+const POSITION_OPTIONS: { label: string; value: SubtitlePosition }[] = [
+  { label: "Standard (Bas)", value: "standard" },
+  { label: "Rehaussé", value: "elevated" }
+];
+
+const PRESETS: { key: SubtitlePreset; label: string; subtitle: string }[] = [
+  { key: "netflix", label: "Netflix Standard", subtitle: "Blanc net & ombre portée" },
+  { key: "netflix_box", label: "Netflix avec Encart", subtitle: "Bandeau noir translucide" },
+  { key: "cinema_yellow", label: "Cinéma Jaune", subtitle: "Jaune classique haute visibilité" },
+  { key: "high_contrast", label: "Contraste Élevé", subtitle: "Grand texte sur fond noir opaque" }
+];
+
+export function SubtitleStyleModal({ visible, onClose }: SubtitleStyleModalProps) {
+  const { settings, updateSettings, applyPreset, resetToDefaults } = useSubtitleSettingsStore();
+  const [previewDarkScene, setPreviewDarkScene] = useState(true);
+
+  if (!visible) return null;
+
+  const handleApplyPreset = (preset: SubtitlePreset) => {
+    hapticService.impactMedium();
+    applyPreset(preset);
+  };
+
+  const handleUpdate = (partial: Parameters<typeof updateSettings>[0]) => {
+    hapticService.impactLight();
+    updateSettings(partial);
+  };
+
+  const handleReset = () => {
+    hapticService.impactMedium();
+    resetToDefaults();
+  };
+
+  // Preview styling calculations
+  const previewFontSize = SUBTITLE_SIZE_VALUES[settings.size] || 20;
+
+  const previewBoxStyle =
+    settings.background === "semi_black"
+      ? styles.previewBoxSemiBlack
+      : settings.background === "solid_black"
+      ? styles.previewBoxSolidBlack
+      : settings.background === "pill"
+      ? styles.previewBoxPill
+      : styles.previewBoxNone;
+
+  const previewShadowStyle =
+    settings.shadow === "netflix_shadow"
+      ? styles.shadowNetflix
+      : settings.shadow === "thick_outline"
+      ? styles.shadowThick
+      : styles.shadowNone;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      testID="subtitle-style-modal"
+    >
+      <View style={styles.backdrop}>
+        <View style={styles.modalCard}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View>
+              <FinoraText variant="title" weight="700" color="textPrimary">
+                Style des sous-titres
+              </FinoraText>
+              <FinoraText variant="caption" color="textSecondary">
+                Personnalisation du rendu à la Netflix
+              </FinoraText>
+            </View>
+
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                onPress={handleReset}
+                style={styles.resetButton}
+                testID="subtitle-reset-button"
+              >
+                <Ionicons name="refresh-outline" size={14} color={colors.textMuted} />
+                <FinoraText variant="caption" color="textMuted" style={{ marginLeft: 4 }}>
+                  Défaut
+                </FinoraText>
+              </TouchableOpacity>
+
+              <FinoraIconButton
+                accessibilityLabel="Fermer"
+                onPress={onClose}
+                size={36}
+                backgroundColor={colors.surface}
+                testID="subtitle-style-close-button"
+              >
+                <Ionicons name="close" size={20} color="#FFFFFF" />
+              </FinoraIconButton>
+            </View>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollBody}>
+            {/* Live Interactive Preview */}
+            <View style={styles.previewSection}>
+              <View style={styles.previewHeader}>
+                <FinoraText variant="caption" color="textSecondary" weight="700">
+                  APERÇU EN DIRECT
+                </FinoraText>
+                <Pressable
+                  onPress={() => setPreviewDarkScene(!previewDarkScene)}
+                  style={styles.sceneToggle}
+                  testID="toggle-preview-scene"
+                >
+                  <Ionicons
+                    name={previewDarkScene ? "sunny-outline" : "moon-outline"}
+                    size={14}
+                    color="#FFFFFF"
+                  />
+                  <FinoraText variant="caption" color="textPrimary" style={{ marginLeft: 4, fontSize: 11 }}>
+                    {previewDarkScene ? "Tester fond clair" : "Tester fond sombre"}
+                  </FinoraText>
+                </Pressable>
+              </View>
+
+              <View
+                style={[
+                  styles.previewScreen,
+                  previewDarkScene ? styles.previewDarkScene : styles.previewLightScene
+                ]}
+                testID="subtitle-preview-box"
+              >
+                <View
+                  style={[
+                    styles.previewSubtitleContainer,
+                    settings.position === "elevated" && { marginBottom: 28 }
+                  ]}
+                >
+                  <View style={[styles.previewBoxBase, previewBoxStyle]}>
+                    <FinoraText
+                      style={[
+                        styles.previewText,
+                        {
+                          fontSize: previewFontSize,
+                          lineHeight: Math.round(previewFontSize * 1.35),
+                          color: settings.textColor
+                        },
+                        previewShadowStyle
+                      ]}
+                    >
+                      FINORA — Voici l'aperçu de vos sous-titres.
+                    </FinoraText>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* 1-Click Presets */}
+            <View style={styles.section}>
+              <FinoraText variant="caption" color="textSecondary" weight="700" style={styles.sectionTitle}>
+                MODÈLES PRÉDÉFINIS (PRESETS)
+              </FinoraText>
+              <View style={styles.presetGrid}>
+                {PRESETS.map((p) => (
+                  <TouchableOpacity
+                    key={p.key}
+                    style={styles.presetCard}
+                    onPress={() => handleApplyPreset(p.key)}
+                    activeOpacity={0.7}
+                    testID={`preset-${p.key}`}
+                  >
+                    <FinoraText variant="caption" weight="700" color="textPrimary">
+                      {p.label}
+                    </FinoraText>
+                    <FinoraText variant="caption" color="textMuted" style={{ fontSize: 11, marginTop: 2 }}>
+                      {p.subtitle}
+                    </FinoraText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Text Color Selection */}
+            <View style={styles.section}>
+              <FinoraText variant="caption" color="textSecondary" weight="700" style={styles.sectionTitle}>
+                COULEUR DU TEXTE
+              </FinoraText>
+              <View style={styles.optionsRow}>
+                {COLOR_OPTIONS.map((c) => {
+                  const selected = settings.textColor === c.value;
+                  return (
+                    <TouchableOpacity
+                      key={c.value}
+                      style={[styles.colorChip, selected && styles.chipSelected]}
+                      onPress={() => handleUpdate({ textColor: c.value })}
+                      testID={`color-${c.value}`}
+                    >
+                      <View style={[styles.colorDot, { backgroundColor: c.hex }]} />
+                      <FinoraText
+                        variant="caption"
+                        color={selected ? "textPrimary" : "textSecondary"}
+                        weight={selected ? "700" : "400"}
+                      >
+                        {c.label}
+                      </FinoraText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Font Size Selection */}
+            <View style={styles.section}>
+              <FinoraText variant="caption" color="textSecondary" weight="700" style={styles.sectionTitle}>
+                TAILLE DU TEXTE
+              </FinoraText>
+              <View style={styles.optionsRow}>
+                {SIZE_OPTIONS.map((s) => {
+                  const selected = settings.size === s.value;
+                  return (
+                    <TouchableOpacity
+                      key={s.value}
+                      style={[styles.optionChip, selected && styles.chipSelected]}
+                      onPress={() => handleUpdate({ size: s.value })}
+                      testID={`size-${s.value}`}
+                    >
+                      <FinoraText
+                        variant="caption"
+                        color={selected ? "textPrimary" : "textSecondary"}
+                        weight={selected ? "700" : "400"}
+                      >
+                        {s.label}
+                      </FinoraText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Background / Box ("Carré derrière") */}
+            <View style={styles.section}>
+              <FinoraText variant="caption" color="textSecondary" weight="700" style={styles.sectionTitle}>
+                ARRIÈRE-PLAN / CARRÉ ("BOX")
+              </FinoraText>
+              <View style={styles.optionsRow}>
+                {BACKGROUND_OPTIONS.map((b) => {
+                  const selected = settings.background === b.value;
+                  return (
+                    <TouchableOpacity
+                      key={b.value}
+                      style={[styles.optionChip, selected && styles.chipSelected]}
+                      onPress={() => handleUpdate({ background: b.value })}
+                      testID={`bg-${b.value}`}
+                    >
+                      <Ionicons
+                        name={b.icon as any}
+                        size={14}
+                        color={selected ? colors.primary : colors.textMuted}
+                        style={{ marginRight: 6 }}
+                      />
+                      <FinoraText
+                        variant="caption"
+                        color={selected ? "textPrimary" : "textSecondary"}
+                        weight={selected ? "700" : "400"}
+                      >
+                        {b.label}
+                      </FinoraText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Shadow & Outline */}
+            <View style={styles.section}>
+              <FinoraText variant="caption" color="textSecondary" weight="700" style={styles.sectionTitle}>
+                EFFET DE CONTOUR & OMBRE
+              </FinoraText>
+              <View style={styles.optionsRow}>
+                {SHADOW_OPTIONS.map((sh) => {
+                  const selected = settings.shadow === sh.value;
+                  return (
+                    <TouchableOpacity
+                      key={sh.value}
+                      style={[styles.optionChip, selected && styles.chipSelected]}
+                      onPress={() => handleUpdate({ shadow: sh.value })}
+                      testID={`shadow-${sh.value}`}
+                    >
+                      <FinoraText
+                        variant="caption"
+                        color={selected ? "textPrimary" : "textSecondary"}
+                        weight={selected ? "700" : "400"}
+                      >
+                        {sh.label}
+                      </FinoraText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Position */}
+            <View style={styles.section}>
+              <FinoraText variant="caption" color="textSecondary" weight="700" style={styles.sectionTitle}>
+                POSITION VERTICALE
+              </FinoraText>
+              <View style={styles.optionsRow}>
+                {POSITION_OPTIONS.map((pos) => {
+                  const selected = settings.position === pos.value;
+                  return (
+                    <TouchableOpacity
+                      key={pos.value}
+                      style={[styles.optionChip, selected && styles.chipSelected]}
+                      onPress={() => handleUpdate({ position: pos.value })}
+                      testID={`pos-${pos.value}`}
+                    >
+                      <FinoraText
+                        variant="caption"
+                        color={selected ? "textPrimary" : "textSecondary"}
+                        weight={selected ? "700" : "400"}
+                      >
+                        {pos.label}
+                      </FinoraText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    justifyContent: "flex-end"
+  },
+  modalCard: {
+    backgroundColor: "#111116",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "88%",
+    paddingBottom: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)"
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255, 255, 255, 0.1)"
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  resetButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    marginRight: 4
+  },
+  scrollBody: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md
+  },
+  previewSection: {
+    marginBottom: spacing.lg
+  },
+  previewHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8
+  },
+  sceneToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6
+  },
+  previewScreen: {
+    height: 120,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.15)"
+  },
+  previewDarkScene: {
+    backgroundColor: "#181822"
+  },
+  previewLightScene: {
+    backgroundColor: "#D1D5DB"
+  },
+  previewSubtitleContainer: {
+    alignItems: "center",
+    maxWidth: "92%"
+  },
+  previewBoxBase: {
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  previewBoxNone: {
+    backgroundColor: "transparent",
+    paddingHorizontal: 0,
+    paddingVertical: 0
+  },
+  previewBoxSemiBlack: {
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 4
+  },
+  previewBoxSolidBlack: {
+    backgroundColor: "rgba(4, 4, 6, 0.95)",
+    borderRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 4
+  },
+  previewBoxPill: {
+    backgroundColor: "rgba(18, 18, 24, 0.88)",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255, 255, 255, 0.15)"
+  },
+  previewText: {
+    fontWeight: "700",
+    textAlign: "center"
+  },
+  section: {
+    marginBottom: spacing.lg
+  },
+  sectionTitle: {
+    fontSize: 11,
+    letterSpacing: 0.8,
+    marginBottom: 10
+  },
+  presetGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  presetCard: {
+    width: "48%",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)"
+  },
+  optionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  optionChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)"
+  },
+  colorChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)"
+  },
+  chipSelected: {
+    borderColor: colors.primary,
+    backgroundColor: "rgba(229, 9, 20, 0.15)"
+  },
+  colorDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.4)"
+  },
+  shadowNetflix: {
+    textShadowColor: "rgba(0, 0, 0, 0.95)",
+    textShadowOffset: { width: 1.5, height: 1.5 },
+    textShadowRadius: 3.5
+  },
+  shadowThick: {
+    textShadowColor: "#000000",
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 1
+  },
+  shadowNone: {
+    textShadowColor: "transparent",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 0
+  }
+});

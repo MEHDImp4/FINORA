@@ -15,8 +15,10 @@ import {
   diagnosticsService,
   ServerDiagnosticsResult
 } from "../../core/jellyfin/diagnosticsService";
+import { SubtitleStyleModal } from "../../features/player/components/SubtitleStyleModal";
 
 export default function SettingsScreen() {
+  const [showSubtitleModal, setShowSubtitleModal] = useState(false);
   const session = useAuthStore((state) => state.session);
   const login = useAuthStore((state) => state.login);
   const logout = useAuthStore((state) => state.logout);
@@ -256,6 +258,23 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {/* Subtitle & Accessibility Appearance */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>Sous-titres & Accessibilité</Text>
+          <Text style={styles.cardDescription}>
+            Personnalisez l'affichage des sous-titres : typographie nette style Netflix, arrière-plans opaques ou translucides, couleurs et aperçu en direct.
+          </Text>
+
+          <View style={styles.actionRow}>
+            <FinoraButton
+              label="Personnaliser les sous-titres"
+              variant="secondary"
+              size="md"
+              onPress={() => setShowSubtitleModal(true)}
+            />
+          </View>
+        </View>
+
         {/* Server Diagnostics Section */}
         <View style={styles.card}>
           <Text style={styles.sectionHeader}>Server Diagnostics (DIAG-01)</Text>
@@ -324,6 +343,12 @@ export default function SettingsScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Subtitle Customization Kit Modal */}
+      <SubtitleStyleModal
+        visible={showSubtitleModal}
+        onClose={() => setShowSubtitleModal(false)}
+      />
     </FinoraScreen>
   );
 }
