@@ -163,16 +163,21 @@ export default function DetailsScreen() {
     hapticService.notificationSuccess();
   };
 
+  const seriesTargetId =
+    (item?.type === "Season" || item?.type === "Episode") && (item?.seriesId || item?.parentId)
+      ? item.seriesId || item.parentId
+      : undefined;
+
   React.useEffect(() => {
-    if (item && item.type === "Season" && item.seriesId) {
+    if (seriesTargetId) {
       router.replace({
         pathname: "/details/[id]",
-        params: { id: item.seriesId }
+        params: { id: seriesTargetId }
       });
     }
-  }, [item, router]);
+  }, [seriesTargetId, router]);
 
-  if (isLoading) {
+  if (isLoading || seriesTargetId) {
     return (
       <View style={styles.centerContainer} testID="details-loading">
         <ActivityIndicator size="large" color={colors.primary} />

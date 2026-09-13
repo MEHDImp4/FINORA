@@ -104,7 +104,11 @@ export default function SearchScreen() {
       if (query.trim().length >= 2) {
         searchHistoryService.addSearchTerm(query.trim()).then(setRecentSearches);
       }
-      router.push(`/details/${item.id}`);
+      const targetId =
+        (item.type === "Episode" || item.type === "Season") && item.seriesId
+          ? item.seriesId
+          : item.id;
+      router.push(`/details/${targetId}`);
     },
     [query, router]
   );

@@ -268,4 +268,49 @@ describe("HomeScreen", () => {
       component.unmount();
     });
   });
+
+  it("navigates to series details when an episode item with seriesId is pressed", () => {
+    (useRecentlyAdded as jest.Mock).mockReturnValue({
+      data: [
+        {
+          id: "ep-101",
+          name: "Pilot",
+          seriesName: "Breaking Bad",
+          seriesId: "series-999",
+          type: "Episode",
+          backdropImageTag: "backdrop-tag-pilot",
+          playedPercentage: 0,
+          isPlayed: false,
+          isFavorite: false
+        }
+      ],
+      isLoading: false,
+      refetch: jest.fn()
+    });
+
+    const component = ReactTestRenderer.create(
+      <QueryClientProvider client={queryClient}>
+        <HomeScreen />
+      </QueryClientProvider>
+    );
+    const root = component.root;
+
+    const card = root
+      .findAllByProps({ accessibilityHint: "Double tap to open media details" })
+      .find((el) => el.props.accessibilityLabel?.includes("Pilot"));
+    expect(card).toBeDefined();
+    ReactTestRenderer.act(() => {
+      card?.props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: "/details/[id]",
+      params: { id: "series-999" }
+    });
+
+    ReactTestRenderer.act(() => {
+      component.unmount();
+    });
+  });
 });
+

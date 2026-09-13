@@ -117,4 +117,50 @@ describe("SearchScreen", () => {
       tree.unmount();
     });
   });
+
+  it("navigates to seriesId when an episode search result with seriesId is pressed", async () => {
+    const mockResults = [
+      {
+        id: "ep-456",
+        name: "Ozymandias",
+        seriesName: "Breaking Bad",
+        seriesId: "series-789",
+        type: "Episode",
+        playedPercentage: 0,
+        isPlayed: false,
+        primaryImageTag: "tag-ep"
+      }
+    ];
+
+    mockUseSearchMedia.mockReturnValue({
+      data: mockResults,
+      isLoading: false,
+      isFetching: false
+    });
+
+    let tree: any;
+    await act(async () => {
+      tree = ReactTestRenderer.create(<SearchScreen />);
+    });
+
+    const searchInput = tree.root.findByProps({ accessibilityLabel: "Search input" });
+    act(() => {
+      searchInput.props.onChangeText("Ozymandias");
+      jest.advanceTimersByTime(300);
+    });
+
+    const mediaCard = tree.root.findByProps({ accessibilityHint: "Double tap to open media details" });
+    expect(mediaCard).toBeTruthy();
+
+    act(() => {
+      mediaCard.props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith("/details/series-789");
+
+    act(() => {
+      tree.unmount();
+    });
+  });
 });
+

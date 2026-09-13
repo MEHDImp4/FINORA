@@ -202,7 +202,11 @@ export default function HomeScreen() {
   };
 
   const handleItemPress = (item: MediaItem) => {
-    router.push({ pathname: "/details/[id]", params: { id: item.id } });
+    const targetId =
+      (item.type === "Episode" || item.type === "Season") && item.seriesId
+        ? item.seriesId
+        : item.id;
+    router.push({ pathname: "/details/[id]", params: { id: targetId } });
   };
 
   const handleToggleFavorite = (item: MediaItem) => {
