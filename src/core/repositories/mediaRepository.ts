@@ -19,7 +19,7 @@ export interface GetItemsOptions {
 }
 
 const MEDIA_FIELDS =
-  "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ParentBackdropImageTags,ParentBackdropItemId,SeriesPrimaryImageTag,ParentPrimaryImageTag,ParentThumbImageTag,ParentThumbItemId,ParentId,PrimaryImageAspectRatio,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber,SeriesId,SeriesName,SeasonId,LocationType,MediaSources,ChildCount,RecursiveItemCount,MediaSourceCount,ItemCounts";
+  "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ParentBackdropImageTags,ParentBackdropItemId,SeriesPrimaryImageTag,ParentPrimaryImageTag,ParentThumbImageTag,ParentThumbItemId,ParentId,PrimaryImageAspectRatio,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber,SeriesId,SeriesName,SeasonId,LocationType,MediaSources,ChildCount,RecursiveItemCount,MediaSourceCount,ItemCounts,Chapters";
 
 export function isValidMediaDto(dto: any): boolean {
   if (!dto) return false;
@@ -222,7 +222,7 @@ export class MediaRepository {
     const http = this.getHttp(customClient);
     const dto = await http.request<any>(`/Users/${userId}/Items/${itemId}`, {
       params: {
-        Fields: `${MEDIA_FIELDS},OfficialRating,Taglines,People,MediaStreams,MediaSources`
+        Fields: `${MEDIA_FIELDS},OfficialRating,Taglines,People,MediaStreams,MediaSources,Chapters`
       }
     });
     return mapJellyfinItemToMediaItem(dto);

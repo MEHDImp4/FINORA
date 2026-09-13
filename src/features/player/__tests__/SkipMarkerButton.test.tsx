@@ -104,4 +104,37 @@ describe("SkipMarkerButton", () => {
       root.unmount();
     });
   });
+
+  it("detects French 'Générique' chapters and displays French label", () => {
+    const frenchChapters: ChapterMarker[] = [
+      { name: "Prologue", startPositionTicks: 0, markerType: "Chapter" },
+      { name: "Générique d'ouverture", startPositionTicks: 200000000 }, // 20s
+      { name: "Épisode", startPositionTicks: 900000000 } // 90s
+    ];
+    const onSeek = jest.fn();
+    let root: any;
+
+    act(() => {
+      root = renderer.create(
+        <SkipMarkerButton
+          chapters={frenchChapters}
+          currentTimeSeconds={30}
+          durationSeconds={1200}
+          onSeek={onSeek}
+        />
+      );
+    });
+
+    const skipIntroBtn = root.root.findByProps({ testID: "skip-intro-button" });
+    expect(skipIntroBtn).toBeTruthy();
+
+    act(() => {
+      skipIntroBtn.props.onPress();
+    });
+    expect(onSeek).toHaveBeenCalledWith(90);
+
+    act(() => {
+      root.unmount();
+    });
+  });
 });

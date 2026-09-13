@@ -59,6 +59,8 @@ export function PlayerScreen({
   // Persistent preferences store
   const resolveBestTracks = usePlaybackPreferencesStore((state) => state.resolveBestTracks);
   const setSeriesPreference = usePlaybackPreferencesStore((state) => state.setSeriesPreference);
+  const autoSkipIntro = usePlaybackPreferencesStore((state) => state.preferences.autoSkipIntro);
+  const [hasAutoSkipped, setHasAutoSkipped] = useState(false);
 
   // Compute best initial audio and subtitle stream index according to user / series preferences
   const { initialAudioIndex: bestAudioIndex, initialSubtitleIndex: bestSubtitleIndex } = useMemo(() => {
@@ -305,6 +307,49 @@ export function PlayerScreen({
       }
     }
   }, [isCustomSubtitleActive, player]);
+
+  // Automatic intro skip if preference is enabled
+  useEffect(() => {
+    if (!autoSkipIntro || hasAutoSkipped || !item.chapters || item.chapters.length === 0) {
+      return;
+    }
+
+    const currentTicks = Math.round(snapshot.currentTimeSeconds * 10000000);
+    let introStartTicks: number | null = null;
+    let introEndTicks: number | null = null;
+
+    for (let i = 0; i < item.chapters.length; i++) {
+      const ch = item.chapters[i];
+      const nameLower = ch.name.toLowerCase();
+      const isIntro =
+        ch.markerType === "IntroStart" ||
+        nameLower.includes("intro") ||
+        nameLower.includes("générique") ||
+        nameLower.includes("generique");
+
+      if (isIntro) {
+        introStartTicks = ch.startPositionTicks;
+        const next = item.chapters[i + 1];
+        if (next) {
+          introEndTicks = next.startPositionTicks;
+        }
+      } else if (ch.markerType === "IntroEnd") {
+        introEndTicks = ch.startPositionTicks;
+      }
+    }
+
+    if (
+      introStartTicks !== null &&
+      introEndTicks !== null &&
+      currentTicks >= introStartTicks &&
+      currentTicks < introEndTicks
+    ) {
+      const targetSeconds = introEndTicks / 10000000;
+      logger.info(`[PlayerScreen] Auto-skipping intro to ${targetSeconds}s`);
+      setHasAutoSkipped(true);
+      controls.seekTo(targetSeconds);
+    }
+  }, [autoSkipIntro, hasAutoSkipped, item.chapters, snapshot.currentTimeSeconds, controls]);
 
   const handleBack = () => {
     stopSession();

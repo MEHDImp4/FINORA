@@ -27,13 +27,20 @@ export function SkipMarkerButton({
   const currentTicks = Math.round(currentTimeSeconds * 10000000);
 
   // Check for intro range
-  // Either explicitly marked by IntroStart & IntroEnd markers, or a chapter named "Intro"
+  // Either explicitly marked by IntroStart & IntroEnd markers, or a chapter named "Intro" / "Générique"
   let introStartTicks: number | null = null;
   let introEndTicks: number | null = null;
 
   for (let i = 0; i < chapters.length; i++) {
     const ch = chapters[i];
-    if (ch.markerType === "IntroStart" || ch.name.toLowerCase().includes("intro")) {
+    const nameLower = ch.name.toLowerCase();
+    const isIntroChapter =
+      ch.markerType === "IntroStart" ||
+      nameLower.includes("intro") ||
+      nameLower.includes("générique") ||
+      nameLower.includes("generique");
+
+    if (isIntroChapter) {
       introStartTicks = ch.startPositionTicks;
       // End of intro is either IntroEnd marker or the next chapter's start
       const next = chapters[i + 1];
@@ -66,17 +73,22 @@ export function SkipMarkerButton({
         testID="skip-intro-button"
       >
         <FinoraText variant="body" style={styles.buttonText}>
-          Skip Intro
+          Passer l'intro
         </FinoraText>
-        <Ionicons name="play-skip-forward" size={15} color="#FFFFFF" style={{ marginLeft: 6 }} />
+        <Ionicons name="play-skip-forward" size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
       </Pressable>
     );
   }
 
-  // Check for credits range (CreditsStart or chapter named "Credits" / "End Credits")
+  // Check for credits range (CreditsStart or chapter named "Credits" / "Fin")
   let creditsStartTicks: number | null = null;
   for (const ch of chapters) {
-    if (ch.markerType === "CreditsStart" || ch.name.toLowerCase().includes("credit")) {
+    const nameLower = ch.name.toLowerCase();
+    if (
+      ch.markerType === "CreditsStart" ||
+      nameLower.includes("credit") ||
+      nameLower.includes("générique de fin")
+    ) {
       creditsStartTicks = ch.startPositionTicks;
       break;
     }
@@ -100,9 +112,9 @@ export function SkipMarkerButton({
         testID="skip-credits-button"
       >
         <FinoraText variant="body" style={styles.buttonText}>
-          Skip Credits
+          Passer le générique
         </FinoraText>
-        <Ionicons name="play-skip-forward" size={15} color="#FFFFFF" style={{ marginLeft: 6 }} />
+        <Ionicons name="play-skip-forward" size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
       </Pressable>
     );
   }
