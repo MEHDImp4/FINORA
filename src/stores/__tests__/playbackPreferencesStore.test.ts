@@ -75,6 +75,7 @@ describe("playbackPreferencesStore", () => {
   it("resolves tracks based on global preferences when no series preference exists", () => {
     usePlaybackPreferencesStore.setState({
       preferences: {
+        ...DEFAULT_PLAYBACK_PREFERENCES,
         preferredAudioLanguage: "fr",
         preferredSubtitleLanguage: "fr",
         subtitleMode: "smart",

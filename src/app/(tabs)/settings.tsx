@@ -2,668 +2,614 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   ScrollView,
-  TouchableOpacity
+  Alert
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { FinoraScreen } from "../../design-system/components/FinoraScreen";
 import { FinoraButton } from "../../design-system/components/FinoraButton";
+import { colors, spacing } from "../../design-system/tokens";
 import { useAuthStore } from "../../stores/authStore";
 import { useServerStore } from "../../stores/serverStore";
-import { usePlaybackPreferencesStore, SubtitleMode } from "../../stores/playbackPreferencesStore";
 import {
-  diagnosticsService,
-  ServerDiagnosticsResult
-} from "../../core/jellyfin/diagnosticsService";
+  usePlaybackPreferencesStore,
+  SubtitleMode
+} from "../../stores/playbackPreferencesStore";
+import { DownloadQuality } from "../../features/offline/downloadQuality";
 import { SubtitleStyleModal } from "../../features/player/components/SubtitleStyleModal";
+import {
+  SettingsSection,
+  SettingsRow,
+  SettingsSwitchRow
+} from "../../features/settings/components/SettingsComponents";
+import {
+  SelectionPickerModal,
+  SelectionOption
+} from "../../features/settings/components/SelectionPickerModal";
+import { ServerConnectModal } from "../../features/settings/components/ServerConnectModal";
+import { ServerDiagnosticsModal } from "../../features/settings/components/ServerDiagnosticsModal";
+import { hapticService } from "../../core/feedback/hapticService";
+
+// Options de langues audio (Strictement sans emojis)
+const AUDIO_LANG_OPTIONS: SelectionOption<string>[] = [
+  { id: "fr", label: "Français", subtitle: "Piste audio française prioritaire" },
+  { id: "en", label: "Anglais", subtitle: "Piste audio anglaise" },
+  { id: "ja", label: "Japonais", subtitle: "Recommandé pour les animations et animes" },
+  { id: "es", label: "Espagnol", subtitle: "Piste audio espagnole" },
+  { id: "de", label: "Allemand", subtitle: "Piste audio allemande" },
+  { id: "auto", label: "Original / Automatique", subtitle: "Conserve la piste par défaut du média" }
+];
+
+// Options de sous-titres (Sans emojis)
+const SUBTITLE_LANG_OPTIONS: SelectionOption<string>[] = [
+  { id: "fr", label: "Français", subtitle: "Sous-titres complets en français" },
+  { id: "en", label: "Anglais", subtitle: "Sous-titres en anglais" },
+  { id: "es", label: "Espagnol", subtitle: "Sous-titres en espagnol" },
+  { id: "none", label: "Désactivés", subtitle: "Aucun sous-titre par défaut" }
+];
+
+// Modes d'activation des sous-titres
+const SUBTITLE_MODE_OPTIONS: SelectionOption<SubtitleMode>[] = [
+  {
+    id: "smart",
+    label: "Intelligent",
+    subtitle: "Active les sous-titres seulement si l'audio n'est pas dans votre langue",
+    badge: "Recommandé"
+  },
+  {
+    id: "always",
+    label: "Toujours afficher",
+    subtitle: "Affiche systématiquement les sous-titres disponibles"
+  },
+  {
+    id: "off",
+    label: "Désactivés par défaut",
+    subtitle: "Démarre la lecture sans sous-titres"
+  }
+];
+
+// Profils de qualité de téléchargement
+const DOWNLOAD_QUALITY_OPTIONS: SelectionOption<DownloadQuality>[] = [
+  {
+    id: "original",
+    label: "Qualité d'origine",
+    subtitle: "Fichier source direct sans transcodage",
+    badge: "Optimal"
+  },
+  {
+    id: "1080p",
+    label: "1080p Full HD",
+    subtitle: "Idéal pour grand écran ou tablette"
+  },
+  {
+    id: "720p",
+    label: "720p HD",
+    subtitle: "Compromis idéal taille / netteté sur mobile"
+  },
+  {
+    id: "480p",
+    label: "480p SD",
+    subtitle: "Économiseur d'espace et stockage réduit"
+  }
+];
+
+// Vitesse de lecture par défaut
+const PLAYBACK_SPEED_OPTIONS: SelectionOption<number>[] = [
+  { id: 1.0, label: "1.0x", subtitle: "Vitesse standard normale" },
+  { id: 1.25, label: "1.25x", subtitle: "Légère accélération" },
+  { id: 1.5, label: "1.5x", subtitle: "Visionnage rapide" }
+];
 
 export default function SettingsScreen() {
-  const [showSubtitleModal, setShowSubtitleModal] = useState(false);
+  const router = useRouter();
+
+  // Stores
   const session = useAuthStore((state) => state.session);
-  const login = useAuthStore((state) => state.login);
   const logout = useAuthStore((state) => state.logout);
   const savedAccounts = useServerStore((state) => state.savedAccounts);
   const loadSavedAccounts = useServerStore((state) => state.loadSavedAccounts);
   const switchAccount = useServerStore((state) => state.switchAccount);
   const removeAccount = useServerStore((state) => state.removeAccount);
 
-  // Playback & Language preferences
   const preferences = usePlaybackPreferencesStore((state) => state.preferences);
   const setPreferredAudioLanguage = usePlaybackPreferencesStore((state) => state.setPreferredAudioLanguage);
   const setPreferredSubtitleLanguage = usePlaybackPreferencesStore((state) => state.setPreferredSubtitleLanguage);
   const setSubtitleMode = usePlaybackPreferencesStore((state) => state.setSubtitleMode);
+  const setAutoSkipIntro = usePlaybackPreferencesStore((state) => state.setAutoSkipIntro);
+  const setPlaybackSpeed = usePlaybackPreferencesStore((state) => state.setPlaybackSpeed);
+  const setDownloadWifiOnly = usePlaybackPreferencesStore((state) => state.setDownloadWifiOnly);
+  const setDefaultDownloadQuality = usePlaybackPreferencesStore((state) => state.setDefaultDownloadQuality);
+  const setHapticsEnabled = usePlaybackPreferencesStore((state) => state.setHapticsEnabled);
 
-  const [isRunning, setIsRunning] = useState(false);
-  const [diagResult, setDiagResult] = useState<ServerDiagnosticsResult | null>(null);
-
-  // Connect form state
-  const [serverInput, setServerInput] = useState("https://azeur-jelly-web.smp4.xyz");
-  const [usernameInput, setUsernameInput] = useState("");
-  const [passwordInput, setPasswordInput] = useState("");
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [loginSuccess, setLoginSuccess] = useState<string | null>(null);
+  // Modals state
+  const [showConnectModal, setShowConnectModal] = useState(false);
+  const [showDiagModal, setShowDiagModal] = useState(false);
+  const [showSubtitleStyleModal, setShowSubtitleStyleModal] = useState(false);
+  const [activePicker, setActivePicker] = useState<"audio" | "sub" | "subMode" | "speed" | "downloadQuality" | null>(null);
 
   useEffect(() => {
     loadSavedAccounts();
   }, [loadSavedAccounts]);
 
-  const handleConnect = async () => {
-    if (!serverInput.trim()) {
-      setLoginError("Please enter a Jellyfin server URL.");
-      return;
-    }
-    if (!usernameInput.trim()) {
-      setLoginError("Please enter your username.");
-      return;
-    }
-
-    setIsLoggingIn(true);
-    setLoginError(null);
-    setLoginSuccess(null);
-
-    try {
-      const normalizedUrl = serverInput.trim().replace(/\/+$/, "").replace(/\/web(\/.*)?$/i, "");
-      const success = await login(
+  const handleClearCache = () => {
+    hapticService.impactMedium();
+    Alert.alert(
+      "Vider le cache",
+      "Cette action supprime les miniatures et les requêtes mises en cache pour libérer de l'espace.",
+      [
+        { text: "Annuler", style: "cancel" },
         {
-          username: usernameInput.trim(),
-          password: passwordInput
-        },
-        normalizedUrl
-      );
-
-      if (success) {
-        const currentSession = useAuthStore.getState().session;
-        if (currentSession) {
-          const { serverManager } = await import("../../core/jellyfin/serverManager");
-          await serverManager.saveAccount({
-            serverId: currentSession.serverId,
-            serverName: "Jellyfin Server",
-            serverUrl: currentSession.serverUrl,
-            userId: currentSession.userId,
-            userName: currentSession.userName,
-            lastUsedAt: Date.now()
-          });
+          text: "Vider le cache",
+          style: "destructive",
+          onPress: () => {
+            hapticService.impactHeavy();
+            Alert.alert("Cache vidé", "Le cache temporaire a été libéré avec succès.");
+          }
         }
-        setLoginSuccess("Connected successfully!");
-        setPasswordInput("");
-        await loadSavedAccounts();
-      } else {
-        const err = useAuthStore.getState().errorMessage;
-        setLoginError(err || "Authentication failed. Check credentials.");
-      }
-    } catch (e) {
-      setLoginError((e as Error).message || "Failed to connect to server.");
-    } finally {
-      setIsLoggingIn(false);
-    }
+      ]
+    );
   };
 
-  const handleRunDiagnostics = async () => {
-    const url = session?.serverUrl || serverInput.trim() || "https://azeur-jelly-web.smp4.xyz";
-    setIsRunning(true);
-    try {
-      const res = await diagnosticsService.runDiagnostics(url, session?.token);
-      setDiagResult(res);
-    } finally {
-      setIsRunning(false);
-    }
+  const handleLogout = () => {
+    hapticService.impactHeavy();
+    Alert.alert(
+      "Déconnexion",
+      "Êtes-vous sûr de vouloir vous déconnecter du serveur Jellyfin actif ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Se déconnecter",
+          style: "destructive",
+          onPress: async () => {
+            await logout();
+          }
+        }
+      ]
+    );
   };
+
+  const audioLabel = AUDIO_LANG_OPTIONS.find((o) => o.id === preferences.preferredAudioLanguage)?.label || preferences.preferredAudioLanguage;
+  const subtitleLabel = SUBTITLE_LANG_OPTIONS.find((o) => o.id === preferences.preferredSubtitleLanguage)?.label || preferences.preferredSubtitleLanguage;
+  const subtitleModeLabel = SUBTITLE_MODE_OPTIONS.find((o) => o.id === preferences.subtitleMode)?.label || preferences.subtitleMode;
+  const downloadQualityLabel = DOWNLOAD_QUALITY_OPTIONS.find((o) => o.id === preferences.defaultDownloadQuality)?.label || preferences.defaultDownloadQuality;
+  const speedLabel = `${preferences.playbackSpeed || 1.0}x`;
 
   return (
     <FinoraScreen safeBottom={false}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.headerTitle}>Settings</Text>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* Titre Principal */}
+        <View style={styles.headerContainer}>
+          <Text style={styles.pageTitle}>Paramètres</Text>
+          <Text style={styles.pageSubtitle}>Configuration de lecture, serveur et compte</Text>
+        </View>
 
-        {/* Active Account Section */}
-        <View style={styles.card}>
-          <Text style={styles.sectionHeader}>Active Session</Text>
+        {/* 1. SERVEUR & COMPTE */}
+        <SettingsSection
+          title="Serveur et Compte"
+          description="Gérez votre session Jellyfin active, vos serveurs enregistrés et l'état de connexion."
+        >
           {session ? (
-            <View style={styles.sessionInfo}>
-              <Text style={styles.infoLabel}>
-                User: <Text style={styles.infoValue}>{session.userName}</Text>
-              </Text>
-              <Text style={styles.infoLabel}>
-                Server URL: <Text style={styles.infoValue}>{session.serverUrl}</Text>
-              </Text>
-              <Text style={styles.infoLabel}>
-                Server ID: <Text style={styles.infoValue}>{session.serverId}</Text>
-              </Text>
-              <View style={styles.actionRow}>
-                <FinoraButton
-                  label="Log Out"
-                  variant="secondary"
-                  size="sm"
-                  onPress={logout}
-                />
+            <View style={styles.sessionHeaderCard}>
+              <View style={styles.sessionAvatar}>
+                <Ionicons name="person" size={20} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sessionUser}>{session.userName}</Text>
+                <Text style={styles.sessionUrl} numberOfLines={1}>
+                  {session.serverUrl}
+                </Text>
+              </View>
+              <View style={styles.statusPill}>
+                <View style={styles.statusDot} />
+                <Text style={styles.statusPillText}>En ligne</Text>
               </View>
             </View>
           ) : (
-            <Text style={styles.emptyText}>Not connected to any Jellyfin server.</Text>
+            <View style={styles.disconnectedBanner}>
+              <Ionicons name="cloud-offline-outline" size={24} color="#8A8A9E" style={{ marginRight: 12 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.disconnectedTitle}>Non connecté</Text>
+                <Text style={styles.disconnectedSubtitle}>Connectez-vous à une instance Jellyfin.</Text>
+              </View>
+            </View>
           )}
-        </View>
 
-        {/* Connect to Server / Login Form */}
-        <View style={styles.card}>
-          <Text style={styles.sectionHeader}>
-            {session ? "Add Another Server / Switch User" : "Connect to Jellyfin Server"}
-          </Text>
-          <Text style={styles.cardDescription}>
-            Enter your Jellyfin server address and user credentials to connect.
-          </Text>
+          <SettingsRow
+            iconName="add-circle-outline"
+            iconColor="#4F8EF7"
+            title="Changer ou ajouter un serveur"
+            subtitle="Basculer vers une autre instance Jellyfin"
+            onPress={() => setShowConnectModal(true)}
+          />
 
-          <View style={styles.formGroup}>
-            <Text style={styles.inputLabel}>Server URL</Text>
-            <TextInput
-              style={styles.textInput}
-              value={serverInput}
-              onChangeText={setServerInput}
-              placeholder="https://your-jellyfin-server.com"
-              placeholderTextColor="#666680"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-            />
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.inputLabel}>Username</Text>
-            <TextInput
-              style={styles.textInput}
-              value={usernameInput}
-              onChangeText={setUsernameInput}
-              placeholder="Username"
-              placeholderTextColor="#666680"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.inputLabel}>Password</Text>
-            <TextInput
-              style={styles.textInput}
-              value={passwordInput}
-              onChangeText={setPasswordInput}
-              placeholder="Password"
-              placeholderTextColor="#666680"
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          {loginError ? (
-            <View style={styles.errorBanner}>
-              <Ionicons name="alert-circle" size={18} color="#FF4D4D" style={{ marginRight: 6 }} />
-              <Text style={styles.errorText}>{loginError}</Text>
-            </View>
-          ) : null}
-
-          {loginSuccess ? (
-            <View style={styles.successBanner}>
-              <Ionicons name="checkmark-circle" size={18} color="#4BB543" style={{ marginRight: 6 }} />
-              <Text style={styles.successText}>{loginSuccess}</Text>
-            </View>
-          ) : null}
-
-          <View style={styles.actionRow}>
-            <FinoraButton
-              label={isLoggingIn ? "Connecting..." : "Connect & Log In"}
-              variant="primary"
-              size="md"
-              loading={isLoggingIn}
-              onPress={handleConnect}
-            />
-          </View>
-        </View>
-
-        {/* Saved Accounts / Multi-Server Switching (AUTH-04) */}
-        <View style={styles.card}>
-          <Text style={styles.sectionHeader}>Saved Accounts (AUTH-04)</Text>
-          <Text style={styles.cardDescription}>
-            Switch between configured Jellyfin servers and user profiles without re-entering credentials.
-          </Text>
-          {savedAccounts.length > 0 ? (
-            savedAccounts.map((account) => {
-              const isActive =
-                session?.serverId === account.serverId && session?.userId === account.userId;
-              return (
-                <View
-                  key={`${account.serverId}-${account.userId}`}
-                  style={styles.accountRow}
-                  testID={`saved-account-${account.userId}`}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.infoValue}>
-                      {account.userName} {isActive ? "(Active)" : ""}
-                    </Text>
-                    <Text style={styles.infoLabel}>{account.serverUrl}</Text>
-                  </View>
-                  {!isActive ? (
-                    <View style={{ flexDirection: "row", gap: 8 }}>
-                      <FinoraButton
-                        label="Switch"
-                        variant="primary"
-                        size="sm"
-                        onPress={() => switchAccount(account.serverId, account.userId)}
-                      />
-                      <FinoraButton
-                        label="Remove"
-                        variant="secondary"
-                        size="sm"
-                        onPress={() => removeAccount(account.serverId, account.userId)}
-                      />
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })
-          ) : (
-            <Text style={styles.emptyText}>No other accounts saved.</Text>
-          )}
-        </View>
-
-        {/* Audio & Subtitle Language Preferences */}
-        <View style={styles.card}>
-          <Text style={styles.sectionHeader}>Langues & Lecture</Text>
-          <Text style={styles.cardDescription}>
-            Définissez votre langue audio et vos sous-titres préférés. Ces choix s'appliquent automatiquement à tous les films et séries, et vos modifications manuelles en cours de visionnage sont mémorisées par série.
-          </Text>
-
-          {/* Preferred Audio Language */}
-          <View style={styles.formGroup}>
-            <Text style={styles.inputLabel}>Langue Audio Préférée</Text>
-            <View style={styles.chipRow}>
-              {[
-                { id: "fr", label: "Français 🇫🇷" },
-                { id: "en", label: "Anglais 🇬🇧" },
-                { id: "ja", label: "Japonais 🇯🇵" },
-                { id: "es", label: "Espagnol 🇪🇸" },
-                { id: "de", label: "Allemand 🇩🇪" },
-                { id: "auto", label: "Auto / Original" }
-              ].map((opt) => {
-                const isSelected = preferences.preferredAudioLanguage === opt.id;
+          {savedAccounts.length > 1 ? (
+            <View style={styles.savedAccountsContainer}>
+              <Text style={styles.subCategoryHeader}>Comptes enregistrés</Text>
+              {savedAccounts.map((acc, idx) => {
+                const isActive = session?.serverId === acc.serverId && session?.userId === acc.userId;
                 return (
-                  <TouchableOpacity
-                    key={opt.id}
-                    style={[styles.chip, isSelected && styles.chipActive]}
-                    onPress={() => setPreferredAudioLanguage(opt.id)}
-                    testID={`audio-lang-chip-${opt.id}`}
-                  >
-                    <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Preferred Subtitle Language */}
-          <View style={styles.formGroup}>
-            <Text style={styles.inputLabel}>Sous-titres Préférés</Text>
-            <View style={styles.chipRow}>
-              {[
-                { id: "fr", label: "Français 🇫🇷" },
-                { id: "en", label: "Anglais 🇬🇧" },
-                { id: "es", label: "Espagnol 🇪🇸" },
-                { id: "none", label: "Désactivés" }
-              ].map((opt) => {
-                const isSelected = preferences.preferredSubtitleLanguage === opt.id;
-                return (
-                  <TouchableOpacity
-                    key={opt.id}
-                    style={[styles.chip, isSelected && styles.chipActive]}
-                    onPress={() => setPreferredSubtitleLanguage(opt.id)}
-                    testID={`sub-lang-chip-${opt.id}`}
-                  >
-                    <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Subtitle Activation Mode */}
-          <View style={styles.formGroup}>
-            <Text style={styles.inputLabel}>Activation des Sous-titres</Text>
-            <View style={styles.modeColumn}>
-              {[
-                {
-                  id: "smart" as SubtitleMode,
-                  title: "Intelligent (Recommandé)",
-                  desc: "Active les sous-titres uniquement si l'audio n'est pas dans votre langue préférée (ex: VO sous-titrée)."
-                },
-                {
-                  id: "always" as SubtitleMode,
-                  title: "Toujours afficher",
-                  desc: "Affiche toujours vos sous-titres préférés s'ils sont disponibles."
-                },
-                {
-                  id: "off" as SubtitleMode,
-                  title: "Toujours désactivés",
-                  desc: "Ne charge aucun sous-titre au démarrage de la lecture."
-                }
-              ].map((m) => {
-                const isSelected = preferences.subtitleMode === m.id;
-                return (
-                  <TouchableOpacity
-                    key={m.id}
-                    style={[styles.modeRow, isSelected && styles.modeRowActive]}
-                    onPress={() => setSubtitleMode(m.id)}
-                    testID={`sub-mode-${m.id}`}
-                  >
-                    <Ionicons
-                      name={isSelected ? "radio-button-on" : "radio-button-off"}
-                      size={18}
-                      color={isSelected ? "#E50914" : "#666680"}
-                      style={{ marginRight: 10, marginTop: 2 }}
-                    />
+                  <View key={`${acc.serverId}-${acc.userId}`} style={[styles.accountItemRow, idx > 0 && styles.accountBorder]}>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.modeTitle, isSelected && styles.modeTitleActive]}>
-                        {m.title}
+                      <Text style={[styles.accountName, isActive && styles.accountNameActive]}>
+                        {acc.userName} {isActive ? "(Actif)" : ""}
                       </Text>
-                      <Text style={styles.modeDesc}>{m.desc}</Text>
+                      <Text style={styles.accountUrl} numberOfLines={1}>{acc.serverUrl}</Text>
                     </View>
-                  </TouchableOpacity>
+                    {!isActive ? (
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <FinoraButton
+                          label="Basculer"
+                          variant="primary"
+                          size="sm"
+                          onPress={() => switchAccount(acc.serverId, acc.userId)}
+                        />
+                        <FinoraButton
+                          label="Retirer"
+                          variant="secondary"
+                          size="sm"
+                          onPress={() => removeAccount(acc.serverId, acc.userId)}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
                 );
               })}
             </View>
-          </View>
-        </View>
+          ) : null}
 
-        {/* Subtitle & Accessibility Appearance */}
-        <View style={styles.card}>
-          <Text style={styles.sectionHeader}>Sous-titres & Accessibilité</Text>
-          <Text style={styles.cardDescription}>
-            Personnalisez l'affichage des sous-titres : typographie nette style Netflix, arrière-plans opaques ou translucides, couleurs et aperçu en direct.
-          </Text>
+          <SettingsRow
+            iconName="pulse-outline"
+            iconColor="#FFB800"
+            title="Diagnostic de connexion"
+            subtitle="Latence ms, sécurité TLS/HTTPS, état de l'API"
+            onPress={() => setShowDiagModal(true)}
+          />
 
-          <View style={styles.actionRow}>
-            <FinoraButton
-              label="Personnaliser les sous-titres"
-              variant="secondary"
-              size="md"
-              onPress={() => setShowSubtitleModal(true)}
+          {session ? (
+            <SettingsRow
+              iconName="log-out-outline"
+              title="Déconnexion"
+              destructive
+              showChevron={false}
+              isLast
+              onPress={handleLogout}
             />
-          </View>
-        </View>
+          ) : null}
+        </SettingsSection>
 
-        {/* Server Diagnostics Section */}
-        <View style={styles.card}>
-          <Text style={styles.sectionHeader}>Server Diagnostics (DIAG-01)</Text>
-          <Text style={styles.cardDescription}>
-            Inspect connection latency, TLS/HTTPS security status, and Jellyfin API health.
-          </Text>
+        {/* 2. LECTURE & AUDIO */}
+        <SettingsSection
+          title="Lecture et Audio"
+          description="Personnalisez vos préférences de lecture audio et de visionnage."
+        >
+          <SettingsRow
+            iconName="volume-medium-outline"
+            iconColor="#E50914"
+            title="Langue audio préférée"
+            subtitle="Priorité automatique pour les films et séries"
+            value={audioLabel}
+            onPress={() => setActivePicker("audio")}
+          />
 
-          <View style={styles.actionRow}>
-            <FinoraButton
-              label="Run Diagnostics"
-              variant="primary"
-              size="md"
-              loading={isRunning}
-              onPress={handleRunDiagnostics}
-            />
-          </View>
+          <SettingsSwitchRow
+            iconName="play-skip-forward-outline"
+            iconColor="#E50914"
+            title="Passer automatiquement les intros"
+            subtitle="Saute automatiquement les génériques au démarrage"
+            value={preferences.autoSkipIntro}
+            onValueChange={setAutoSkipIntro}
+          />
 
-          {diagResult && (
-            <View style={styles.resultsContainer}>
-              <View style={styles.metricRow}>
-                <Text style={styles.metricLabel}>Target URL:</Text>
-                <Text style={styles.metricValue}>{diagResult.serverUrl}</Text>
-              </View>
+          <SettingsRow
+            iconName="speedometer-outline"
+            iconColor="#E50914"
+            title="Vitesse de lecture standard"
+            value={speedLabel}
+            isLast
+            onPress={() => setActivePicker("speed")}
+          />
+        </SettingsSection>
 
-              <View style={styles.metricRow}>
-                <Text style={styles.metricLabel}>Security / TLS:</Text>
-                <Text
-                  style={[
-                    styles.metricValue,
-                    { color: diagResult.isHttps ? "#4BB543" : "#FFB800" }
-                  ]}
-                >
-                  {diagResult.isHttps ? "Secure (HTTPS)" : "Unencrypted (HTTP Warning)"}
-                </Text>
-              </View>
+        {/* 3. SOUS-TITRES & STYLE */}
+        <SettingsSection
+          title="Sous-titres"
+          description="Langue, mode d'activation et personnalisation graphique."
+        >
+          <SettingsRow
+            iconName="chatbubble-ellipses-outline"
+            iconColor="#00E5FF"
+            title="Langue des sous-titres"
+            value={subtitleLabel}
+            onPress={() => setActivePicker("sub")}
+          />
 
-              <View style={styles.metricRow}>
-                <Text style={styles.metricLabel}>Round-Trip Latency:</Text>
-                <Text style={styles.metricValue}>{diagResult.pingMs} ms</Text>
-              </View>
+          <SettingsRow
+            iconName="options-outline"
+            iconColor="#00E5FF"
+            title="Activation des sous-titres"
+            value={subtitleModeLabel}
+            onPress={() => setActivePicker("subMode")}
+          />
 
-              <View style={styles.metricRow}>
-                <Text style={styles.metricLabel}>Server Name:</Text>
-                <Text style={styles.metricValue}>{diagResult.serverName}</Text>
-              </View>
+          <SettingsRow
+            iconName="color-wand-outline"
+            iconColor="#00E5FF"
+            title="Personnaliser l'apparence"
+            subtitle="Polices, ombres, fonds et opacité des sous-titres"
+            isLast
+            onPress={() => setShowSubtitleStyleModal(true)}
+          />
+        </SettingsSection>
 
-              <View style={styles.metricRow}>
-                <Text style={styles.metricLabel}>Version:</Text>
-                <Text style={styles.metricValue}>{diagResult.version}</Text>
-              </View>
+        {/* 4. TÉLÉCHARGEMENTS & STOCKAGE */}
+        <SettingsSection
+          title="Téléchargements et Stockage"
+          description="Gestion du stockage hors-ligne et des limites réseau."
+        >
+          <SettingsRow
+            iconName="film-outline"
+            iconColor="#4BB543"
+            title="Qualité par défaut"
+            value={downloadQualityLabel}
+            onPress={() => setActivePicker("downloadQuality")}
+          />
 
-              <View style={styles.metricRow}>
-                <Text style={styles.metricLabel}>API Status:</Text>
-                <Text
-                  style={[
-                    styles.metricValue,
-                    { color: diagResult.apiHealthy ? "#4BB543" : "#E50914" }
-                  ]}
-                >
-                  {diagResult.apiHealthy ? "Healthy" : "Degraded / Unreachable"}
-                </Text>
-              </View>
+          <SettingsSwitchRow
+            iconName="wifi-outline"
+            iconColor="#4BB543"
+            title="Télécharger en Wi-Fi uniquement"
+            subtitle="Préserve votre forfait de données mobiles"
+            value={preferences.downloadWifiOnly}
+            onValueChange={setDownloadWifiOnly}
+          />
 
-              <Text style={styles.statusMessage}>{diagResult.statusMessage}</Text>
-            </View>
-          )}
-        </View>
+          <SettingsRow
+            iconName="folder-open-outline"
+            iconColor="#4BB543"
+            title="Gérer les téléchargements"
+            subtitle="Voir les films et séries stockés hors-ligne"
+            onPress={() => router.push("/(tabs)/downloads")}
+          />
+
+          <SettingsRow
+            iconName="trash-outline"
+            iconColor="#8A8A9E"
+            title="Vider le cache de l'application"
+            subtitle="Supprime les images et métadonnées temporaires"
+            isLast
+            onPress={handleClearCache}
+          />
+        </SettingsSection>
+
+        {/* 5. EXPÉRIENCE & SYSTÈME */}
+        <SettingsSection
+          title="Système et Accessibilité"
+          description="Paramètres de retours haptiques et spécifications de l'application."
+        >
+          <SettingsSwitchRow
+            iconName="phone-portrait-outline"
+            iconColor="#D1D1E0"
+            title="Retours haptiques"
+            subtitle="Vibrations subtiles lors des interactions tactiles"
+            value={preferences.hapticsEnabled}
+            onValueChange={setHapticsEnabled}
+          />
+
+          <SettingsRow
+            iconName="hardware-chip-outline"
+            iconColor="#D1D1E0"
+            title="Moteur de lecture"
+            value="ExoPlayer / Media3"
+            showChevron={false}
+          />
+
+          <SettingsRow
+            iconName="information-circle-outline"
+            iconColor="#D1D1E0"
+            title="Version de l'application"
+            value="FINORA 1.0.0 (Fabric)"
+            showChevron={false}
+            isLast
+          />
+        </SettingsSection>
       </ScrollView>
 
-      {/* Subtitle Customization Kit Modal */}
+      {/* Modal Sélecteur Générique */}
+      <SelectionPickerModal
+        visible={activePicker === "audio"}
+        title="Langue audio préférée"
+        description="Choisissez la langue audio qui sera sélectionnée par défaut lors du lancement d'un média."
+        options={AUDIO_LANG_OPTIONS}
+        selectedValue={preferences.preferredAudioLanguage}
+        onSelect={setPreferredAudioLanguage}
+        onClose={() => setActivePicker(null)}
+      />
+
+      <SelectionPickerModal
+        visible={activePicker === "sub"}
+        title="Langue des sous-titres"
+        description="Sélectionnez la langue des sous-titres à charger automatiquement."
+        options={SUBTITLE_LANG_OPTIONS}
+        selectedValue={preferences.preferredSubtitleLanguage}
+        onSelect={setPreferredSubtitleLanguage}
+        onClose={() => setActivePicker(null)}
+      />
+
+      <SelectionPickerModal
+        visible={activePicker === "subMode"}
+        title="Mode d'affichage des sous-titres"
+        description="Définissez les conditions d'affichage automatique des sous-titres."
+        options={SUBTITLE_MODE_OPTIONS}
+        selectedValue={preferences.subtitleMode}
+        onSelect={setSubtitleMode}
+        onClose={() => setActivePicker(null)}
+      />
+
+      <SelectionPickerModal
+        visible={activePicker === "downloadQuality"}
+        title="Qualité de téléchargement"
+        description="Définissez la résolution et le format des médias téléchargés pour l'accès hors-ligne."
+        options={DOWNLOAD_QUALITY_OPTIONS}
+        selectedValue={preferences.defaultDownloadQuality}
+        onSelect={setDefaultDownloadQuality}
+        onClose={() => setActivePicker(null)}
+      />
+
+      <SelectionPickerModal
+        visible={activePicker === "speed"}
+        title="Vitesse de lecture"
+        description="Vitesse standard lors du démarrage de la vidéo."
+        options={PLAYBACK_SPEED_OPTIONS}
+        selectedValue={preferences.playbackSpeed || 1.0}
+        onSelect={setPlaybackSpeed}
+        onClose={() => setActivePicker(null)}
+      />
+
+      {/* Modal Ajout / Changement de Serveur */}
+      <ServerConnectModal
+        visible={showConnectModal}
+        onClose={() => setShowConnectModal(false)}
+      />
+
+      {/* Modal Diagnostics */}
+      <ServerDiagnosticsModal
+        visible={showDiagModal}
+        onClose={() => setShowDiagModal(false)}
+      />
+
+      {/* Modal Personnalisation Sous-titres */}
       <SubtitleStyleModal
-        visible={showSubtitleModal}
-        onClose={() => setShowSubtitleModal(false)}
+        visible={showSubtitleStyleModal}
+        onClose={() => setShowSubtitleStyleModal(false)}
       />
     </FinoraScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    paddingBottom: 80
+  scrollContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: 110
   },
-  headerTitle: {
-    fontSize: 28,
+  headerContainer: {
+    marginBottom: spacing.xl,
+    marginTop: spacing.sm
+  },
+  pageTitle: {
+    fontSize: 32,
     fontWeight: "800",
     color: "#FFFFFF",
-    marginBottom: 20
+    letterSpacing: -0.5
   },
-  card: {
-    backgroundColor: "#14141A",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#262633",
-    padding: 18,
-    marginBottom: 20
-  },
-  sectionHeader: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    marginBottom: 8
-  },
-  cardDescription: {
+  pageSubtitle: {
     fontSize: 14,
     color: "#8A8A9E",
-    marginBottom: 16,
-    lineHeight: 20
+    marginTop: 4
   },
-  sessionInfo: {
-    marginTop: 8
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: "#8A8A9E",
-    marginBottom: 4
-  },
-  infoValue: {
-    color: "#FFFFFF",
-    fontWeight: "600"
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#8A8A9E",
-    fontStyle: "italic"
-  },
-  actionRow: {
-    marginTop: 14,
-    flexDirection: "row"
-  },
-  resultsContainer: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#262633"
-  },
-  metricRow: {
+  sessionHeaderCard: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8
-  },
-  metricLabel: {
-    fontSize: 14,
-    color: "#8A8A9E"
-  },
-  metricValue: {
-    fontSize: 14,
-    color: "#FFFFFF",
-    fontWeight: "600"
-  },
-  statusMessage: {
-    marginTop: 8,
-    fontSize: 13,
-    color: "#8A8A9E",
-    fontStyle: "italic"
-  },
-  accountRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 10,
+    padding: spacing.md,
+    backgroundColor: "rgba(255, 255, 255, 0.03)",
     borderBottomWidth: 1,
-    borderBottomColor: "#1E1E26"
+    borderBottomColor: "#1E1E28"
   },
-  formGroup: {
-    marginBottom: 14
+  sessionAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: spacing.md
   },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#B3B3CC",
-    marginBottom: 6
-  },
-  textInput: {
-    backgroundColor: "#1C1C26",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#2D2D3D",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
+  sessionUser: {
+    fontSize: 16,
+    fontWeight: "700",
     color: "#FFFFFF"
   },
-  errorBanner: {
+  sessionUrl: {
+    fontSize: 12,
+    color: "#8A8A9E",
+    marginTop: 2
+  },
+  statusPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(229, 9, 20, 0.15)",
-    borderColor: "rgba(229, 9, 20, 0.4)",
+    backgroundColor: "rgba(75, 181, 67, 0.12)",
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12
+    borderColor: "rgba(75, 181, 67, 0.3)",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4
   },
-  errorText: {
-    color: "#FF6B6B",
-    fontSize: 13,
-    flex: 1
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#4BB543",
+    marginRight: 6
   },
-  successBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(75, 181, 67, 0.15)",
-    borderColor: "rgba(75, 181, 67, 0.4)",
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12
-  },
-  successText: {
-    color: "#4BB543",
-    fontSize: 13,
+  statusPillText: {
+    fontSize: 11,
     fontWeight: "600",
-    flex: 1
+    color: "#4BB543"
   },
-  chipRow: {
+  disconnectedBanner: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 4
+    alignItems: "center",
+    padding: spacing.md,
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    borderBottomWidth: 1,
+    borderBottomColor: "#1E1E28"
   },
-  chip: {
-    backgroundColor: "#1C1C26",
-    borderWidth: 1,
-    borderColor: "#2D2D3D",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7
+  disconnectedTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#D1D1E0"
   },
-  chipActive: {
-    backgroundColor: "rgba(229, 9, 20, 0.15)",
-    borderColor: "#E50914"
+  disconnectedSubtitle: {
+    fontSize: 12,
+    color: "#8A8A9E",
+    marginTop: 2
   },
-  chipText: {
-    color: "#B3B3CC",
-    fontSize: 13,
-    fontWeight: "500"
+  savedAccountsContainer: {
+    padding: spacing.md,
+    backgroundColor: "#161622",
+    borderBottomWidth: 1,
+    borderBottomColor: "#1E1E28"
   },
-  chipTextActive: {
-    color: "#FFFFFF",
-    fontWeight: "600"
+  subCategoryHeader: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#8A8A9E",
+    letterSpacing: 1,
+    marginBottom: spacing.sm
   },
-  modeColumn: {
-    gap: 8,
-    marginTop: 4
-  },
-  modeRow: {
+  accountItemRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: "#16161F",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#22222E",
-    padding: 12
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8
   },
-  modeRowActive: {
-    borderColor: "#E50914",
-    backgroundColor: "rgba(229, 9, 20, 0.05)"
+  accountBorder: {
+    borderTopWidth: 1,
+    borderTopColor: "#20202E"
   },
-  modeTitle: {
-    color: "#D1D1E0",
+  accountName: {
     fontSize: 14,
     fontWeight: "600",
-    marginBottom: 2
-  },
-  modeTitleActive: {
     color: "#FFFFFF"
   },
-  modeDesc: {
-    color: "#8A8A9E",
+  accountNameActive: {
+    color: colors.primary
+  },
+  accountUrl: {
     fontSize: 12,
-    lineHeight: 16
+    color: "#8A8A9E",
+    marginTop: 2
   }
 });
