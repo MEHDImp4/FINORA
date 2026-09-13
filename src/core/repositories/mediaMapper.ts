@@ -123,7 +123,14 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
         width: typeof s.Width === "number" ? s.Width : undefined,
         height: typeof s.Height === "number" ? s.Height : undefined,
         channels: typeof s.Channels === "number" ? s.Channels : undefined,
-        isDefault: Boolean(s.IsDefault)
+        isDefault: Boolean(s.IsDefault),
+        deliveryUrl: s.DeliveryUrl || undefined,
+        isTextSubtitleStream:
+          typeof s.IsTextSubtitleStream === "boolean"
+            ? s.IsTextSubtitleStream
+            : ["subrip", "srt", "vtt", "webvtt", "ass", "ssa"].includes(
+                (s.Codec || "").toLowerCase()
+              )
       }))
     : undefined;
 

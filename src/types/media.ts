@@ -26,6 +26,8 @@ export interface MediaStreamInfo {
   height?: number;
   channels?: number;
   isDefault?: boolean;
+  deliveryUrl?: string;
+  isTextSubtitleStream?: boolean;
 }
 
 export interface ChapterMarker {

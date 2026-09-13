@@ -78,7 +78,8 @@ export function PlayerScreen({
     subtitleStreamIndex: selectedSubtitleIndex,
     serverUrl,
     token,
-    localPath
+    localPath,
+    streams: item.mediaStreams
   });
 
   // Server stream states (ONLY updated when native track switching cannot be performed and server stream must be replaced)
@@ -452,7 +453,13 @@ export function PlayerScreen({
         }}
         onSelectSubtitle={(idx) => {
           setSelectedSubtitleIndex(idx);
+          setServerSubtitleIndex(idx);
           setTracksModalVisible(false);
+
+          if (idx === null) {
+            player.subtitleTrack = null;
+            return;
+          }
 
           const subStreams = item.mediaStreams?.filter((s) => s.type === "Subtitle") || [];
           const currentTracks =
@@ -460,23 +467,15 @@ export function PlayerScreen({
               ? player.availableSubtitleTracks
               : availableSubtitleTracks;
 
-          if (idx === null) {
-            player.subtitleTrack = null;
-            setServerSubtitleIndex(null);
-            return;
-          }
-
           if (currentTracks && currentTracks.length > 0) {
             const matchedNative = findMatchingSubtitleTrack(currentTracks, subStreams, idx);
             if (matchedNative) {
-              logger.info(`[PlayerScreen] Setting player.subtitleTrack directly to: ${matchedNative.id || matchedNative.label}`);
-              player.subtitleTrack = matchedNative;
-              return;
+              logger.info(`[PlayerScreen] Matched native track: ${matchedNative.id || matchedNative.label}`);
+              if (!isCustomSubtitleActive) {
+                player.subtitleTrack = matchedNative;
+              }
             }
           }
-
-          logger.info(`[PlayerScreen] Native subtitle not found in container. Switching server-side subtitle stream to index ${idx}`);
-          setServerSubtitleIndex(idx);
         }}
         onSelectQuality={(q) => {
           setSelectedQuality(q);
