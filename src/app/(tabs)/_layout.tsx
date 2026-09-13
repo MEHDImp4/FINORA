@@ -6,22 +6,21 @@ import { Ionicons } from "@expo/vector-icons";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const bottomPadding = Math.max(insets.bottom, Platform.OS === "ios" ? 20 : 8);
-  const tabHeight = 54 + bottomPadding;
+  const bottomInset = Platform.OS === "ios" ? insets.bottom + 6 : 16;
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#E50914",
+        tabBarActiveTintColor: "#FFFFFF",
         tabBarInactiveTintColor: "#8A8A9E",
         tabBarStyle: [
-          styles.tabBar,
+          styles.floatingTabBar,
           {
-            height: tabHeight,
-            paddingBottom: bottomPadding
+            bottom: bottomInset
           }
         ],
+        tabBarItemStyle: styles.tabBarItem,
         tabBarLabelStyle: styles.tabBarLabel
       }}
     >
@@ -29,8 +28,12 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size - 2} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={20}
+              color={focused ? "#E50914" : color}
+            />
           )
         }}
       />
@@ -44,26 +47,31 @@ export default function TabsLayout() {
         name="library"
         options={{
           title: "Library",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="film-outline" size={size - 2} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "film" : "film-outline"}
+              size={20}
+              color={focused ? "#E50914" : color}
+            />
           )
         }}
       />
       <Tabs.Screen
         name="downloads"
         options={{
-          title: "Downloads",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="download-outline" size={size - 2} color={color} />
-          )
+          href: null
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: "Settings",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size - 2} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "settings" : "settings-outline"}
+              size={20}
+              color={focused ? "#E50914" : color}
+            />
           )
         }}
       />
@@ -72,15 +80,37 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: "#101014",
-    borderTopColor: "#22222C",
-    borderTopWidth: 1,
-    paddingTop: 6
+  floatingTabBar: {
+    position: "absolute",
+    left: 24,
+    right: 24,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(18, 18, 24, 0.94)",
+    borderTopWidth: 0,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    elevation: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    paddingHorizontal: 8,
+    paddingBottom: 0,
+    paddingTop: 0,
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  tabBarItem: {
+    paddingVertical: 6,
+    justifyContent: "center",
+    alignItems: "center"
   },
   tabBarLabel: {
     fontSize: 11,
-    fontWeight: "600"
+    fontWeight: "700",
+    marginTop: 2
   }
 });
+
 

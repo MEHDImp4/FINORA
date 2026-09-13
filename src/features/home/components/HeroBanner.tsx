@@ -253,7 +253,13 @@ export const HeroBanner = React.memo(function HeroBanner({
 
 const styles = StyleSheet.create({
   container: {
-    width: "100%",
+    marginHorizontal: 14,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
     height: HERO_HEIGHT,
     backgroundColor: colors.background,
     position: "relative",

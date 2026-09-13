@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { View, StyleSheet, ScrollView, RefreshControl, Pressable, ActivityIndicator } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { FinoraScreen } from "../../design-system/components/FinoraScreen";
@@ -59,6 +60,7 @@ function HomeLibraryRow({
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const session = useAuthStore((state) => state.session);
   const userId = session?.userId;
@@ -339,6 +341,90 @@ export default function HomeScreen() {
           />
         }
       >
+        {/* Netflix Top Header: Brand mark + "Home", Downloads & Notifications */}
+        <View style={[styles.topHeader, { paddingTop: Math.max(insets.top, 12) }]}>
+          <View style={styles.topHeaderRow}>
+            <View style={styles.brandRow}>
+              <View style={styles.brandBadge}>
+                <FinoraText variant="title" color="textPrimary" weight="900" style={styles.brandBadgeText}>
+                  F
+                </FinoraText>
+              </View>
+              <FinoraText variant="title" color="textPrimary" weight="800" style={styles.headerTitle}>
+                Home
+              </FinoraText>
+            </View>
+
+            <View style={styles.headerIconsRow}>
+              <Pressable
+                style={styles.headerIconButton}
+                onPress={() => router.push("/(tabs)/downloads")}
+                accessibilityRole="button"
+                accessibilityLabel="Téléchargements"
+              >
+                <Ionicons name="download-outline" size={20} color="#FFFFFF" />
+              </Pressable>
+
+              <Pressable
+                style={styles.headerIconButton}
+                onPress={() => {}}
+                accessibilityRole="button"
+                accessibilityLabel="Notifications"
+              >
+                <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
+                <View style={styles.notificationDot} />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Quick Library Shortcuts / Categories Pills directly below Header */}
+          <View style={styles.categoriesBar}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesContent}
+            >
+              <Pressable
+                style={[styles.categoryPill, styles.watchlistPill]}
+                onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: "watchlist" } })}
+                accessibilityRole="button"
+                accessibilityLabel="Browse Watchlist"
+              >
+                <Ionicons name="bookmark" size={12} color="#E50914" style={styles.watchlistPillIcon} />
+                <FinoraText variant="caption" color="textPrimary" weight="700">
+                  Watchlist
+                </FinoraText>
+              </Pressable>
+
+              {libraries?.map((lib) => (
+                <Pressable
+                  key={lib.id}
+                  style={styles.categoryPill}
+                  onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: lib.id } })}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Browse ${lib.name}`}
+                >
+                  <FinoraText variant="caption" color="textSecondary" weight="600">
+                    {lib.name}
+                  </FinoraText>
+                </Pressable>
+              ))}
+
+              <Pressable
+                style={styles.categoryPill}
+                onPress={() => router.push("/(tabs)/library")}
+                accessibilityRole="button"
+                accessibilityLabel="Browse Categories"
+              >
+                <FinoraText variant="caption" color="textSecondary" weight="600">
+                  Catégories
+                </FinoraText>
+                <Ionicons name="chevron-down" size={11} color={colors.textSecondary} style={{ marginLeft: 3 }} />
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+
         {/* Dynamic Hero Banner */}
         <HeroBanner
           item={featuredItem}
@@ -347,41 +433,6 @@ export default function HomeScreen() {
           onToggleFavorite={handleToggleFavorite}
           onPressDetails={handleItemPress}
         />
-
-        {/* Quick Library Shortcuts */}
-        <View style={styles.categoriesBar}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesContent}
-          >
-            <Pressable
-              style={[styles.categoryPill, styles.watchlistPill]}
-              onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: "watchlist" } })}
-              accessibilityRole="button"
-              accessibilityLabel="Browse Watchlist"
-            >
-              <Ionicons name="bookmark" size={12} color="#E50914" style={styles.watchlistPillIcon} />
-              <FinoraText variant="caption" color="textPrimary" weight="700">
-                Watchlist
-              </FinoraText>
-            </Pressable>
-
-            {libraries?.map((lib) => (
-              <Pressable
-                key={lib.id}
-                style={styles.categoryPill}
-                onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: lib.id } })}
-                accessibilityRole="button"
-                accessibilityLabel={`Browse ${lib.name}`}
-              >
-                <FinoraText variant="caption" color="textSecondary" weight="600">
-                  {lib.name}
-                </FinoraText>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
 
         {/* Continue Watching Section (Posters with progress bars) */}
         {resumeItems && resumeItems.length > 0 ? (
@@ -459,7 +510,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   contentContainer: {
-    paddingBottom: 60
+    paddingBottom: 100
   },
   failureContainer: {
     flexGrow: 1,
@@ -473,12 +524,74 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: spacing.xl
   },
+  topHeader: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xs,
+    backgroundColor: "transparent"
+  },
+  topHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.xs
+  },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
+  },
+  brandBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: "#E50914",
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  brandBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "900",
+    lineHeight: 22
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: -0.5
+  },
+  headerIconsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
+  },
+  headerIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative"
+  },
+  notificationDot: {
+    position: "absolute",
+    top: 7,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#E50914",
+    borderWidth: 1.5,
+    borderColor: "#101014"
+  },
   categoriesBar: {
-    marginVertical: spacing.md
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs
   },
   categoriesContent: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.sm
+    gap: spacing.sm,
+    paddingRight: spacing.md
   },
   categoryPill: {
     paddingHorizontal: 14,
