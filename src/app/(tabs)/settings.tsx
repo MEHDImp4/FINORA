@@ -36,10 +36,10 @@ import { hapticService } from "../../core/feedback/hapticService";
 const AUDIO_LANG_OPTIONS: SelectionOption<string>[] = [
   { id: "fr", label: "Français", subtitle: "Piste audio française prioritaire" },
   { id: "en", label: "Anglais", subtitle: "Piste audio anglaise" },
-  { id: "ja", label: "Japonais", subtitle: "Recommandé pour les animations et animes" },
+  { id: "ja", label: "Japonais", subtitle: "Idéal pour les animations et animes" },
   { id: "es", label: "Espagnol", subtitle: "Piste audio espagnole" },
   { id: "de", label: "Allemand", subtitle: "Piste audio allemande" },
-  { id: "auto", label: "Original / Automatique", subtitle: "Conserve la piste par défaut du média" }
+  { id: "auto", label: "Original / Auto", subtitle: "Piste par défaut du média" }
 ];
 
 // Options de sous-titres (Sans emojis)
@@ -65,7 +65,7 @@ const SUBTITLE_MODE_OPTIONS: SelectionOption<SubtitleMode>[] = [
   },
   {
     id: "off",
-    label: "Désactivés par défaut",
+    label: "Désactivés",
     subtitle: "Démarre la lecture sans sous-titres"
   }
 ];
@@ -81,23 +81,23 @@ const DOWNLOAD_QUALITY_OPTIONS: SelectionOption<DownloadQuality>[] = [
   {
     id: "1080p",
     label: "1080p Full HD",
-    subtitle: "Idéal pour grand écran ou tablette"
+    subtitle: "Haute fidélité grand écran"
   },
   {
     id: "720p",
     label: "720p HD",
-    subtitle: "Compromis idéal taille / netteté sur mobile"
+    subtitle: "Optimal pour mobile"
   },
   {
     id: "480p",
     label: "480p SD",
-    subtitle: "Économiseur d'espace et stockage réduit"
+    subtitle: "Économiseur d'espace"
   }
 ];
 
 // Vitesse de lecture par défaut
 const PLAYBACK_SPEED_OPTIONS: SelectionOption<number>[] = [
-  { id: 1.0, label: "1.0x", subtitle: "Vitesse standard normale" },
+  { id: 1.0, label: "1.0x", subtitle: "Vitesse standard" },
   { id: 1.25, label: "1.25x", subtitle: "Légère accélération" },
   { id: 1.5, label: "1.5x", subtitle: "Visionnage rapide" }
 ];
@@ -137,15 +137,15 @@ export default function SettingsScreen() {
     hapticService.impactMedium();
     Alert.alert(
       "Vider le cache",
-      "Cette action supprime les miniatures et les requêtes mises en cache pour libérer de l'espace.",
+      "Supprimer les miniatures et métadonnées temporaires ?",
       [
         { text: "Annuler", style: "cancel" },
         {
-          text: "Vider le cache",
+          text: "Vider",
           style: "destructive",
           onPress: () => {
             hapticService.impactHeavy();
-            Alert.alert("Cache vidé", "Le cache temporaire a été libéré avec succès.");
+            Alert.alert("Cache libéré", "Le cache temporaire a été vidé.");
           }
         }
       ]
@@ -156,7 +156,7 @@ export default function SettingsScreen() {
     hapticService.impactHeavy();
     Alert.alert(
       "Déconnexion",
-      "Êtes-vous sûr de vouloir vous déconnecter du serveur Jellyfin actif ?",
+      "Voulez-vous vous déconnecter du serveur actif ?",
       [
         { text: "Annuler", style: "cancel" },
         {
@@ -179,48 +179,34 @@ export default function SettingsScreen() {
   return (
     <FinoraScreen safeBottom={false}>
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Titre Principal */}
+        {/* Titre Principal Épuré */}
         <View style={styles.headerContainer}>
           <Text style={styles.pageTitle}>Paramètres</Text>
-          <Text style={styles.pageSubtitle}>Configuration de lecture, serveur et compte</Text>
         </View>
 
-        {/* 1. SERVEUR & COMPTE */}
-        <SettingsSection
-          title="Serveur et Compte"
-          description="Gérez votre session Jellyfin active, vos serveurs enregistrés et l'état de connexion."
-        >
+        {/* 1. COMPTE */}
+        <SettingsSection title="Compte">
           {session ? (
             <View style={styles.sessionHeaderCard}>
               <View style={styles.sessionAvatar}>
-                <Ionicons name="person" size={20} color="#FFFFFF" />
+                <Ionicons name="person" size={18} color="#FFFFFF" />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sessionUser}>{session.userName}</Text>
+              <View style={styles.sessionTextContainer}>
+                <Text style={styles.sessionUser} numberOfLines={1}>
+                  {session.userName}
+                </Text>
                 <Text style={styles.sessionUrl} numberOfLines={1}>
                   {session.serverUrl}
                 </Text>
               </View>
-              <View style={styles.statusPill}>
-                <View style={styles.statusDot} />
-                <Text style={styles.statusPillText}>En ligne</Text>
-              </View>
             </View>
-          ) : (
-            <View style={styles.disconnectedBanner}>
-              <Ionicons name="cloud-offline-outline" size={24} color="#8A8A9E" style={{ marginRight: 12 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.disconnectedTitle}>Non connecté</Text>
-                <Text style={styles.disconnectedSubtitle}>Connectez-vous à une instance Jellyfin.</Text>
-              </View>
-            </View>
-          )}
+          ) : null}
 
           <SettingsRow
-            iconName="add-circle-outline"
+            iconName="server-outline"
             iconColor="#4F8EF7"
-            title="Changer ou ajouter un serveur"
-            subtitle="Basculer vers une autre instance Jellyfin"
+            title="Changer de serveur"
+            value={session ? "Connecté" : "Non connecté"}
             onPress={() => setShowConnectModal(true)}
           />
 
@@ -231,8 +217,8 @@ export default function SettingsScreen() {
                 const isActive = session?.serverId === acc.serverId && session?.userId === acc.userId;
                 return (
                   <View key={`${acc.serverId}-${acc.userId}`} style={[styles.accountItemRow, idx > 0 && styles.accountBorder]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.accountName, isActive && styles.accountNameActive]}>
+                    <View style={{ flex: 1, marginRight: 10 }}>
+                      <Text style={[styles.accountName, isActive && styles.accountNameActive]} numberOfLines={1}>
                         {acc.userName} {isActive ? "(Actif)" : ""}
                       </Text>
                       <Text style={styles.accountUrl} numberOfLines={1}>{acc.serverUrl}</Text>
@@ -262,8 +248,7 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="pulse-outline"
             iconColor="#FFB800"
-            title="Diagnostic de connexion"
-            subtitle="Latence ms, sécurité TLS/HTTPS, état de l'API"
+            title="Diagnostic réseau"
             onPress={() => setShowDiagModal(true)}
           />
 
@@ -279,16 +264,12 @@ export default function SettingsScreen() {
           ) : null}
         </SettingsSection>
 
-        {/* 2. LECTURE & AUDIO */}
-        <SettingsSection
-          title="Lecture et Audio"
-          description="Personnalisez vos préférences de lecture audio et de visionnage."
-        >
+        {/* 2. LECTURE */}
+        <SettingsSection title="Lecture">
           <SettingsRow
             iconName="volume-medium-outline"
             iconColor="#E50914"
-            title="Langue audio préférée"
-            subtitle="Priorité automatique pour les films et séries"
+            title="Audio"
             value={audioLabel}
             onPress={() => setActivePicker("audio")}
           />
@@ -296,8 +277,7 @@ export default function SettingsScreen() {
           <SettingsSwitchRow
             iconName="play-skip-forward-outline"
             iconColor="#E50914"
-            title="Passer automatiquement les intros"
-            subtitle="Saute automatiquement les génériques au démarrage"
+            title="Passer les intros"
             value={preferences.autoSkipIntro}
             onValueChange={setAutoSkipIntro}
           />
@@ -305,22 +285,19 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="speedometer-outline"
             iconColor="#E50914"
-            title="Vitesse de lecture standard"
+            title="Vitesse"
             value={speedLabel}
             isLast
             onPress={() => setActivePicker("speed")}
           />
         </SettingsSection>
 
-        {/* 3. SOUS-TITRES & STYLE */}
-        <SettingsSection
-          title="Sous-titres"
-          description="Langue, mode d'activation et personnalisation graphique."
-        >
+        {/* 3. SOUS-TITRES */}
+        <SettingsSection title="Sous-titres">
           <SettingsRow
             iconName="chatbubble-ellipses-outline"
             iconColor="#00E5FF"
-            title="Langue des sous-titres"
+            title="Langue"
             value={subtitleLabel}
             onPress={() => setActivePicker("sub")}
           />
@@ -328,7 +305,7 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="options-outline"
             iconColor="#00E5FF"
-            title="Activation des sous-titres"
+            title="Affichage"
             value={subtitleModeLabel}
             onPress={() => setActivePicker("subMode")}
           />
@@ -336,22 +313,18 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="color-wand-outline"
             iconColor="#00E5FF"
-            title="Personnaliser l'apparence"
-            subtitle="Polices, ombres, fonds et opacité des sous-titres"
+            title="Style et apparence"
             isLast
             onPress={() => setShowSubtitleStyleModal(true)}
           />
         </SettingsSection>
 
-        {/* 4. TÉLÉCHARGEMENTS & STOCKAGE */}
-        <SettingsSection
-          title="Téléchargements et Stockage"
-          description="Gestion du stockage hors-ligne et des limites réseau."
-        >
+        {/* 4. TÉLÉCHARGEMENTS */}
+        <SettingsSection title="Téléchargements">
           <SettingsRow
             iconName="film-outline"
             iconColor="#4BB543"
-            title="Qualité par défaut"
+            title="Qualité"
             value={downloadQualityLabel}
             onPress={() => setActivePicker("downloadQuality")}
           />
@@ -359,8 +332,7 @@ export default function SettingsScreen() {
           <SettingsSwitchRow
             iconName="wifi-outline"
             iconColor="#4BB543"
-            title="Télécharger en Wi-Fi uniquement"
-            subtitle="Préserve votre forfait de données mobiles"
+            title="Wi-Fi uniquement"
             value={preferences.downloadWifiOnly}
             onValueChange={setDownloadWifiOnly}
           />
@@ -368,31 +340,25 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="folder-open-outline"
             iconColor="#4BB543"
-            title="Gérer les téléchargements"
-            subtitle="Voir les films et séries stockés hors-ligne"
+            title="Mes téléchargements"
             onPress={() => router.push("/(tabs)/downloads")}
           />
 
           <SettingsRow
             iconName="trash-outline"
             iconColor="#8A8A9E"
-            title="Vider le cache de l'application"
-            subtitle="Supprime les images et métadonnées temporaires"
+            title="Vider le cache"
             isLast
             onPress={handleClearCache}
           />
         </SettingsSection>
 
-        {/* 5. EXPÉRIENCE & SYSTÈME */}
-        <SettingsSection
-          title="Système et Accessibilité"
-          description="Paramètres de retours haptiques et spécifications de l'application."
-        >
+        {/* 5. APPLICATION */}
+        <SettingsSection title="Application">
           <SettingsSwitchRow
             iconName="phone-portrait-outline"
             iconColor="#D1D1E0"
-            title="Retours haptiques"
-            subtitle="Vibrations subtiles lors des interactions tactiles"
+            title="Vibrations"
             value={preferences.hapticsEnabled}
             onValueChange={setHapticsEnabled}
           />
@@ -400,16 +366,16 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="hardware-chip-outline"
             iconColor="#D1D1E0"
-            title="Moteur de lecture"
-            value="ExoPlayer / Media3"
+            title="Moteur"
+            value="ExoPlayer"
             showChevron={false}
           />
 
           <SettingsRow
             iconName="information-circle-outline"
             iconColor="#D1D1E0"
-            title="Version de l'application"
-            value="FINORA 1.0.0 (Fabric)"
+            title="Version"
+            value="1.0.0"
             showChevron={false}
             isLast
           />
@@ -419,8 +385,7 @@ export default function SettingsScreen() {
       {/* Modal Sélecteur Générique */}
       <SelectionPickerModal
         visible={activePicker === "audio"}
-        title="Langue audio préférée"
-        description="Choisissez la langue audio qui sera sélectionnée par défaut lors du lancement d'un média."
+        title="Langue audio"
         options={AUDIO_LANG_OPTIONS}
         selectedValue={preferences.preferredAudioLanguage}
         onSelect={setPreferredAudioLanguage}
@@ -429,8 +394,7 @@ export default function SettingsScreen() {
 
       <SelectionPickerModal
         visible={activePicker === "sub"}
-        title="Langue des sous-titres"
-        description="Sélectionnez la langue des sous-titres à charger automatiquement."
+        title="Sous-titres"
         options={SUBTITLE_LANG_OPTIONS}
         selectedValue={preferences.preferredSubtitleLanguage}
         onSelect={setPreferredSubtitleLanguage}
@@ -439,8 +403,7 @@ export default function SettingsScreen() {
 
       <SelectionPickerModal
         visible={activePicker === "subMode"}
-        title="Mode d'affichage des sous-titres"
-        description="Définissez les conditions d'affichage automatique des sous-titres."
+        title="Affichage des sous-titres"
         options={SUBTITLE_MODE_OPTIONS}
         selectedValue={preferences.subtitleMode}
         onSelect={setSubtitleMode}
@@ -450,7 +413,6 @@ export default function SettingsScreen() {
       <SelectionPickerModal
         visible={activePicker === "downloadQuality"}
         title="Qualité de téléchargement"
-        description="Définissez la résolution et le format des médias téléchargés pour l'accès hors-ligne."
         options={DOWNLOAD_QUALITY_OPTIONS}
         selectedValue={preferences.defaultDownloadQuality}
         onSelect={setDefaultDownloadQuality}
@@ -460,7 +422,6 @@ export default function SettingsScreen() {
       <SelectionPickerModal
         visible={activePicker === "speed"}
         title="Vitesse de lecture"
-        description="Vitesse standard lors du démarrage de la vidéo."
         options={PLAYBACK_SPEED_OPTIONS}
         selectedValue={preferences.playbackSpeed || 1.0}
         onSelect={setPlaybackSpeed}
@@ -495,85 +456,47 @@ const styles = StyleSheet.create({
     paddingBottom: 110
   },
   headerContainer: {
-    marginBottom: spacing.xl,
-    marginTop: spacing.sm
+    marginBottom: spacing.lg,
+    marginTop: spacing.xs
   },
   pageTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "800",
     color: "#FFFFFF",
     letterSpacing: -0.5
   },
-  pageSubtitle: {
-    fontSize: 14,
-    color: "#8A8A9E",
-    marginTop: 4
-  },
   sessionHeaderCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: spacing.md,
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
     borderBottomWidth: 1,
-    borderBottomColor: "#1E1E28"
+    borderBottomColor: "#1C1C26"
   },
   sessionAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.primary,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: spacing.md
+    marginRight: 12
+  },
+  sessionTextContainer: {
+    flex: 1,
+    justifyContent: "center"
   },
   sessionUser: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "600",
     color: "#FFFFFF"
   },
   sessionUrl: {
     fontSize: 12,
-    color: "#8A8A9E",
-    marginTop: 2
-  },
-  statusPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(75, 181, 67, 0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(75, 181, 67, 0.3)",
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#4BB543",
-    marginRight: 6
-  },
-  statusPillText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#4BB543"
-  },
-  disconnectedBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: spacing.md,
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
-    borderBottomWidth: 1,
-    borderBottomColor: "#1E1E28"
-  },
-  disconnectedTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#D1D1E0"
-  },
-  disconnectedSubtitle: {
-    fontSize: 12,
-    color: "#8A8A9E",
+    color: "#6E6E82",
     marginTop: 2
   },
   savedAccountsContainer: {

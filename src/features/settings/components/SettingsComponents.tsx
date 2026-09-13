@@ -13,15 +13,13 @@ import { hapticService } from "../../../core/feedback/hapticService";
 
 interface SettingsSectionProps {
   title: string;
-  description?: string;
   children: React.ReactNode;
 }
 
-export function SettingsSection({ title, description, children }: SettingsSectionProps) {
+export function SettingsSection({ title, children }: SettingsSectionProps) {
   return (
     <View style={styles.sectionContainer}>
       <Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
-      {description ? <Text style={styles.sectionDescription}>{description}</Text> : null}
       <View style={styles.card}>{children}</View>
     </View>
   );
@@ -63,7 +61,7 @@ export function SettingsRow({
         <View
           style={[
             styles.iconWrapper,
-            { backgroundColor: destructive ? "rgba(229, 9, 20, 0.12)" : "rgba(255, 255, 255, 0.06)" }
+            { backgroundColor: destructive ? "rgba(229, 9, 20, 0.12)" : "rgba(255, 255, 255, 0.05)" }
           ]}
         >
           <Ionicons
@@ -75,17 +73,27 @@ export function SettingsRow({
       ) : null}
 
       <View style={styles.rowTextContainer}>
-        <Text style={[styles.rowTitle, destructive && styles.destructiveText]}>{title}</Text>
-        {subtitle ? <Text style={styles.rowSubtitle}>{subtitle}</Text> : null}
+        <Text style={[styles.rowTitle, destructive && styles.destructiveText]} numberOfLines={1}>
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text style={styles.rowSubtitle} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
       </View>
 
-      {value ? <Text style={styles.rowValue}>{value}</Text> : null}
+      {value ? (
+        <Text style={styles.rowValue} numberOfLines={1}>
+          {value}
+        </Text>
+      ) : null}
 
       {showChevron && !destructive ? (
         <Ionicons
           name="chevron-forward"
           size={16}
-          color="#666680"
+          color="#55556B"
           style={styles.chevron}
         />
       ) : null}
@@ -185,7 +193,7 @@ const styles = StyleSheet.create({
   rowContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
+    paddingVertical: 13,
     paddingHorizontal: 16
   },
   rowBorder: {
@@ -196,18 +204,19 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12
   },
   rowTextContainer: {
     flex: 1,
-    justifyContent: "center"
+    justifyContent: "center",
+    marginRight: 12
   },
   rowTitle: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "500",
     color: "#FFFFFF"
   },
   destructiveText: {
@@ -222,7 +231,9 @@ const styles = StyleSheet.create({
   rowValue: {
     fontSize: 14,
     color: "#8A8A9E",
-    marginRight: 6
+    marginRight: 6,
+    maxWidth: "45%",
+    textAlign: "right"
   },
   chevron: {
     marginLeft: 2
