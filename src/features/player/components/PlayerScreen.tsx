@@ -190,7 +190,7 @@ export function PlayerScreen({
   });
 
   // Jellyfin Playback Session Reporting Hook
-  usePlaybackSession({
+  const { stopSession } = usePlaybackSession({
     itemId: item.id,
     mediaSourceId: plan.mediaSourceId,
     playMethod: plan.mode,
@@ -300,6 +300,7 @@ export function PlayerScreen({
   }, [isCustomSubtitleActive, player]);
 
   const handleBack = () => {
+    stopSession();
     controls.pause();
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
     onBack();

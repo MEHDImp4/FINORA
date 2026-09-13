@@ -99,6 +99,7 @@ describe("PlayerScreen", () => {
     });
 
     expect(onBackMock).toHaveBeenCalledTimes(1);
+    expect(mockRepo.reportPlaybackStopped).toHaveBeenCalledTimes(1);
 
     act(() => {
       root.unmount();

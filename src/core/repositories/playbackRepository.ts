@@ -86,12 +86,19 @@ export class PlaybackRepository {
   ): Promise<void> {
     try {
       const http = this.getHttp(customClient);
+      const mediaSourceId = options.mediaSourceId || options.itemId;
+      const positionTicks = options.positionTicks || 0;
       await http.request("/Sessions/Playing/Stopped", {
         method: "POST",
+        params: {
+          ItemId: options.itemId,
+          MediaSourceId: mediaSourceId,
+          PositionTicks: positionTicks
+        },
         body: JSON.stringify({
           ItemId: options.itemId,
-          MediaSourceId: options.mediaSourceId || options.itemId,
-          PositionTicks: options.positionTicks || 0
+          MediaSourceId: mediaSourceId,
+          PositionTicks: positionTicks
         })
       });
     } catch (error) {

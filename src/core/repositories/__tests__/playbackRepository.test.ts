@@ -65,6 +65,11 @@ describe("PlaybackRepository", () => {
 
     expect(mockHttpClient.request).toHaveBeenCalledWith("/Sessions/Playing/Stopped", {
       method: "POST",
+      params: {
+        ItemId: "movie-1",
+        MediaSourceId: "movie-1",
+        PositionTicks: 60000000
+      },
       body: JSON.stringify({
         ItemId: "movie-1",
         MediaSourceId: "movie-1",

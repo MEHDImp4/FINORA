@@ -16,6 +16,10 @@ export interface UsePlaybackSessionOptions {
   isOffline?: boolean;
 }
 
+export interface UsePlaybackSessionResult {
+  stopSession: (customTicks?: number) => void;
+}
+
 export function usePlaybackSession({
   itemId,
   mediaSourceId,
@@ -25,8 +29,9 @@ export function usePlaybackSession({
   repository = playbackRepository,
   throttleIntervalMs = 8000,
   isOffline = false
-}: UsePlaybackSessionOptions): void {
+}: UsePlaybackSessionOptions): UsePlaybackSessionResult {
   const hasStartedRef = useRef(false);
+  const hasStoppedRef = useRef(false);
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
 
@@ -50,11 +55,44 @@ export function usePlaybackSession({
     }
   };
 
+  const stopSession = (customTicks?: number) => {
+    if (hasStoppedRef.current) return;
+    hasStoppedRef.current = true;
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (hasStartedRef.current && itemId) {
+      const posTicks =
+        typeof customTicks === "number"
+          ? customTicks
+          : secondsToTicks(snapshotRef.current.currentTimeSeconds);
+      const totalTicks = secondsToTicks(snapshotRef.current.durationSeconds);
+      const isPlayed = totalTicks > 0 && posTicks / totalTicks >= 0.9;
+
+      if (!isOffline) {
+        repository.reportPlaybackStopped({
+          itemId,
+          mediaSourceId: mediaSourceId || itemId,
+          positionTicks: posTicks
+        });
+      }
+
+      offlineStorageService.updateLocalPlaybackPosition(itemId, posTicks, totalTicks).catch(() => {});
+      offlineStorageService.enqueueProgressSync(itemId, posTicks, isPlayed).catch(() => {});
+      if (isPlayed) {
+        offlineStorageService.markAsWatched(itemId).catch(() => {});
+      }
+    }
+  };
+
   // Report start when player begins playing for the first time
   useEffect(() => {
     if (!itemId) return;
 
-    if (snapshot.state === "playing" && !hasStartedRef.current) {
+    if (snapshot.state === "playing" && !hasStartedRef.current && !hasStoppedRef.current) {
       hasStartedRef.current = true;
       if (!isOffline) {
         repository.reportPlaybackStart({
@@ -69,9 +107,10 @@ export function usePlaybackSession({
 
   // Periodic throttled progress reporting + state change reporting
   useEffect(() => {
-    if (!itemId || !hasStartedRef.current) return;
+    if (!itemId || !hasStartedRef.current || hasStoppedRef.current) return;
 
     const reportProgress = (eventName: "TimeUpdate" | "Pause" | "Unpause", isPaused: boolean) => {
+      if (hasStoppedRef.current) return;
       lastReportedPausedRef.current = isPaused;
       const posTicks = secondsToTicks(snapshotRef.current.currentTimeSeconds);
       const totalTicks = secondsToTicks(snapshotRef.current.durationSeconds);
@@ -95,6 +134,13 @@ export function usePlaybackSession({
         offlineStorageService.markAsWatched(itemId).catch(() => {});
       }
     };
+
+    // If playback ended, immediately stop the session rather than emitting a progress update
+    if (snapshot.state === "ended") {
+      const totalTicks = secondsToTicks(snapshotRef.current.durationSeconds);
+      stopSession(totalTicks);
+      return;
+    }
 
     // State transition pause/resume reporting
     const isPaused = snapshot.state === "paused";
@@ -123,8 +169,8 @@ export function usePlaybackSession({
 
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState.match(/inactive|background/)) {
-        // App moving to background: send immediate progress
-        if (hasStartedRef.current && !isOffline) {
+        // App moving to background: send immediate progress if not already stopped
+        if (hasStartedRef.current && !hasStoppedRef.current && !isOffline) {
           repository.reportPlaybackProgress({
             itemId,
             mediaSourceId: mediaSourceId || itemId,
@@ -142,28 +188,14 @@ export function usePlaybackSession({
     };
   }, [itemId, mediaSourceId, repository, isOffline]);
 
-  // Report stopped on unmount or ended
+  // Report stopped on unmount if not already stopped
   useEffect(() => {
     return () => {
-      if (hasStartedRef.current && itemId) {
-        const posTicks = secondsToTicks(snapshotRef.current.currentTimeSeconds);
-        const totalTicks = secondsToTicks(snapshotRef.current.durationSeconds);
-        const isPlayed = totalTicks > 0 && posTicks / totalTicks >= 0.9;
-
-        if (!isOffline) {
-          repository.reportPlaybackStopped({
-            itemId,
-            mediaSourceId: mediaSourceId || itemId,
-            positionTicks: posTicks
-          });
-        }
-
-        offlineStorageService.updateLocalPlaybackPosition(itemId, posTicks, totalTicks).catch(() => {});
-        offlineStorageService.enqueueProgressSync(itemId, posTicks, isPlayed).catch(() => {});
-        if (isPlayed) {
-          offlineStorageService.markAsWatched(itemId).catch(() => {});
-        }
+      if (!hasStoppedRef.current) {
+        stopSession();
       }
     };
   }, [itemId, mediaSourceId, repository, isOffline]);
+
+  return { stopSession };
 }
