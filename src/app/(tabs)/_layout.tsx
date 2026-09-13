@@ -145,10 +145,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(18, 18, 24, 0.94)",
-    height: 56,
-    borderRadius: 28,
-    paddingHorizontal: 16,
-    gap: 12,
+    height: 58,
+    borderRadius: 29,
+    paddingHorizontal: 20,
+    gap: 16,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.12)",
     elevation: 12,
@@ -158,13 +158,13 @@ const styles = StyleSheet.create({
     shadowRadius: 12
   },
   tabItem: {
-    width: 76,
+    width: 84,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 4
   },
   tabLabel: {
-    fontSize: 10,
+    fontSize: 10.5,
     marginTop: 2
   }
 });
