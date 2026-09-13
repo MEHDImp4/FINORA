@@ -71,8 +71,18 @@ export async function checkServerReachability(
     });
     clearTimeout(timer);
 
-    // Any HTTP response (even 401/403/500) confirms the host and port are alive
-    return response.status >= 200 && response.status < 600;
+    // 502 Bad Gateway, 503 Service Unavailable, 504 Gateway Timeout, 404 or 5xx: backend container is stopped
+    if (response.status >= 500 || response.status === 404 || response.status < 200 || response.status >= 400) {
+      return false;
+    }
+
+    // Validate that the response is actual Jellyfin JSON, not an HTML error page from Nginx/OpenResty
+    try {
+      const data = await response.json();
+      return Boolean(data && (data.ServerName || data.Version || data.Id));
+    } catch {
+      return false;
+    }
   } catch {
     return false;
   }

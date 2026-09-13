@@ -40,13 +40,24 @@ describe("networkStatusService", () => {
   });
 
   describe("checkServerReachability", () => {
-    it("returns true when Jellyfin public info returns 200", async () => {
+    it("returns true when Jellyfin public info returns 200 with valid metadata", async () => {
       global.fetch = jest.fn().mockResolvedValueOnce({
-        status: 200
+        status: 200,
+        json: async () => ({ ServerName: "My Jellyfin", Version: "10.9.0", Id: "srv-1" })
       });
 
       const reachable = await checkServerReachability("http://192.168.1.50:8096", 500);
       expect(reachable).toBe(true);
+    });
+
+    it("returns false when proxy returns 502 Bad Gateway or 503", async () => {
+      global.fetch = jest.fn().mockResolvedValueOnce({
+        status: 502,
+        json: async () => ({})
+      });
+
+      const reachable = await checkServerReachability("http://192.168.1.50:8096", 500);
+      expect(reachable).toBe(false);
     });
 
     it("returns false when server is unreachable or offline", async () => {
@@ -86,7 +97,8 @@ describe("networkStatusService", () => {
 
     it("diagnoses 'unknown' when both internet and server are reachable", async () => {
       global.fetch = jest.fn().mockResolvedValue({
-        status: 200
+        status: 200,
+        json: async () => ({ ServerName: "My Jellyfin", Version: "10.9.0" })
       });
 
       const result = await diagnoseNetworkFailure("http://192.168.1.50:8096", 500);
