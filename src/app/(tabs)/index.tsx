@@ -342,7 +342,7 @@ export default function HomeScreen() {
               <Pressable
                 key={lib.id}
                 style={styles.categoryPill}
-                onPress={() => router.push("/(tabs)/library")}
+                onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: lib.id } })}
                 accessibilityRole="button"
                 accessibilityLabel={`Browse ${lib.name}`}
               >

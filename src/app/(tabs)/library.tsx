@@ -34,14 +34,17 @@ export default function LibraryScreen() {
 
   // Active library state
   const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(
-    params.tab === "watchlist" ? WATCHLIST_ID : null
+    params.tab === "watchlist" ? WATCHLIST_ID : params.tab || null
   );
 
   useEffect(() => {
+    if (!params.tab) return;
     if (params.tab === "watchlist") {
       setSelectedLibraryId(WATCHLIST_ID);
-      setSelectedGenre(null);
+    } else {
+      setSelectedLibraryId(params.tab);
     }
+    setSelectedGenre(null);
   }, [params.tab]);
 
   // Sorting state
@@ -67,7 +70,14 @@ export default function LibraryScreen() {
   const activeLibrary = useMemo(() => {
     if (isWatchlist) return undefined;
     if (selectedLibraryId) {
-      return libraries.find((lib) => lib.id === selectedLibraryId);
+      const normalizedSelected = selectedLibraryId.toLowerCase().replace(/[\s-_]/g, "");
+      const match = libraries.find((lib) => {
+        if (lib.id === selectedLibraryId) return true;
+        const colType = (lib.collectionType || (lib as any).type || "").toLowerCase().replace(/[\s-_]/g, "");
+        const nameType = (lib.name || "").toLowerCase().replace(/[\s-_]/g, "");
+        return colType === normalizedSelected || nameType === normalizedSelected;
+      });
+      if (match) return match;
     }
     return libraries.length > 0 ? libraries[0] : undefined;
   }, [selectedLibraryId, libraries, isWatchlist]);

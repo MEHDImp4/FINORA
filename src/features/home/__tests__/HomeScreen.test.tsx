@@ -6,9 +6,10 @@ import { useAuthStore } from "../../../stores/authStore";
 import { useResumeItems, useRecentlyAdded, useLibraries, useWatchlistItems } from "../../../hooks/useMediaQueries";
 import { useToggleFavorite } from "../../../hooks/useUserDataMutations";
 
+const mockPush = jest.fn();
 jest.mock("expo-router", () => ({
   useRouter: () => ({
-    push: jest.fn(),
+    push: mockPush,
     replace: jest.fn(),
     back: jest.fn()
   }),
@@ -34,6 +35,7 @@ describe("HomeScreen", () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
+    mockPush.mockClear();
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false }
@@ -228,6 +230,39 @@ describe("HomeScreen", () => {
 
     const downloadsBtn = root.findByProps({ testID: "failure-go-downloads-button" });
     expect(downloadsBtn).toBeDefined();
+
+    ReactTestRenderer.act(() => {
+      component.unmount();
+    });
+  });
+
+  it("navigates to library with correct tab when pressing category pills", () => {
+    const component = ReactTestRenderer.create(
+      <QueryClientProvider client={queryClient}>
+        <HomeScreen />
+      </QueryClientProvider>
+    );
+    const root = component.root;
+
+    // Press Watchlist pill
+    const watchlistPill = root.findByProps({ accessibilityLabel: "Browse Watchlist" });
+    ReactTestRenderer.act(() => {
+      watchlistPill.props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: "/(tabs)/library",
+      params: { tab: "watchlist" }
+    });
+
+    // Press Movies pill
+    const moviesPill = root.findByProps({ accessibilityLabel: "Browse Movies" });
+    ReactTestRenderer.act(() => {
+      moviesPill.props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: "/(tabs)/library",
+      params: { tab: "lib-1" }
+    });
 
     ReactTestRenderer.act(() => {
       component.unmount();

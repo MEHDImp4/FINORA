@@ -95,14 +95,14 @@ describe("networkStatusService", () => {
       expect(result).toBe("server_unreachable");
     });
 
-    it("diagnoses 'unknown' when both internet and server are reachable", async () => {
+    it("returns null when both internet and server are reachable (no network failure)", async () => {
       global.fetch = jest.fn().mockResolvedValue({
         status: 200,
         json: async () => ({ ServerName: "My Jellyfin", Version: "10.9.0" })
       });
 
       const result = await diagnoseNetworkFailure("http://192.168.1.50:8096", 500);
-      expect(result).toBe("unknown");
+      expect(result).toBeNull();
     });
   });
 });

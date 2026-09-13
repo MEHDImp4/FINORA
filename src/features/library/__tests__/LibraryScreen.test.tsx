@@ -4,13 +4,14 @@ import LibraryScreen from "../../../app/(tabs)/library";
 
 // Mock router
 const mockPush = jest.fn();
+let mockSearchParams: { tab?: string } = {};
 jest.mock("expo-router", () => ({
   useRouter: () => ({
     push: mockPush,
     replace: jest.fn(),
     back: jest.fn()
   }),
-  useLocalSearchParams: () => ({})
+  useLocalSearchParams: () => mockSearchParams
 }));
 
 // Mock authStore
@@ -55,6 +56,7 @@ jest.mock("../../../hooks/useMediaQueries", () => ({
 describe("LibraryScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
   });
 
   it("renders library tabs, sort action, genres filter bar, and media grid", async () => {
@@ -123,5 +125,30 @@ describe("LibraryScreen", () => {
     });
 
     expect(watchlistTab.props.accessibilityState.selected).toBe(true);
+  });
+
+  it("selects library tab specified in route params.tab by ID", async () => {
+    mockSearchParams = { tab: "lib-shows" };
+    let tree: any;
+    await act(async () => {
+      tree = ReactTestRenderer.create(<LibraryScreen />);
+    });
+
+    const showsTab = tree.root.findByProps({ accessibilityLabel: "Select library TV Shows" });
+    expect(showsTab.props.accessibilityState.selected).toBe(true);
+
+    const moviesTab = tree.root.findByProps({ accessibilityLabel: "Select library Movies" });
+    expect(moviesTab.props.accessibilityState.selected).toBe(false);
+  });
+
+  it("selects library tab specified in route params.tab by collectionType or name", async () => {
+    mockSearchParams = { tab: "tvshows" };
+    let tree: any;
+    await act(async () => {
+      tree = ReactTestRenderer.create(<LibraryScreen />);
+    });
+
+    const showsTab = tree.root.findByProps({ accessibilityLabel: "Select library TV Shows" });
+    expect(showsTab.props.accessibilityState.selected).toBe(true);
   });
 });
