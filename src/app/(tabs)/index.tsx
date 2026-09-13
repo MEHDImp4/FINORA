@@ -4,6 +4,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { FinoraScreen } from "../../design-system/components/FinoraScreen";
 import { HeroBanner } from "../../features/home/components/HeroBanner";
 import { MediaCarousel } from "../../features/home/components/MediaCarousel";
@@ -421,11 +422,13 @@ export default function HomeScreen() {
         <View style={[styles.topHeader, { paddingTop: Math.max(insets.top, 12) }]}>
           <View style={styles.topHeaderRow}>
             <View style={styles.brandRow}>
-              <View style={styles.brandBadge}>
-                <FinoraText variant="title" color="textPrimary" weight="900" style={styles.brandBadgeText}>
-                  F
-                </FinoraText>
-              </View>
+              <Image
+                source={require("../../../assets/finora-icon-f.png")}
+                style={styles.brandLogoIcon}
+                contentFit="contain"
+                transition={200}
+                accessibilityLabel="Logo FINORA"
+              />
               <FinoraText variant="title" color="textPrimary" weight="800" style={styles.headerTitle}>
                 Home
               </FinoraText>
@@ -599,19 +602,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.sm
   },
-  brandBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: "#E50914",
-    justifyContent: "center",
-    alignItems: "center"
-  },
-  brandBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "900",
-    lineHeight: 22
+  brandLogoIcon: {
+    width: 32,
+    height: 32
   },
   headerTitle: {
     fontSize: 22,

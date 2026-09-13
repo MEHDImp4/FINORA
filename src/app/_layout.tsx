@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
+import { Image } from "expo-image";
 import { useAuthStore } from "../stores/authStore";
 import { QueryProvider } from "../providers/QueryProvider";
 import { offlineSyncManager } from "../features/offline/offlineSyncManager";
@@ -34,7 +35,18 @@ export default function RootLayout() {
           <StatusBar style="light" />
           {status === "idle" || status === "restoring" ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#E50914" />
+              <Image
+                source={require("../../assets/finora-logo-text.png")}
+                style={styles.splashLogo}
+                contentFit="contain"
+                transition={300}
+                accessibilityLabel="FINORA"
+              />
+              <ActivityIndicator
+                size="small"
+                color="#E50914"
+                style={styles.splashLoader}
+              />
             </View>
           ) : (
             <Stack
@@ -63,5 +75,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#0A0A0C",
     justifyContent: "center",
     alignItems: "center"
+  },
+  splashLogo: {
+    width: 220,
+    height: 70
+  },
+  splashLoader: {
+    marginTop: 24
   }
 });
