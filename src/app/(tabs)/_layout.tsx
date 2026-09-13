@@ -47,7 +47,7 @@ function FinoraPillTabBar({ state, descriptors, navigation, insets }: any) {
               {options.tabBarIcon?.({
                 focused: isFocused,
                 color: isFocused ? "#E50914" : "#8A8A9E",
-                size: 22
+                size: 24
               })}
               <Text
                 style={[
@@ -83,7 +83,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
               name={focused ? "home" : "home-outline"}
-              size={size || 22}
+              size={size || 24}
               color={focused ? "#E50914" : color}
             />
           )
@@ -102,7 +102,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
               name={focused ? "film" : "film-outline"}
-              size={size || 22}
+              size={size || 24}
               color={focused ? "#E50914" : color}
             />
           )
@@ -121,7 +121,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
               name={focused ? "settings" : "settings-outline"}
-              size={size || 22}
+              size={size || 24}
               color={focused ? "#E50914" : color}
             />
           )
@@ -145,10 +145,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(18, 18, 24, 0.94)",
-    height: 54,
-    borderRadius: 27,
-    paddingHorizontal: 16,
-    gap: 16,
+    height: 56,
+    borderRadius: 28,
+    paddingHorizontal: 12,
+    gap: 8,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.12)",
     elevation: 12,
@@ -158,9 +158,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12
   },
   tabItem: {
+    width: 66,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 10,
     paddingVertical: 4
   },
   tabLabel: {
