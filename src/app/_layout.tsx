@@ -11,16 +11,22 @@ import { notificationService } from "../core/notifications/notificationService";
 import { QueryProvider } from "../providers/QueryProvider";
 import { offlineSyncManager } from "../features/offline/offlineSyncManager";
 import { offlineStorageService } from "../features/offline/offlineStorage";
+import { useOnboardingStore } from "../stores/onboardingStore";
+import { OnboardingScreen } from "../features/onboarding/components/OnboardingScreen";
 
 export default function RootLayout() {
   const status = useAuthStore((state) => state.status);
   const session = useAuthStore((state) => state.session);
   const restoreSession = useAuthStore((state) => state.restoreSession);
+  const isOnboardingCompleted = useOnboardingStore((state) => state.isCompleted);
+  const isOnboardingLoaded = useOnboardingStore((state) => state.isLoaded);
+  const loadOnboardingStatus = useOnboardingStore((state) => state.loadOnboardingStatus);
   const router = useRouter();
   const [minSplashDone, setMinSplashDone] = React.useState(false);
 
   useEffect(() => {
     restoreSession();
+    loadOnboardingStatus();
     // Auto-cleanup watched downloads older than 48h (2-3 days policy)
     offlineStorageService.cleanupExpiredWatchedMedia(48).catch(() => {});
     // Initialize notification engine and load stored notifications
@@ -33,7 +39,7 @@ export default function RootLayout() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [restoreSession]);
+  }, [restoreSession, loadOnboardingStatus]);
 
   // Deep linking: when user taps a notification on their device
   useEffect(() => {
@@ -53,7 +59,8 @@ export default function RootLayout() {
     }
   }, [status, session?.userId]);
 
-  const showSplash = !minSplashDone || status === "idle" || status === "restoring";
+  const showSplash = !minSplashDone || status === "idle" || status === "restoring" || !isOnboardingLoaded;
+  const showOnboarding = !showSplash && !isOnboardingCompleted && status !== "authenticated";
 
   return (
     <SafeAreaProvider>
@@ -75,6 +82,8 @@ export default function RootLayout() {
                 style={styles.splashLoader}
               />
             </View>
+          ) : showOnboarding ? (
+            <OnboardingScreen />
           ) : (
             <Stack
               screenOptions={{

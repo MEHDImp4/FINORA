@@ -13,6 +13,7 @@ import { FinoraButton } from "../../design-system/components/FinoraButton";
 import { colors, spacing } from "../../design-system/tokens";
 import { useAuthStore } from "../../stores/authStore";
 import { useServerStore } from "../../stores/serverStore";
+import { useOnboardingStore } from "../../stores/onboardingStore";
 import {
   usePlaybackPreferencesStore,
   SubtitleMode
@@ -462,7 +463,31 @@ export default function SettingsScreen() {
             title="Version"
             value="1.0.0"
             showChevron={false}
+          />
+
+          <SettingsRow
+            iconName="sparkles-outline"
+            iconColor="#E50914"
+            title="Revoir la présentation FINORA"
+            subtitle="Relancer l'onboarding de bienvenue"
+            showChevron
             isLast
+            onPress={() => {
+              hapticService.impactLight();
+              Alert.alert(
+                "Présentation FINORA",
+                "Souhaitez-vous revoir l'écran de bienvenue et de présentation ?",
+                [
+                  { text: "Annuler", style: "cancel" },
+                  {
+                    text: "Revoir",
+                    onPress: async () => {
+                      await useOnboardingStore.getState().resetOnboarding();
+                    }
+                  }
+                ]
+              );
+            }}
           />
         </SettingsSection>
       </ScrollView>

@@ -26,6 +26,11 @@ const ScrollView = React.forwardRef((props, ref) =>
 );
 ScrollView.displayName = "ScrollView";
 
+const KeyboardAvoidingView = React.forwardRef((props, ref) =>
+  React.createElement("KeyboardAvoidingView", { ...props, ref }, props.children)
+);
+KeyboardAvoidingView.displayName = "KeyboardAvoidingView";
+
 const TouchableOpacity = React.forwardRef((props, ref) =>
   React.createElement("TouchableOpacity", { ...props, ref }, props.children)
 );
@@ -177,6 +182,7 @@ module.exports = {
   Pressable,
   TouchableOpacity,
   ScrollView,
+  KeyboardAvoidingView,
   RefreshControl,
   FlatList,
   ActivityIndicator,

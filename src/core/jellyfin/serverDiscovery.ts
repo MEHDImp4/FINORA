@@ -1,6 +1,8 @@
 import { HttpClient } from "../network/httpClient";
 import { FinoraError } from "../errors";
 
+export const DEFAULT_JELLYFIN_SERVER = "https://azeur-jelly-web.smp4.xyz";
+
 export interface ServerUrlValidationResult {
   url: string;
   isHttps: boolean;

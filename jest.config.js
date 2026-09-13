@@ -9,6 +9,7 @@ module.exports = {
     "^expo-screen-orientation$": "<rootDir>/__mocks__/expo-screen-orientation.js",
     "^expo-constants$": "<rootDir>/__mocks__/expo-constants.js",
     "^expo-notifications$": "<rootDir>/__mocks__/expo-notifications.js",
+    "^expo-image$": "<rootDir>/__mocks__/expo-image.js",
     "^react-test-renderer$": "<rootDir>/__mocks__/react-test-renderer.js",
     "\\.(png|jpg|jpeg|gif|svg)$": "<rootDir>/__mocks__/fileMock.js"
   },

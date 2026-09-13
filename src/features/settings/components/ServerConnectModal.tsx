@@ -17,6 +17,7 @@ import { FinoraButton } from "../../../design-system/components/FinoraButton";
 import { useAuthStore } from "../../../stores/authStore";
 import { useServerStore } from "../../../stores/serverStore";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { DEFAULT_JELLYFIN_SERVER } from "../../../core/jellyfin/serverDiscovery";
 
 interface ServerConnectModalProps {
   visible: boolean;
@@ -27,7 +28,7 @@ export function ServerConnectModal({ visible, onClose }: ServerConnectModalProps
   const login = useAuthStore((state) => state.login);
   const loadSavedAccounts = useServerStore((state) => state.loadSavedAccounts);
 
-  const [serverInput, setServerInput] = useState("https://azeur-jelly-web.smp4.xyz");
+  const [serverInput, setServerInput] = useState(DEFAULT_JELLYFIN_SERVER);
   const [usernameInput, setUsernameInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
