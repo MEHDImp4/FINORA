@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { View, FlatList, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { offlineStorageService } from "../offlineStorage";
 import { downloadManager } from "../downloadManager";
@@ -9,6 +10,10 @@ import { OfflineMediaRecord, DownloadItem } from "../types";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { useAuthStore } from "../../../stores/authStore";
+import { getPosterUrl } from "../../../core/repositories/imageUrlBuilder";
+import { DownloadProgressCard } from "./DownloadProgressCard";
+import { DownloadedSeriesView } from "./DownloadedSeriesView";
 
 export function formatBytes(bytes: number): string {
   if (bytes <= 0) return "0 MB";
@@ -43,10 +48,6 @@ export function formatTimeRemaining(seconds?: number): string {
   return `~${seconds}s`;
 }
 
-interface DownloadsScreenProps {
-  onPlayItem?: (record: OfflineMediaRecord) => void;
-}
-
 export function getRetentionLabel(record: OfflineMediaRecord): string | null {
   if (!record.completedWatchedAt && !record.isPlayed) return null;
   if (!record.completedWatchedAt) return "Vu • Suppression programmée";
@@ -64,14 +65,39 @@ export function getRetentionLabel(record: OfflineMediaRecord): string | null {
   return "Vu • Expire bientôt";
 }
 
+export interface DownloadedSeriesGroup {
+  type: "series";
+  seriesId: string;
+  seriesName: string;
+  seriesPosterPath?: string;
+  posterLocalPath?: string;
+  episodes: (OfflineMediaRecord & { fileExists?: boolean; actualBytes?: number })[];
+  totalBytes: number;
+}
+
+export interface DownloadedMovieGroup {
+  type: "movie";
+  movie: OfflineMediaRecord & { fileExists?: boolean; actualBytes?: number };
+}
+
+export type DownloadedCatalogItem = DownloadedSeriesGroup | DownloadedMovieGroup;
+
+interface DownloadsScreenProps {
+  onPlayItem?: (record: OfflineMediaRecord) => void;
+}
+
 export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
   const router = useRouter();
+  const session = useAuthStore((s) => s.session);
+  const serverUrl = session?.serverUrl || "";
+
   const [offlineItems, setOfflineItems] = useState<
     (OfflineMediaRecord & { fileExists?: boolean; actualBytes?: number })[]
   >([]);
   const [totalPhysicalStorage, setTotalPhysicalStorage] = useState<number>(0);
   const [hasOrphans, setHasOrphans] = useState<boolean>(false);
   const [activeDownloads, setActiveDownloads] = useState<DownloadItem[]>([]);
+  const [selectedSeriesKey, setSelectedSeriesKey] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     await offlineStorageService.cleanupExpiredWatchedMedia(48);
@@ -81,7 +107,6 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     setHasOrphans(verified.hasOrphans);
   }, []);
 
-  // Reload catalog whenever user switches to the Downloads tab
   useFocusEffect(
     useCallback(() => {
       loadData();
@@ -92,7 +117,6 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     loadData();
     const unsub = downloadManager.subscribe((downloads) => {
       setActiveDownloads(downloads);
-      // If any download completed, refresh offline storage catalog automatically
       const hasCompleted = downloads.some((d) => d.status === "completed");
       if (hasCompleted) {
         loadData();
@@ -123,6 +147,16 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     [loadData]
   );
 
+  const handleDeleteSeries = useCallback(
+    async (seriesIdOrName: string) => {
+      hapticService.impactMedium();
+      await offlineStorageService.deleteSeriesOfflineMedia(seriesIdOrName);
+      setSelectedSeriesKey(null);
+      await loadData();
+    },
+    [loadData]
+  );
+
   const handleCleanOrphans = useCallback(async () => {
     hapticService.notificationSuccess();
     await offlineStorageService.cleanupOrphanMedia();
@@ -139,74 +173,65 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     await downloadManager.cancelDownload(itemId);
   }, []);
 
-  const renderItem = useCallback(
-    ({ item }: { item: OfflineMediaRecord & { fileExists?: boolean; actualBytes?: number } }) => {
-      const retentionLabel = getRetentionLabel(item);
-      const isMissing = item.fileExists === false;
+  // Group offline items: series grouped together, movies separate
+  const catalogItems = useMemo<DownloadedCatalogItem[]>(() => {
+    const seriesMap = new Map<string, DownloadedSeriesGroup>();
+    const movieItems: DownloadedMovieGroup[] = [];
 
-      return (
-        <View style={styles.recordRow} testID={`offline-item-${item.itemId}`}>
-          <View style={styles.recordInfo}>
-            <FinoraText variant="body" style={styles.itemTitle} numberOfLines={1}>
-              {item.title}
-            </FinoraText>
-            <View style={styles.metaRow}>
-              <FinoraText variant="caption" style={styles.itemMeta}>
-                {item.seriesName ? `${item.seriesName} • ` : ""}
-                {typeof item.seasonIndex === "number" && typeof item.episodeIndex === "number"
-                  ? `S${item.seasonIndex}:E${item.episodeIndex} • `
-                  : `${item.type} • `}
-                {formatBytes(item.actualBytes !== undefined ? item.actualBytes : item.fileSizeBytes)}
-              </FinoraText>
-              {isMissing ? (
-                <View style={styles.missingBadge}>
-                  <Ionicons name="alert-circle-outline" size={12} color="#E50914" style={{ marginRight: 3 }} />
-                  <FinoraText variant="caption" style={styles.missingText}>
-                    Fichier manquant
-                  </FinoraText>
-                </View>
-              ) : null}
-              {retentionLabel ? (
-                <View style={styles.retentionBadge}>
-                  <Ionicons name="time-outline" size={12} color="#F5A623" style={{ marginRight: 3 }} />
-                  <FinoraText variant="caption" style={styles.retentionText}>
-                    {retentionLabel}
-                  </FinoraText>
-                </View>
-              ) : null}
-            </View>
-          </View>
+    for (const item of offlineItems) {
+      if (item.type === "Episode") {
+        const seriesKey =
+          item.seriesId ||
+          item.seriesName ||
+          (item.title.includes(" - ") ? item.title.split(" - ")[0] : item.title);
+        const seriesName =
+          item.seriesName ||
+          (item.title.includes(" - ") ? item.title.split(" - ")[0] : item.title);
 
-          <View style={styles.actionButtons}>
-            {!isMissing ? (
-              <Pressable
-                style={styles.playButton}
-                onPress={() => handlePlay(item)}
-                accessibilityRole="button"
-                accessibilityLabel={`Play offline ${item.title}`}
-              >
-                <Ionicons name="play" size={16} color="#FFFFFF" />
-                <FinoraText variant="caption" style={styles.playText}>
-                  Play
-                </FinoraText>
-              </Pressable>
-            ) : null}
+        const itemBytes = item.actualBytes ?? item.fileSizeBytes ?? 0;
+        const poster = item.seriesPosterPath || item.posterPath;
+        const localPoster = item.posterLocalPath;
 
-            <Pressable
-              style={styles.deleteButton}
-              onPress={() => handleDelete(item)}
-              accessibilityRole="button"
-              accessibilityLabel={`Delete ${item.title}`}
-              hitSlop={8}
-            >
-              <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />
-            </Pressable>
-          </View>
-        </View>
-      );
-    },
-    [handlePlay, handleDelete]
-  );
+        const existing = seriesMap.get(seriesKey);
+        if (existing) {
+          existing.episodes.push(item);
+          existing.totalBytes += itemBytes;
+          if (!existing.seriesPosterPath && poster) {
+            existing.seriesPosterPath = poster;
+          }
+          if (!existing.posterLocalPath && localPoster) {
+            existing.posterLocalPath = localPoster;
+          }
+        } else {
+          seriesMap.set(seriesKey, {
+            type: "series",
+            seriesId: item.seriesId || seriesKey,
+            seriesName,
+            seriesPosterPath: poster,
+            posterLocalPath: localPoster,
+            episodes: [item],
+            totalBytes: itemBytes
+          });
+        }
+      } else {
+        movieItems.push({
+          type: "movie",
+          movie: item
+        });
+      }
+    }
+
+    return [...Array.from(seriesMap.values()), ...movieItems];
+  }, [offlineItems]);
+
+  // Selected series for detail inspection
+  const activeSeries = useMemo(() => {
+    if (!selectedSeriesKey) return null;
+    const found = catalogItems.find(
+      (it) => it.type === "series" && (it.seriesId === selectedSeriesKey || it.seriesName === selectedSeriesKey)
+    );
+    return found && found.type === "series" ? found : null;
+  }, [selectedSeriesKey, catalogItems]);
 
   const pendingOrFailedDownloads = useMemo(() => {
     return activeDownloads.filter(
@@ -227,24 +252,196 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     [activeDownloads]
   );
 
+  // If a series is selected, render the dedicated series detail view
+  if (activeSeries) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+        <DownloadedSeriesView
+          seriesName={activeSeries.seriesName}
+          seriesId={activeSeries.seriesId}
+          seriesPosterPath={activeSeries.seriesPosterPath}
+          posterLocalPath={activeSeries.posterLocalPath}
+          episodes={activeSeries.episodes}
+          serverUrl={serverUrl}
+          onBack={() => setSelectedSeriesKey(null)}
+          onPlayEpisode={handlePlay}
+          onDeleteEpisode={handleDelete}
+          onDeleteSeries={handleDeleteSeries}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  const renderCatalogItem = ({ item }: { item: DownloadedCatalogItem }) => {
+    if (item.type === "series") {
+      const posterUri = item.posterLocalPath
+        ? item.posterLocalPath
+        : item.seriesPosterPath && serverUrl
+        ? getPosterUrl(serverUrl, item.seriesId, item.seriesPosterPath, 200)
+        : undefined;
+
+      return (
+        <Pressable
+          style={styles.catalogCard}
+          onPress={() => {
+            hapticService.impactLight();
+            setSelectedSeriesKey(item.seriesId || item.seriesName);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Browse series ${item.seriesName}, ${item.episodes.length} episodes`}
+          testID={`downloaded-series-card-${item.seriesId}`}
+        >
+          {/* Poster with Episode Count Badge */}
+          <View style={styles.cardPosterContainer}>
+            {posterUri ? (
+              <Image source={{ uri: posterUri }} style={styles.cardPoster} contentFit="cover" transition={200} />
+            ) : (
+              <View style={styles.cardPosterFallback}>
+                <Ionicons name="tv-outline" size={28} color={colors.textSecondary} />
+              </View>
+            )}
+            <View style={styles.episodeCountBadge}>
+              <FinoraText variant="caption" weight="700" style={styles.episodeCountText}>
+                {`${item.episodes.length} EP`}
+              </FinoraText>
+            </View>
+          </View>
+
+          {/* Series Info */}
+          <View style={styles.cardInfo}>
+            <FinoraText variant="body" weight="700" style={styles.cardTitle} numberOfLines={1}>
+              {item.seriesName}
+            </FinoraText>
+            <FinoraText variant="caption" style={styles.cardSubtitle} numberOfLines={1}>
+              {`Série • ${item.episodes.length} ${item.episodes.length <= 1 ? "épisode" : "épisodes"} téléchargés`}
+            </FinoraText>
+            <FinoraText variant="caption" style={styles.cardSize}>
+              {formatBytes(item.totalBytes)}
+            </FinoraText>
+          </View>
+
+          {/* Chevron */}
+          <View style={styles.cardChevron}>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          </View>
+        </Pressable>
+      );
+    }
+
+    // Movie card
+    const movie = item.movie;
+    const isMissing = movie.fileExists === false;
+    const retentionLabel = getRetentionLabel(movie);
+    const posterUri = movie.posterLocalPath
+      ? movie.posterLocalPath
+      : movie.posterPath && serverUrl
+      ? getPosterUrl(serverUrl, movie.itemId, movie.posterPath, 200)
+      : undefined;
+
+    return (
+      <View style={styles.catalogCard} testID={`offline-item-${movie.itemId}`}>
+        {/* Poster */}
+        <Pressable
+          style={styles.cardPosterContainer}
+          onPress={() => handlePlay(movie)}
+          accessibilityRole="button"
+          accessibilityLabel={`Poster ${movie.title}`}
+        >
+          {posterUri ? (
+            <Image source={{ uri: posterUri }} style={styles.cardPoster} contentFit="cover" transition={200} />
+          ) : (
+            <View style={styles.cardPosterFallback}>
+              <Ionicons name="film-outline" size={28} color={colors.textSecondary} />
+            </View>
+          )}
+          <View style={styles.movieBadge}>
+            <FinoraText variant="caption" weight="700" style={styles.movieBadgeText}>
+              FILM
+            </FinoraText>
+          </View>
+        </Pressable>
+
+        {/* Info */}
+        <View style={styles.cardInfo}>
+          <FinoraText variant="body" weight="700" style={styles.cardTitle} numberOfLines={1}>
+            {movie.title}
+          </FinoraText>
+          <FinoraText variant="caption" style={styles.cardSubtitle} numberOfLines={1}>
+            {`Film${movie.year ? ` • ${movie.year}` : ""}`}
+          </FinoraText>
+          <View style={styles.metaRow}>
+            <FinoraText variant="caption" style={styles.cardSize}>
+              {formatBytes(movie.actualBytes ?? movie.fileSizeBytes)}
+            </FinoraText>
+
+            {isMissing && (
+              <View style={styles.missingBadge}>
+                <Ionicons name="alert-circle-outline" size={11} color="#E50914" style={{ marginRight: 2 }} />
+                <FinoraText variant="caption" style={styles.missingText}>
+                  Manquant
+                </FinoraText>
+              </View>
+            )}
+
+            {retentionLabel && (
+              <View style={styles.retentionBadge}>
+                <Ionicons name="time-outline" size={11} color="#F5A623" style={{ marginRight: 2 }} />
+                <FinoraText variant="caption" style={styles.retentionText}>
+                  {retentionLabel}
+                </FinoraText>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Actions */}
+        <View style={styles.cardActions}>
+          {!isMissing && (
+            <Pressable
+              style={styles.playButton}
+              onPress={() => handlePlay(movie)}
+              accessibilityRole="button"
+              accessibilityLabel={`Play offline ${movie.title}`}
+            >
+              <Ionicons name="play" size={15} color="#FFFFFF" />
+              <FinoraText variant="caption" weight="600" style={styles.playText}>
+                Play
+              </FinoraText>
+            </Pressable>
+          )}
+
+          <Pressable
+            style={styles.deleteButton}
+            onPress={() => handleDelete(movie)}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${movie.title}`}
+            hitSlop={8}
+          >
+            <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-      {/* Header & Real Storage Indicator */}
+      {/* Header & Storage Indicator */}
       <View style={styles.header}>
-        <FinoraText variant="title" style={styles.headerTitle}>
-          Downloads
+        <FinoraText variant="title" weight="700" style={styles.headerTitle}>
+          Téléchargements
         </FinoraText>
         <FinoraText variant="caption" style={styles.storageText}>
-          Total offline storage: {formatBytes(totalPhysicalStorage)}
+          Stockage hors-ligne utilisé : {formatBytes(totalPhysicalStorage)}
         </FinoraText>
       </View>
 
-      {/* Orphan Cleanup Banner if Phantom Entries Exist */}
+      {/* Orphan Cleanup Banner */}
       {hasOrphans && (
         <View style={styles.orphanBanner}>
           <Ionicons name="information-circle-outline" size={20} color="#F5A623" style={{ marginRight: 8 }} />
           <View style={{ flex: 1 }}>
-            <FinoraText variant="caption" style={styles.orphanTitle}>
+            <FinoraText variant="caption" weight="600" style={styles.orphanTitle}>
               Données résiduelles détectées
             </FinoraText>
             <FinoraText variant="caption" style={styles.orphanSubtitle}>
@@ -257,7 +454,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
             accessibilityRole="button"
             accessibilityLabel="Nettoyer les fichiers manquants"
           >
-            <FinoraText variant="caption" style={styles.cleanButtonText}>
+            <FinoraText variant="caption" weight="600" style={styles.cleanButtonText}>
               Nettoyer
             </FinoraText>
           </Pressable>
@@ -267,141 +464,70 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
       {/* Active, Queued & Failed Downloads Section */}
       {pendingOrFailedDownloads.length > 0 && (
         <View style={styles.activeSection}>
-          <FinoraText variant="caption" style={styles.sectionTitle}>
-            {`Téléchargements (${activeCount}/3 actifs${queuedCount > 0 ? ` • ${queuedCount} en attente` : ""})`}
+          <FinoraText variant="caption" weight="700" style={styles.sectionTitle}>
+            {`EN COURS (${activeCount}/3 actifs${queuedCount > 0 ? ` • ${queuedCount} en attente` : ""})`}
           </FinoraText>
-          {pendingOrFailedDownloads.map((download) => {
-            const isFailed = download.status === "failed";
-            const isQueued = download.status === "queued";
-            const progressPercent = Math.round(download.progress * 100);
-
-            return (
-              <View key={download.itemId} style={styles.downloadProgressRow}>
-                <View style={styles.downloadRowHeader}>
-                  <FinoraText variant="body" style={styles.downloadTitle} numberOfLines={1}>
-                    {download.title}
-                  </FinoraText>
-                  <View style={styles.rowActions}>
-                    {isFailed ? (
-                      <Pressable
-                        style={styles.retryButton}
-                        onPress={() => handleRetry(download.itemId)}
-                        accessibilityRole="button"
-                        accessibilityLabel="Réessayer"
-                      >
-                        <Ionicons name="refresh" size={14} color="#FFFFFF" />
-                        <FinoraText variant="caption" style={styles.retryButtonText}>
-                          Réessayer
-                        </FinoraText>
-                      </Pressable>
-                    ) : null}
-                    <Pressable
-                      style={styles.cancelButton}
-                      onPress={() => handleCancelDownload(download.itemId)}
-                      accessibilityRole="button"
-                      accessibilityLabel="Annuler"
-                      hitSlop={6}
-                    >
-                      <Ionicons name="close-circle-outline" size={18} color={colors.textSecondary} />
-                    </Pressable>
-                  </View>
-                </View>
-
-                {isFailed ? (
-                  <View style={styles.errorNotice}>
-                    <Ionicons name="alert-circle" size={14} color="#E50914" style={{ marginRight: 4 }} />
-                    <FinoraText variant="caption" style={styles.errorText}>
-                      {download.error || "Échec du téléchargement"}
-                    </FinoraText>
-                  </View>
-                ) : isQueued ? (
-                  <View style={styles.queuedNotice}>
-                    <Ionicons name="hourglass-outline" size={13} color="#4A90E2" style={{ marginRight: 4 }} />
-                    <FinoraText variant="caption" style={styles.queuedText}>
-                      En file d'attente (démarrera automatiquement)
-                    </FinoraText>
-                  </View>
-                ) : (
-                  <>
-                    <View style={styles.progressBar}>
-                      <View
-                        style={[
-                          styles.progressFill,
-                          {
-                            width:
-                              download.totalBytes > 0
-                                ? `${progressPercent}%`
-                                : download.bytesDownloaded > 0
-                                ? "100%"
-                                : "5%"
-                          }
-                        ]}
-                      />
-                    </View>
-                    <View style={styles.progressStatusRow}>
-                      <FinoraText variant="caption" style={styles.progressMeta}>
-                        {download.totalBytes > 0
-                          ? `${formatBytes(download.bytesDownloaded)} / ${formatBytes(download.totalBytes)}`
-                          : download.bytesDownloaded > 0
-                          ? `${formatBytes(download.bytesDownloaded)} reçus`
-                          : "Connexion au serveur..."}
-                        {download.speedBytesPerSecond ? ` • ${formatSpeed(download.speedBytesPerSecond)}` : ""}
-                        {download.estimatedSecondsRemaining ? ` • ${formatTimeRemaining(download.estimatedSecondsRemaining)}` : ""}
-                      </FinoraText>
-                      <FinoraText variant="caption" style={styles.progressPercent}>
-                        {download.totalBytes > 0 ? `${progressPercent}%` : "En cours"}
-                      </FinoraText>
-                    </View>
-                  </>
-                )}
-              </View>
-            );
-          })}
+          {pendingOrFailedDownloads.map((download) => (
+            <DownloadProgressCard
+              key={download.itemId}
+              download={download}
+              serverUrl={serverUrl}
+              onRetry={handleRetry}
+              onCancel={handleCancelDownload}
+            />
+          ))}
         </View>
       )}
 
-      {/* Downloaded Offline Catalog List */}
+      {/* Downloaded Catalog List */}
       <FlatList
-        data={offlineItems}
-        keyExtractor={(item) => item.itemId}
-        renderItem={renderItem}
+        data={catalogItems}
+        keyExtractor={(item) => (item.type === "series" ? `series-${item.seriesId}` : `movie-${item.movie.itemId}`)}
+        renderItem={renderCatalogItem}
         contentContainerStyle={styles.listContainer}
+        ListHeaderComponent={
+          catalogItems.length > 0 ? (
+            <View style={styles.catalogHeader}>
+              <FinoraText variant="caption" weight="700" style={styles.catalogHeaderText}>
+                CONTENUS DISPONIBLES ({catalogItems.length})
+              </FinoraText>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <View style={styles.emptyBadge}>
-              <Ionicons name="sparkles" size={12} color={colors.primary} style={{ marginRight: 4 }} />
-              <FinoraText variant="caption" weight="700" style={styles.emptyBadgeText}>
-                STOCKAGE HORS-LIGNE
+          pendingOrFailedDownloads.length === 0 ? (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyBadge}>
+                <Ionicons name="sparkles" size={12} color={colors.primary} style={{ marginRight: 4 }} />
+                <FinoraText variant="caption" weight="700" style={styles.emptyBadgeText}>
+                  STOCKAGE HORS-LIGNE
+                </FinoraText>
+              </View>
+              <View style={styles.emptyIconCircle}>
+                <Ionicons name="cloud-download-outline" size={44} color={colors.primary} />
+              </View>
+              <FinoraText variant="title" weight="700" style={styles.emptyTitle}>
+                Aucun téléchargement
               </FinoraText>
-            </View>
-            <View style={styles.emptyIconCircle}>
-              <Ionicons
-                name="cloud-download-outline"
-                size={44}
-                color={colors.primary}
-              />
-            </View>
-            <FinoraText variant="title" weight="700" style={styles.emptyTitle}>
-              Aucun téléchargement
-            </FinoraText>
-            <FinoraText variant="caption" style={styles.emptySubtitle}>
-              Téléchargez des films et séries depuis votre catalogue pour en profiter partout en voyage ou en déplacement, même sans connexion.
-            </FinoraText>
-            <Pressable
-              style={styles.exploreButton}
-              onPress={() => {
-                hapticService.impactMedium();
-                router.push("/(tabs)");
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Explorer le catalogue"
-            >
-              <Ionicons name="film-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <FinoraText variant="body" weight="700" style={styles.exploreButtonText}>
-                Explorer le catalogue
+              <FinoraText variant="caption" style={styles.emptySubtitle}>
+                Téléchargez des films et séries depuis votre catalogue pour en profiter partout en voyage ou en déplacement, même sans connexion.
               </FinoraText>
-            </Pressable>
-          </View>
+              <Pressable
+                style={styles.exploreButton}
+                onPress={() => {
+                  hapticService.impactMedium();
+                  router.push("/(tabs)");
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Explorer le catalogue"
+              >
+                <Ionicons name="film-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <FinoraText variant="body" weight="700" style={styles.exploreButtonText}>
+                  Explorer le catalogue
+                </FinoraText>
+              </Pressable>
+            </View>
+          ) : null
         }
       />
     </SafeAreaView>
@@ -420,7 +546,6 @@ const styles = StyleSheet.create({
     borderBottomColor: "#1C1C26"
   },
   headerTitle: {
-    fontWeight: "700",
     color: colors.textPrimary,
     marginBottom: 4
   },
@@ -428,63 +553,110 @@ const styles = StyleSheet.create({
     color: colors.textSecondary
   },
   activeSection: {
-    padding: spacing.md,
-    backgroundColor: "#14141E",
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+    backgroundColor: "#11111A",
     borderBottomWidth: 1,
-    borderBottomColor: "#222232"
+    borderBottomColor: "#1E1E2C"
   },
   sectionTitle: {
-    fontWeight: "600",
     color: colors.primary,
-    marginBottom: spacing.xs
-  },
-  downloadProgressRow: {
-    marginVertical: spacing.xs
-  },
-  downloadTitle: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    marginBottom: 4
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: "#2B2B3D",
-    borderRadius: 3,
-    overflow: "hidden"
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: colors.primary
-  },
-  progressPercent: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    marginTop: 2,
-    alignSelf: "flex-end"
+    letterSpacing: 0.8,
+    marginBottom: spacing.sm
   },
   listContainer: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md
   },
-  recordRow: {
+  catalogHeader: {
+    marginBottom: spacing.sm
+  },
+  catalogHeaderText: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    letterSpacing: 0.8
+  },
+  catalogCard: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1A1A26"
+    backgroundColor: "#14141E",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#202030",
+    padding: spacing.sm,
+    marginBottom: spacing.sm
   },
-  recordInfo: {
+  cardPosterContainer: {
+    width: 64,
+    height: 96,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#0C0C12",
+    marginRight: spacing.md,
+    position: "relative"
+  },
+  cardPoster: {
+    width: "100%",
+    height: "100%"
+  },
+  cardPosterFallback: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#1A1A26"
+  },
+  episodeCountBadge: {
+    position: "absolute",
+    bottom: 4,
+    left: 4,
+    right: 4,
+    backgroundColor: "rgba(139, 92, 246, 0.88)",
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignItems: "center"
+  },
+  episodeCountText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    letterSpacing: 0.5
+  },
+  movieBadge: {
+    position: "absolute",
+    bottom: 4,
+    left: 4,
+    right: 4,
+    backgroundColor: "rgba(74, 144, 226, 0.85)",
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignItems: "center"
+  },
+  movieBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    letterSpacing: 0.5
+  },
+  cardInfo: {
     flex: 1,
-    marginRight: spacing.md
+    justifyContent: "center"
   },
-  itemTitle: {
+  cardTitle: {
     color: colors.textPrimary,
-    fontWeight: "600",
+    fontSize: 15,
     marginBottom: 4
   },
-  itemMeta: {
-    color: colors.textSecondary
+  cardSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginBottom: 6
+  },
+  cardSize: {
+    color: colors.textSecondary,
+    fontSize: 12
+  },
+  cardChevron: {
+    paddingHorizontal: spacing.xs
   },
   metaRow: {
     flexDirection: "row",
@@ -493,20 +665,33 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 2
   },
+  missingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(229, 9, 20, 0.15)",
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 4
+  },
+  missingText: {
+    color: "#E50914",
+    fontSize: 10,
+    fontWeight: "600"
+  },
   retentionBadge: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(245, 166, 35, 0.15)",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
     borderRadius: 4
   },
   retentionText: {
     color: "#F5A623",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600"
   },
-  actionButtons: {
+  cardActions: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm
@@ -516,13 +701,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.primary,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    paddingVertical: 7,
+    borderRadius: 8,
     gap: 4
   },
   playText: {
     color: "#FFFFFF",
-    fontWeight: "600"
+    fontSize: 12
   },
   deleteButton: {
     padding: 6
@@ -601,101 +786,19 @@ const styles = StyleSheet.create({
     borderRadius: 8
   },
   orphanTitle: {
-    color: "#F5A623",
-    fontWeight: "700"
+    color: "#F5A623"
   },
   orphanSubtitle: {
     color: colors.textSecondary,
     fontSize: 11
   },
   cleanButton: {
-    backgroundColor: "#F5A623",
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 4,
     borderRadius: 6,
-    marginLeft: 6
+    backgroundColor: "rgba(245, 166, 35, 0.2)"
   },
   cleanButtonText: {
-    color: "#000000",
-    fontWeight: "700",
-    fontSize: 12
-  },
-  downloadRowHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4
-  },
-  rowActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8
-  },
-  retryButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    gap: 4
-  },
-  retryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "600"
-  },
-  cancelButton: {
-    padding: 2
-  },
-  errorNotice: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(229, 9, 20, 0.1)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginTop: 2
-  },
-  errorText: {
-    color: "#E50914",
-    fontSize: 11
-  },
-  progressStatusRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 4
-  },
-  progressMeta: {
-    color: colors.textSecondary,
-    fontSize: 11
-  },
-  missingBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(229, 9, 20, 0.15)",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4
-  },
-  missingText: {
-    color: "#E50914",
-    fontSize: 11,
-    fontWeight: "600"
-  },
-  queuedNotice: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(74, 144, 226, 0.12)",
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 4,
-    marginTop: 2
-  },
-  queuedText: {
-    color: "#4A90E2",
-    fontSize: 11,
-    fontWeight: "500"
+    color: "#F5A623"
   }
 });

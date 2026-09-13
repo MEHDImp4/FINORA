@@ -104,7 +104,8 @@ export default function DetailsScreen() {
         type: "Movie",
         year: mediaItem.year,
         downloadUrl,
-        localPath
+        localPath,
+        posterPath: mediaItem.primaryImageTag
       },
       {
         totalTicks: mediaItem.totalTicks || 72000000000,
@@ -139,14 +140,17 @@ export default function DetailsScreen() {
           localPath,
           seriesId: item?.id,
           seriesName: item?.name,
+          seriesPosterPath: item?.primaryImageTag,
           seasonIndex: ep.seasonIndex,
-          episodeIndex: ep.episodeIndex
+          episodeIndex: ep.episodeIndex,
+          posterPath: ep.primaryImageTag || item?.primaryImageTag
         },
         {
           totalTicks: ep.totalTicks || 25000000000,
           playbackPositionTicks: ep.playbackPositionTicks || 0,
           overview: ep.overview,
           posterPath: ep.primaryImageTag || item?.primaryImageTag,
+          seriesPosterPath: item?.primaryImageTag,
           seriesId: item?.id,
           seriesName: item?.name,
           seasonIndex: ep.seasonIndex,

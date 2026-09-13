@@ -24,8 +24,11 @@ export interface DownloadItem {
   completedAt?: number;
   seriesId?: string;
   seriesName?: string;
+  seriesPosterPath?: string;
   seasonIndex?: number;
   episodeIndex?: number;
+  posterPath?: string;
+  posterLocalPath?: string;
 }
 
 export interface OfflineMediaRecord {
@@ -39,6 +42,8 @@ export interface OfflineMediaRecord {
   totalTicks: number;
   playbackPositionTicks: number;
   posterPath?: string;
+  seriesPosterPath?: string;
+  posterLocalPath?: string;
   savedAt: number;
   isPlayed?: boolean;
   completedWatchedAt?: number;

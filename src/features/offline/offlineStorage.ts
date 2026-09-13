@@ -43,15 +43,50 @@ export class OfflineStorageService {
   }
 
   /**
-   * Deletes an offline media record.
+   * Deletes an offline media record and cleans up physical file.
    */
   public async deleteOfflineMedia(itemId: string): Promise<void> {
     const all = await this.getAllOfflineMedia();
-    const filtered = all.filter((item) => item.itemId !== itemId);
+    const item = all.find((i) => i.itemId === itemId);
+    const filtered = all.filter((i) => i.itemId !== itemId);
     await AsyncStorage.setItem(
       OFFLINE_CATALOG_STORAGE_KEY,
       JSON.stringify(filtered)
     );
+    if (item?.localPath && typeof FileSystem.deleteAsync === "function") {
+      try {
+        await FileSystem.deleteAsync(item.localPath, { idempotent: true });
+      } catch {
+        // Safe deletion
+      }
+    }
+  }
+
+  /**
+   * Deletes all downloaded episodes for a series and cleans up physical files.
+   */
+  public async deleteSeriesOfflineMedia(seriesIdOrName: string): Promise<void> {
+    const all = await this.getAllOfflineMedia();
+    const seriesEpisodes = all.filter(
+      (i) => i.seriesId === seriesIdOrName || (i.seriesName && i.seriesName === seriesIdOrName)
+    );
+    const remaining = all.filter(
+      (i) => i.seriesId !== seriesIdOrName && (!i.seriesName || i.seriesName !== seriesIdOrName)
+    );
+    await AsyncStorage.setItem(
+      OFFLINE_CATALOG_STORAGE_KEY,
+      JSON.stringify(remaining)
+    );
+
+    for (const ep of seriesEpisodes) {
+      if (ep.localPath && typeof FileSystem.deleteAsync === "function") {
+        try {
+          await FileSystem.deleteAsync(ep.localPath, { idempotent: true });
+        } catch {
+          // Safe deletion
+        }
+      }
+    }
   }
 
   /**

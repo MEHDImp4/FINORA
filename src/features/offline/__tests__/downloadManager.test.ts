@@ -140,4 +140,25 @@ describe("DownloadManager", () => {
     expect(manager.getDownload("ep-5")?.status).toBe("downloading");
     expect(manager.getQueueLength()).toBe(0);
   });
+
+  it("retains series poster, series name, and episode poster in download item", async () => {
+    const item = await manager.startDownload({
+      itemId: "ep-series-1",
+      title: "Breaking Bad - Pilot",
+      type: "Episode",
+      seriesId: "series-bb",
+      seriesName: "Breaking Bad",
+      seriesPosterPath: "tag-bb-poster",
+      posterPath: "tag-ep-poster",
+      seasonIndex: 1,
+      episodeIndex: 1,
+      downloadUrl: "https://jellyfin.example.com/Videos/ep-series-1/stream.mp4",
+      localPath: "finora_downloads/ep_1.mp4"
+    });
+
+    expect(item.seriesId).toBe("series-bb");
+    expect(item.seriesName).toBe("Breaking Bad");
+    expect(item.seriesPosterPath).toBe("tag-bb-poster");
+    expect(item.posterPath).toBe("tag-ep-poster");
+  });
 });

@@ -19,6 +19,17 @@ jest.mock("expo-router", () => ({
   useFocusEffect: (cb: any) => cb()
 }));
 
+// Mock authStore
+jest.mock("../../../stores/authStore", () => ({
+  useAuthStore: (selector: any) =>
+    selector({
+      session: {
+        serverUrl: "https://jellyfin.example.com",
+        userId: "user-123"
+      }
+    })
+}));
+
 describe("DownloadsScreen & OfflineSyncManager", () => {
   const mockRecord: OfflineMediaRecord = {
     itemId: "movie-offline-1",
@@ -140,5 +151,128 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     });
 
     expect(getVerifiedSpy.mock.calls.length).toBeGreaterThan(callCountBefore);
+  });
+
+  it("groups multiple episodes of the same series and opens series detail view", async () => {
+    const mockEp1: OfflineMediaRecord = {
+      itemId: "ep-1",
+      title: "Breaking Bad - Pilot",
+      type: "Episode",
+      seriesId: "series-bb",
+      seriesName: "Breaking Bad",
+      seasonIndex: 1,
+      episodeIndex: 1,
+      localPath: "finora_downloads/ep_1.mp4",
+      fileSizeBytes: 500000000,
+      totalTicks: 3000000000,
+      playbackPositionTicks: 0,
+      savedAt: Date.now()
+    };
+    const mockEp2: OfflineMediaRecord = {
+      itemId: "ep-2",
+      title: "Breaking Bad - Cat's in the Bag...",
+      type: "Episode",
+      seriesId: "series-bb",
+      seriesName: "Breaking Bad",
+      seasonIndex: 1,
+      episodeIndex: 2,
+      localPath: "finora_downloads/ep_2.mp4",
+      fileSizeBytes: 500000000,
+      totalTicks: 3000000000,
+      playbackPositionTicks: 0,
+      savedAt: Date.now()
+    };
+
+    jest.spyOn(offlineStorageService, "getVerifiedOfflineMedia").mockResolvedValue({
+      items: [
+        { ...mockEp1, fileExists: true, actualBytes: mockEp1.fileSizeBytes },
+        { ...mockEp2, fileExists: true, actualBytes: mockEp2.fileSizeBytes }
+      ],
+      totalPhysicalBytes: 1000000000,
+      hasOrphans: false
+    });
+
+    const mockOnPlay = jest.fn();
+    let tree: any;
+
+    await act(async () => {
+      tree = ReactTestRenderer.create(<DownloadsScreen onPlayItem={mockOnPlay} />);
+    });
+
+    // Should find single series card for Breaking Bad with 2 episodes
+    const seriesCard = tree.root.findByProps({
+      accessibilityLabel: "Browse series Breaking Bad, 2 episodes"
+    });
+    expect(seriesCard).toBeTruthy();
+
+    // Click on the series card to open DownloadedSeriesView
+    await act(async () => {
+      seriesCard.props.onPress();
+    });
+
+    // Should now display the series view
+    const seriesView = tree.root.findByProps({ testID: "downloaded-series-view" });
+    expect(seriesView).toBeTruthy();
+
+    // Should list both episodes
+    const ep1Item = tree.root.findByProps({ testID: "series-episode-item-ep-1" });
+    const ep2Item = tree.root.findByProps({ testID: "series-episode-item-ep-2" });
+    expect(ep1Item).toBeTruthy();
+    expect(ep2Item).toBeTruthy();
+
+    // Click play on episode 1
+    const ep1PlayBtn = tree.root.findByProps({ accessibilityLabel: "Play offline Breaking Bad - Pilot" });
+    act(() => {
+      ep1PlayBtn.props.onPress();
+    });
+    expect(mockOnPlay).toHaveBeenCalledWith(expect.objectContaining({ itemId: "ep-1" }));
+
+    // Back button returns to main catalog
+    const backBtn = tree.root.findByProps({ accessibilityLabel: "Retour aux téléchargements" });
+    await act(async () => {
+      backBtn.props.onPress();
+    });
+
+    const seriesCardAgain = tree.root.findByProps({
+      accessibilityLabel: "Browse series Breaking Bad, 2 episodes"
+    });
+    expect(seriesCardAgain).toBeTruthy();
+  });
+
+  it("renders active downloads with poster and series info", async () => {
+    const activeEp = {
+      itemId: "active-ep-1",
+      title: "Breaking Bad - And the Bag's in the River",
+      type: "Episode" as const,
+      seriesId: "series-bb",
+      seriesName: "Breaking Bad",
+      seriesPosterPath: "tag-bb-poster",
+      seasonIndex: 1,
+      episodeIndex: 3,
+      downloadUrl: "https://jellyfin.example.com/download/ep3",
+      localPath: "finora_downloads/ep_active.mp4",
+      status: "downloading" as const,
+      progress: 0.45,
+      bytesDownloaded: 225000000,
+      totalBytes: 500000000,
+      speedBytesPerSecond: 2000000,
+      estimatedSecondsRemaining: 137,
+      startedAt: Date.now()
+    };
+
+    jest.spyOn(downloadManager, "subscribe").mockImplementation((listener) => {
+      listener([activeEp]);
+      return () => {};
+    });
+
+    let tree: any;
+    await act(async () => {
+      tree = ReactTestRenderer.create(<DownloadsScreen />);
+    });
+
+    const activeCard = tree.root.findByProps({
+      testID: "download-progress-card-active-ep-1"
+    });
+    expect(activeCard).toBeTruthy();
   });
 });
