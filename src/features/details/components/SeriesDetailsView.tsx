@@ -28,6 +28,8 @@ import { DownloadSeriesModal } from "./DownloadSeriesModal";
 import { DownloadQualityModal } from "./DownloadQualityModal";
 import { DownloadQuality } from "../../offline/downloadQuality";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { MediaCarousel } from "../../home/components/MediaCarousel";
+import { useSimilarItems } from "../../../hooks/useMediaQueries";
 
 export interface SeriesDetailsViewProps {
   series: MediaItem;
@@ -35,6 +37,7 @@ export interface SeriesDetailsViewProps {
   userId: string;
   onPlayEpisode: (episode: MediaItem) => void;
   onBack: () => void;
+  onSelectSimilar?: (item: MediaItem) => void;
   onToggleFavorite?: (item: MediaItem) => void;
   onDownloadEpisodes?: (episodes: MediaItem[], quality: DownloadQuality) => void;
 }
@@ -49,6 +52,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
     userId,
     onPlayEpisode,
     onBack,
+    onSelectSimilar,
     onToggleFavorite,
     onDownloadEpisodes
   }) => {
@@ -58,6 +62,8 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
     const [selectedEpisodeForDownload, setSelectedEpisodeForDownload] =
       useState<MediaItem | null>(null);
+
+    const { data: similarItems = [] } = useSimilarItems(userId, series.id, 12);
 
     const { data: seasons = [], isLoading: isLoadingSeasons } = useSeasons(
       series.id,
@@ -304,6 +310,19 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
         {/* Cast List */}
         {series.people && series.people.length > 0 ? (
           <CastList people={series.people} serverUrl={serverUrl} />
+        ) : null}
+
+        {/* Netflix: Similar Titles Carousel */}
+        {similarItems && similarItems.length > 0 ? (
+          <View style={{ marginTop: spacing.md }}>
+            <MediaCarousel
+              title="Titres similaires"
+              items={similarItems}
+              serverUrl={serverUrl}
+              variant="poster"
+              onItemPress={onSelectSimilar}
+            />
+          </View>
         ) : null}
 
         <DownloadSeriesModal

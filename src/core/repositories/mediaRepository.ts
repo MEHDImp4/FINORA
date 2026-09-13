@@ -223,6 +223,33 @@ export class MediaRepository {
     return mapJellyfinItemToMediaItem(dto);
   }
 
+  public async getSimilarItems(
+    userId: string,
+    itemId: string,
+    limit: number = 12,
+    customClient?: HttpClient
+  ): Promise<MediaItem[]> {
+    if (!userId || !itemId) {
+      throw new FinoraError("Both userId and itemId are required", "INVALID_PARAMS");
+    }
+
+    const http = this.getHttp(customClient);
+    try {
+      const response = await http.request<{ Items?: any[] }>(`/Items/${itemId}/Similar`, {
+        params: {
+          UserId: userId,
+          Limit: limit,
+          Fields: MEDIA_FIELDS,
+          EnableImageTypes: "Primary,Backdrop,Thumb"
+        }
+      });
+      const items = response?.Items || [];
+      return items.filter(isValidMediaDto).map(mapJellyfinItemToMediaItem);
+    } catch {
+      return [];
+    }
+  }
+
   public async getSeasons(
     userId: string,
     seriesId: string,

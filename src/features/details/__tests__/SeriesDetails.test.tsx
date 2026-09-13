@@ -2,7 +2,7 @@ import React from "react";
 import renderer, { act } from "react-test-renderer";
 import { SeriesDetailsView } from "../components/SeriesDetailsView";
 import { MediaItem } from "../../../types/media";
-import { useSeasons, useEpisodes } from "../../../hooks/useMediaQueries";
+import { useSeasons, useEpisodes, useSimilarItems } from "../../../hooks/useMediaQueries";
 
 jest.mock("../../../hooks/useMediaQueries");
 
@@ -93,6 +93,11 @@ describe("SeriesDetailsView", () => {
 
     (useEpisodes as jest.Mock).mockReturnValue({
       data: mockEpisodes,
+      isLoading: false
+    });
+
+    (useSimilarItems as jest.Mock).mockReturnValue({
+      data: [],
       isLoading: false
     });
   });

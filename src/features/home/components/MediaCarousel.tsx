@@ -10,6 +10,7 @@ interface MediaCarouselProps {
   items: MediaItem[];
   serverUrl: string;
   variant?: CardVariant;
+  matchScores?: Record<string, number>;
   onItemPress?: (item: MediaItem) => void;
 }
 
@@ -19,6 +20,7 @@ export const MediaCarousel = React.memo(
     items,
     serverUrl,
     variant = "poster",
+    matchScores,
     onItemPress
   }: MediaCarouselProps) {
     const validItems = React.useMemo(() => {
@@ -61,6 +63,7 @@ export const MediaCarousel = React.memo(
               item={item}
               serverUrl={serverUrl}
               variant={variant}
+              matchScore={matchScores ? matchScores[item.id] : undefined}
               onPress={onItemPress}
             />
           )}
@@ -72,7 +75,8 @@ export const MediaCarousel = React.memo(
     prev.title === next.title &&
     prev.items === next.items &&
     prev.serverUrl === next.serverUrl &&
-    prev.variant === next.variant
+    prev.variant === next.variant &&
+    prev.matchScores === next.matchScores
 );
 
 const styles = StyleSheet.create({

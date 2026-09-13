@@ -23,12 +23,16 @@ import { CastList } from "./CastList";
 import { DownloadQualityModal } from "./DownloadQualityModal";
 import { DownloadQuality } from "../../offline/downloadQuality";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { MediaCarousel } from "../../home/components/MediaCarousel";
+import { useSimilarItems } from "../../../hooks/useMediaQueries";
 
 export interface MovieDetailsViewProps {
   item: MediaItem;
   serverUrl: string;
+  userId?: string;
   onPlay: (item: MediaItem) => void;
   onBack: () => void;
+  onSelectSimilar?: (item: MediaItem) => void;
   onToggleFavorite?: (item: MediaItem) => void;
   onTogglePlayed?: (item: MediaItem) => void;
   onDownload?: (item: MediaItem, quality: DownloadQuality) => void;
@@ -43,8 +47,10 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
   ({
     item,
     serverUrl,
+    userId,
     onPlay,
     onBack,
+    onSelectSimilar,
     onToggleFavorite,
     onTogglePlayed,
     onDownload,
@@ -54,6 +60,7 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
     const insets = useSafeAreaInsets();
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
     const [isQualityModalOpen, setIsQualityModalOpen] = useState(false);
+    const { data: similarItems = [] } = useSimilarItems(userId, item.id, 12);
 
     const backdropUri = item.backdropImageTag
       ? getBackdropUrl(serverUrl, item.id, item.backdropImageTag, 1080)
@@ -329,6 +336,19 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
         {/* Cast & Crew Section */}
         {item.people && item.people.length > 0 ? (
           <CastList people={item.people} serverUrl={serverUrl} />
+        ) : null}
+
+        {/* Netflix: Similar Titles Carousel */}
+        {similarItems && similarItems.length > 0 ? (
+          <View style={{ marginTop: spacing.md }}>
+            <MediaCarousel
+              title="Titres similaires"
+              items={similarItems}
+              serverUrl={serverUrl}
+              variant="poster"
+              onItemPress={onSelectSimilar || onPlay}
+            />
+          </View>
         ) : null}
 
         <DownloadQualityModal

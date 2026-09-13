@@ -279,6 +279,10 @@ export default function DetailsScreen() {
           userId={userId}
           onPlayEpisode={handlePlay}
           onBack={() => router.back()}
+          onSelectSimilar={(similarItem) => {
+            hapticService.selection();
+            router.push({ pathname: "/details/[id]", params: { id: similarItem.id } });
+          }}
           onToggleFavorite={handleToggleFavorite}
           onDownloadEpisodes={handleDownloadSeriesEpisodes}
         />
@@ -286,8 +290,13 @@ export default function DetailsScreen() {
         <MovieDetailsView
           item={item}
           serverUrl={serverUrl}
+          userId={userId}
           onPlay={handlePlay}
           onBack={() => router.back()}
+          onSelectSimilar={(similarItem) => {
+            hapticService.selection();
+            router.push({ pathname: "/details/[id]", params: { id: similarItem.id } });
+          }}
           onToggleFavorite={handleToggleFavorite}
           onTogglePlayed={handleTogglePlayed}
           onDownload={handleDownloadMovie}

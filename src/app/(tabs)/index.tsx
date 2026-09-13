@@ -24,6 +24,10 @@ import { hapticService } from "../../core/feedback/hapticService";
 import { useNetworkDiagnostic } from "../../core/network/networkStatusService";
 import { NetworkFailureStateView } from "../../design-system/components/NetworkFailureStateView";
 import { OfflineBanner } from "../../design-system/components/OfflineBanner";
+import {
+  getRecommendedForYou,
+  getBecauseYouWatched
+} from "../../features/recommendations/recommendationEngine";
 
 function HomeLibraryRow({
   library,
@@ -197,6 +201,40 @@ export default function HomeScreen() {
     return heroPool[heroIndex % heroPool.length];
   }, [heroPool, heroIndex]);
 
+  // Netflix-style Recommendations Engine
+  const recommendedItems = useMemo(() => {
+    return getRecommendedForYou(recentItems || [], resumeItems || [], watchlistItems || [], 16);
+  }, [recentItems, resumeItems, watchlistItems]);
+
+  const recommendedItemsList = useMemo(() => {
+    return recommendedItems.map((r) => r.item);
+  }, [recommendedItems]);
+
+  const recommendedMatchScores = useMemo(() => {
+    const scores: Record<string, number> = {};
+    for (const r of recommendedItems) {
+      scores[r.item.id] = r.matchScore;
+    }
+    return scores;
+  }, [recommendedItems]);
+
+  const becauseYouWatched = useMemo(() => {
+    return getBecauseYouWatched(resumeItems || [], recentItems || [], 12);
+  }, [resumeItems, recentItems]);
+
+  const becauseYouWatchedItems = useMemo(() => {
+    return becauseYouWatched ? becauseYouWatched.items.map((r) => r.item) : [];
+  }, [becauseYouWatched]);
+
+  const becauseYouWatchedScores = useMemo(() => {
+    if (!becauseYouWatched) return {};
+    const scores: Record<string, number> = {};
+    for (const r of becauseYouWatched.items) {
+      scores[r.item.id] = r.matchScore;
+    }
+    return scores;
+  }, [becauseYouWatched]);
+
   const handlePlay = (item: MediaItem) => {
     if (item.type === "Series" || item.type === "Season") {
       router.push({ pathname: "/details/[id]", params: { id: item.id } });
@@ -369,6 +407,30 @@ export default function HomeScreen() {
             items={resumeItems}
             serverUrl={serverUrl}
             variant="poster"
+            onItemPress={handleItemPress}
+          />
+        ) : null}
+
+        {/* Netflix Top Picks: Recommandé pour vous */}
+        {recommendedItemsList.length > 0 ? (
+          <MediaCarousel
+            title="Recommandé pour vous"
+            items={recommendedItemsList}
+            serverUrl={serverUrl}
+            variant="poster"
+            matchScores={recommendedMatchScores}
+            onItemPress={handleItemPress}
+          />
+        ) : null}
+
+        {/* Netflix: Parce que vous avez regardé [Titre] */}
+        {becauseYouWatched && becauseYouWatchedItems.length > 0 ? (
+          <MediaCarousel
+            title={`Parce que vous avez regardé ${becauseYouWatched.sourceItem.name}`}
+            items={becauseYouWatchedItems}
+            serverUrl={serverUrl}
+            variant="poster"
+            matchScores={becauseYouWatchedScores}
             onItemPress={handleItemPress}
           />
         ) : null}

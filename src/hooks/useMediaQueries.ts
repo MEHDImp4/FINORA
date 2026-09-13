@@ -20,7 +20,9 @@ export const mediaKeys = {
   genres: (userId: string, parentId?: string) =>
     [...mediaKeys.all, "genres", userId, parentId] as const,
   watchlist: (userId: string, options?: GetItemsOptions) =>
-    [...mediaKeys.all, "watchlist", userId, options] as const
+    [...mediaKeys.all, "watchlist", userId, options] as const,
+  similar: (userId: string, itemId: string, limit?: number) =>
+    [...mediaKeys.all, "similar", userId, itemId, limit] as const
 };
 
 export function useLibraries(userId?: string) {
@@ -109,6 +111,14 @@ export function useWatchlistItems(
         recursive: true
       }),
     enabled: Boolean(userId)
+  });
+}
+
+export function useSimilarItems(userId?: string, itemId?: string, limit: number = 12) {
+  return useQuery<MediaItem[]>({
+    queryKey: mediaKeys.similar(userId || "", itemId || "", limit),
+    queryFn: () => mediaRepository.getSimilarItems(userId!, itemId!, limit),
+    enabled: Boolean(userId && itemId)
   });
 }
 

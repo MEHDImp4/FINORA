@@ -3,6 +3,10 @@ import renderer, { act } from "react-test-renderer";
 import { MovieDetailsView } from "../components/MovieDetailsView";
 import { MediaItem } from "../../../types/media";
 
+jest.mock("../../../hooks/useMediaQueries", () => ({
+  useSimilarItems: jest.fn(() => ({ data: [] }))
+}));
+
 const mockMovie: MediaItem = {
   id: "mov-1",
   name: "Interstellar",
