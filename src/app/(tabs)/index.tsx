@@ -358,13 +358,13 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* Continue Watching Section (Thumbnails with progress bars) */}
+        {/* Continue Watching Section (Posters with progress bars) */}
         {resumeItems && resumeItems.length > 0 ? (
           <MediaCarousel
             title="Continue Watching"
             items={resumeItems}
             serverUrl={serverUrl}
-            variant="thumbnail"
+            variant="poster"
             onItemPress={handleItemPress}
           />
         ) : null}

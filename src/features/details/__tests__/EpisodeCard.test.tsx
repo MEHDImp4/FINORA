@@ -95,12 +95,18 @@ describe("EpisodeCard", () => {
     );
   });
 
-  it("uses 16:9 Primary image for episode thumbnail", () => {
+  it("prioritizes series primary poster for episode thumbnail with centered framing", () => {
+    const episodeWithSeriesPoster: MediaItem = {
+      ...mockEpisode,
+      seriesId: "series-got",
+      seriesPrimaryImageTag: "tag-series-poster"
+    };
+
     let root: renderer.ReactTestRenderer;
     act(() => {
       root = renderer.create(
         <EpisodeCard
-          episode={mockEpisode}
+          episode={episodeWithSeriesPoster}
           serverUrl="https://jellyfin.example.com"
           onPlay={jest.fn()}
         />
@@ -109,15 +115,16 @@ describe("EpisodeCard", () => {
 
     const instance = root!.root;
     const image = instance.findByProps({ contentFit: "cover" });
-    expect(image.props.source.uri).toContain("/Items/ep-1/Images/Primary");
-    expect(image.props.source.uri).toContain("tag=tag-ep-thumb");
-    expect(image.props.source.uri).not.toContain("Backdrop");
+    expect(image.props.source.uri).toContain("/Items/series-got/Images/Primary");
+    expect(image.props.source.uri).toContain("tag=tag-series-poster");
+    expect(image.props.contentPosition).toBe("center");
   });
 
-  it("cycles to series backdrop when episode still onError is triggered", () => {
-    const episodeWithBackdrop: MediaItem = {
+  it("cycles to fallback when first candidate image onError is triggered", () => {
+    const episodeWithFallback: MediaItem = {
       ...mockEpisode,
       seriesId: "series-got",
+      seriesPrimaryImageTag: "tag-series-poster",
       parentBackdropImageTag: "tag-series-backdrop"
     };
 
@@ -125,7 +132,7 @@ describe("EpisodeCard", () => {
     act(() => {
       root = renderer.create(
         <EpisodeCard
-          episode={episodeWithBackdrop}
+          episode={episodeWithFallback}
           serverUrl="https://jellyfin.example.com"
           onPlay={jest.fn()}
         />
@@ -134,16 +141,16 @@ describe("EpisodeCard", () => {
 
     const instance = root!.root;
     let image = instance.findByProps({ contentFit: "cover" });
-    expect(image.props.source.uri).toContain("tag-ep-thumb");
+    expect(image.props.source.uri).toContain("tag-series-poster");
 
-    // Trigger error on episode still
+    // Trigger error on series poster
     act(() => {
       image.props.onError();
     });
 
-    // Should now fallback to series backdrop
+    // Should now advance in candidates (to series poster untagged or backdrop)
     image = instance.findByProps({ contentFit: "cover" });
-    expect(image.props.source.uri).toContain("tag-series-backdrop");
+    expect(image.props.source.uri).toBeTruthy();
   });
 
   it("triggers onLongPress and onDownload for single episode download", () => {

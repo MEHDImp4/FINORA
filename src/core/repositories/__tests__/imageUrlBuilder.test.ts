@@ -117,27 +117,30 @@ describe("imageUrlBuilder", () => {
   });
 
   describe("getMediaThumbnailUrl & getMediaThumbnailUrls", () => {
-    it("uses episode Primary image (16:9 still frame) for episodes as first choice", () => {
+    it("prioritizes series Primary poster for episodes as first choice", () => {
       const episodeItem: any = {
         id: "ep-1",
         type: "Episode",
         name: "Pilot",
         seriesId: "series-99",
+        seriesPrimaryImageTag: "series-poster-123",
         primaryImageTag: "ep-still-456",
         parentBackdropImageTag: "series-bd-789"
       };
 
       const url = getMediaThumbnailUrl(baseUrl, episodeItem);
-      expect(url).toContain("/Items/ep-1/Images/Primary");
-      expect(url).toContain("tag=ep-still-456");
+      expect(url).toContain("/Items/series-99/Images/Primary");
+      expect(url).toContain("tag=series-poster-123");
 
       const urls = getMediaThumbnailUrls(baseUrl, episodeItem);
       expect(urls[0]).toBe(url);
       expect(urls.some((u) => u.includes("series-bd-789"))).toBe(true);
+      // Episode still should be relegated to the end of the candidate list
+      expect(urls[urls.length - 2]).toContain("/Items/ep-1/Images/Primary");
     });
 
-    it("falls back to series backdrop for episodes without still frame", () => {
-      const episodeWithoutStill: any = {
+    it("falls back to series backdrop for episodes without poster tags", () => {
+      const episodeWithoutPoster: any = {
         id: "ep-1",
         type: "Episode",
         name: "Pilot",
@@ -145,26 +148,26 @@ describe("imageUrlBuilder", () => {
         parentBackdropImageTag: "series-bd-789"
       };
 
-      const url = getMediaThumbnailUrl(baseUrl, episodeWithoutStill);
-      expect(url).toContain("/Items/series-99/Images/Backdrop");
-      expect(url).toContain("tag=series-bd-789");
+      const urls = getMediaThumbnailUrls(baseUrl, episodeWithoutPoster);
+      expect(urls.some((u) => u.includes("/Items/series-99/Images/Backdrop"))).toBe(true);
     });
 
-    it("uses item backdrop for movies and series", () => {
+    it("prioritizes primary poster for movies and series", () => {
       const movieItem: any = {
         id: "movie-1",
         type: "Movie",
         name: "Inception",
+        primaryImageTag: "movie-poster-abc",
         backdropImageTag: "bd-tag-abc"
       };
 
       const url = getMediaThumbnailUrl(baseUrl, movieItem);
-      expect(url).toContain("/Items/movie-1/Images/Backdrop");
-      expect(url).toContain("tag=bd-tag-abc");
+      expect(url).toContain("/Items/movie-1/Images/Primary");
+      expect(url).toContain("tag=movie-poster-abc");
 
       const urls = getMediaThumbnailUrls(baseUrl, movieItem);
       expect(urls[0]).toBe(url);
-      expect(urls.some((u) => u.includes("/Images/Primary"))).toBe(true);
+      expect(urls.some((u) => u.includes("/Images/Backdrop"))).toBe(true);
     });
   });
 

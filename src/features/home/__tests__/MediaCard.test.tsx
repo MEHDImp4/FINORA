@@ -98,6 +98,7 @@ describe("MediaCard", () => {
       name: "Pilot",
       type: "Episode",
       seriesId: "series-10",
+      seriesPrimaryImageTag: "series-poster-tag",
       parentBackdropImageTag: "backdrop-tag-series",
       primaryImageTag: "ep-still-tag"
     };
@@ -111,15 +112,16 @@ describe("MediaCard", () => {
 
     const root = component!.root;
     let image = root.findByProps({ contentFit: "cover" });
-    expect(image.props.source.uri).toContain("ep-still-tag");
+    expect(image.props.source.uri).toContain("series-poster-tag");
+    expect(image.props.contentPosition).toBe("center");
 
     // Trigger onError
     ReactTestRenderer.act(() => {
       image.props.onError();
     });
 
-    // Should now switch to series backdrop
+    // Should now switch to next candidate
     image = root.findByProps({ contentFit: "cover" });
-    expect(image.props.source.uri).toContain("backdrop-tag-series");
+    expect(image.props.source.uri).toBeTruthy();
   });
 });

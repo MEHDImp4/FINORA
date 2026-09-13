@@ -119,6 +119,7 @@ export const MediaCard = React.memo(
               placeholder={item.blurhash ? { blurhash: item.blurhash } : undefined}
               style={styles.image}
               contentFit="cover"
+              contentPosition="center"
               transition={200}
               cachePolicy="memory-disk"
               onError={handleImageError}

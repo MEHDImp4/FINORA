@@ -76,6 +76,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
               source={{ uri: currentUrl }}
               style={styles.thumbnail}
               contentFit="cover"
+              contentPosition="center"
               transition={200}
               placeholder={episode.blurhash ? { blurhash: episode.blurhash } : undefined}
               cachePolicy="memory-disk"
