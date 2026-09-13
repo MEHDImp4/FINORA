@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 export interface DeviceProfile {
   supportedContainers: string[];
   supportedVideoCodecs: string[];
@@ -9,8 +11,9 @@ export interface DeviceProfile {
   maxBitrate?: number;
 }
 
-export function getDefaultDeviceProfile(platform: string = "default"): DeviceProfile {
-  const isIOS = platform.toLowerCase() === "ios";
+export function getDefaultDeviceProfile(platform?: string): DeviceProfile {
+  const targetPlatform = platform && platform !== "default" ? platform : Platform.OS;
+  const isIOS = targetPlatform?.toLowerCase() === "ios";
 
   if (isIOS) {
     return {

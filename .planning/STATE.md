@@ -101,6 +101,12 @@ Items acknowledged and carried forward from previous milestone close:
 |----------|------|--------|-------------|
 | *(none)* | | | |
 
+## Quick Tasks Completed
+
+| Slug | Date | Description | Status |
+|------|------|-------------|--------|
+| device-profile-platform-fix | 2026-09-14 | Resolve device profile platform via Platform.OS for iOS & Android | Complete ✓ |
+
 ## Session Continuity
  
 Last session: 2026-09-11

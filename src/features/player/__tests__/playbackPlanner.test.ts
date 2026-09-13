@@ -65,6 +65,47 @@ describe("PlaybackPlanner", () => {
     expect(plan.reason).toContain("unsupported; remuxing codecs directly");
   });
 
+  it("selects Direct Stream for MKV when platform is 'ios'", () => {
+    const item: MediaItem = {
+      ...baseItem,
+      mediaStreams: [
+        { type: "Video", codec: "h264" },
+        { type: "Audio", codec: "aac" }
+      ]
+    };
+
+    const plan = createPlaybackPlan({
+      item,
+      serverUrl,
+      token,
+      container: "mkv",
+      platform: "ios"
+    });
+
+    expect(plan.mode).toBe("direct-stream");
+    expect(plan.reason).toContain("unsupported; remuxing codecs directly");
+  });
+
+  it("selects Direct Play for MKV when platform is 'android'", () => {
+    const item: MediaItem = {
+      ...baseItem,
+      mediaStreams: [
+        { type: "Video", codec: "h264" },
+        { type: "Audio", codec: "aac" }
+      ]
+    };
+
+    const plan = createPlaybackPlan({
+      item,
+      serverUrl,
+      token,
+      container: "mkv",
+      platform: "android"
+    });
+
+    expect(plan.mode).toBe("direct-play");
+  });
+
   it("selects Transcoding when video codec is unsupported", () => {
     const item: MediaItem = {
       ...baseItem,

@@ -3,7 +3,8 @@ import {
   View,
   StyleSheet,
   ActivityIndicator,
-  StatusBar
+  StatusBar,
+  Platform
 } from "react-native";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { VideoView } from "expo-video";
@@ -156,6 +157,7 @@ export function PlayerScreen({
       item,
       serverUrl,
       token,
+      platform: Platform.OS,
       localPath,
       audioStreamIndex: serverAudioIndex,
       subtitleStreamIndex: serverSubtitleIndex

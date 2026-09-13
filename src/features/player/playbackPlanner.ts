@@ -19,6 +19,7 @@ export interface PlaybackPlanOptions {
   serverUrl: string;
   token?: string;
   deviceProfile?: DeviceProfile;
+  platform?: string;
   container?: string;
   localPath?: string;
   audioStreamIndex?: number;
@@ -34,7 +35,8 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     item,
     serverUrl,
     token = "",
-    deviceProfile = getDefaultDeviceProfile(),
+    platform,
+    deviceProfile = getDefaultDeviceProfile(platform),
     container,
     localPath,
     audioStreamIndex,
