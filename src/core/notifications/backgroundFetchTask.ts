@@ -10,11 +10,18 @@
  *
  * iOS: the OS controls the actual interval (>= 15 min).
  * Android: ~15 min minimum, more reliable than iOS.
+ *
+ * HEADLESS CONTEXT NOTE:
+ * Background tasks run in a headless JS context where the Zustand store has
+ * NOT been hydrated. Do NOT call useAuthStore.getState().session directly —
+ * it will return null. Instead, restore the session explicitly from secure
+ * storage via authRepository.restoreSession() every time the task fires.
  */
 
 import * as TaskManager from "expo-task-manager";
 import * as BackgroundFetch from "expo-background-fetch";
-import { useAuthStore } from "../../stores/authStore";
+import { authRepository } from "../../core/jellyfin/authRepository";
+import { jellyfinClient } from "../../core/jellyfin/jellyfinClient";
 import { syncNewMediaNotifications } from "../../features/notifications/useNotificationSync";
 import { logger } from "../network/logger";
 
@@ -24,13 +31,21 @@ export const FINORA_BG_FETCH_TASK = "FINORA_BACKGROUND_CONTENT_CHECK";
 // Task body (defined at module level - required by TaskManager)
 TaskManager.defineTask(FINORA_BG_FETCH_TASK, async () => {
   try {
-    const session = useAuthStore.getState().session;
+    // ── Restore session from secure storage ──────────────────────────────────
+    // The Zustand store is NOT hydrated in a background/headless context.
+    // We must re-read the session descriptor + token from their persisted sources.
+    const session = await authRepository.restoreSession();
 
     if (!session?.userId) {
-      logger.info("[BgFetch] Skipped: no authenticated session.");
+      logger.info("[BgFetch] Skipped: no authenticated session found in secure storage.");
       return BackgroundFetch.BackgroundFetchResult.NoData;
     }
 
+    // Ensure the Jellyfin client is configured for this session
+    await jellyfinClient.initialize(session.serverUrl);
+    jellyfinClient.setAuthToken(session.token);
+
+    // ── Sync for new media and dispatch notifications ─────────────────────────
     await syncNewMediaNotifications(session.userId);
 
     logger.info("[BgFetch] Content check completed.");
@@ -43,7 +58,7 @@ TaskManager.defineTask(FINORA_BG_FETCH_TASK, async () => {
 
 /**
  * Registers the background fetch task with the OS.
- * Safe to call multiple times - skips if already registered.
+ * Safe to call multiple times — skips if already registered.
  */
 export async function registerBackgroundFetch(): Promise<void> {
   try {
@@ -59,7 +74,7 @@ export async function registerBackgroundFetch(): Promise<void> {
 
     const isRegistered = await TaskManager.isTaskRegisteredAsync(FINORA_BG_FETCH_TASK);
     if (isRegistered) {
-      logger.info("[BgFetch] Task already registered - skipping.");
+      logger.info("[BgFetch] Task already registered — skipping.");
       return;
     }
 

@@ -1,10 +1,19 @@
 import * as TaskManager from "expo-task-manager";
 import * as BackgroundFetch from "expo-background-fetch";
 
-// Mock stores before importing the task module
-jest.mock("../../../stores/authStore", () => ({
-  useAuthStore: {
-    getState: jest.fn(() => ({ session: null }))
+// Mock authRepository (headless session restore) before importing the task module
+jest.mock("../../../core/jellyfin/authRepository", () => ({
+  authRepository: {
+    restoreSession: jest.fn().mockResolvedValue(null)
+  }
+}));
+
+jest.mock("../../../core/jellyfin/jellyfinClient", () => ({
+  jellyfinClient: {
+    initialize: jest.fn().mockResolvedValue(undefined),
+    setAuthToken: jest.fn(),
+    getServerUrl: jest.fn().mockReturnValue("https://jellyfin.example.com"),
+    getHttpClient: jest.fn().mockReturnValue({ request: jest.fn() })
   }
 }));
 
@@ -16,7 +25,7 @@ jest.mock("../../../core/network/logger", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
 
-import { useAuthStore } from "../../../stores/authStore";
+import { authRepository } from "../../../core/jellyfin/authRepository";
 import { syncNewMediaNotifications } from "../../../features/notifications/useNotificationSync";
 import {
   FINORA_BG_FETCH_TASK,
@@ -29,7 +38,7 @@ const mockIsTaskRegisteredAsync = TaskManager.isTaskRegisteredAsync as jest.Mock
 const mockGetStatusAsync = BackgroundFetch.getStatusAsync as jest.Mock;
 const mockRegisterTaskAsync = BackgroundFetch.registerTaskAsync as jest.Mock;
 const mockUnregisterTaskAsync = BackgroundFetch.unregisterTaskAsync as jest.Mock;
-const mockGetState = useAuthStore.getState as jest.Mock;
+const mockRestoreSession = authRepository.restoreSession as jest.Mock;
 const mockSyncNewMedia = syncNewMediaNotifications as jest.Mock;
 
 describe("backgroundFetchTask", () => {
@@ -52,7 +61,7 @@ describe("backgroundFetchTask", () => {
     let taskHandler: (...args: any[]) => any;
 
     beforeAll(() => {
-      // Capture the handler BEFORE any clearAllMocks wipes the call history
+      // Capture the handler before any clearAllMocks wipes the call history
       taskHandler = mockDefineTask.mock.calls[mockDefineTask.mock.calls.length - 1][1];
     });
 
@@ -60,8 +69,9 @@ describe("backgroundFetchTask", () => {
       jest.clearAllMocks();
     });
 
-    it("returns NoData when no session is present", async () => {
-      mockGetState.mockReturnValue({ session: null });
+    it("returns NoData when authRepository.restoreSession returns null (headless — Zustand not hydrated)", async () => {
+      // Simulates the real headless background scenario where Zustand is NOT hydrated
+      mockRestoreSession.mockResolvedValueOnce(null);
 
       const result = await taskHandler();
 
@@ -69,8 +79,8 @@ describe("backgroundFetchTask", () => {
       expect(mockSyncNewMedia).not.toHaveBeenCalled();
     });
 
-    it("returns NoData when session has no userId", async () => {
-      mockGetState.mockReturnValue({ session: { serverUrl: "http://test", token: "tok" } });
+    it("returns NoData when restored session has no userId", async () => {
+      mockRestoreSession.mockResolvedValueOnce({ serverUrl: "https://test", token: "tok" });
 
       const result = await taskHandler();
 
@@ -78,8 +88,14 @@ describe("backgroundFetchTask", () => {
       expect(mockSyncNewMedia).not.toHaveBeenCalled();
     });
 
-    it("calls syncNewMediaNotifications and returns NewData on success", async () => {
-      mockGetState.mockReturnValue({ session: { userId: "user-1", serverUrl: "http://test" } });
+    it("calls syncNewMediaNotifications with the restored userId and returns NewData on success", async () => {
+      mockRestoreSession.mockResolvedValueOnce({
+        userId: "user-1",
+        userName: "Bastoz",
+        serverId: "srv-1",
+        serverUrl: "https://jellyfin.example.com",
+        token: "tok-fresh"
+      });
       mockSyncNewMedia.mockResolvedValueOnce(undefined);
 
       const result = await taskHandler();
@@ -89,8 +105,20 @@ describe("backgroundFetchTask", () => {
     });
 
     it("returns Failed when syncNewMediaNotifications throws", async () => {
-      mockGetState.mockReturnValue({ session: { userId: "user-1" } });
+      mockRestoreSession.mockResolvedValueOnce({
+        userId: "user-1",
+        serverUrl: "https://jellyfin.example.com",
+        token: "tok-fresh"
+      });
       mockSyncNewMedia.mockRejectedValueOnce(new Error("network error"));
+
+      const result = await taskHandler();
+
+      expect(result).toBe(BackgroundFetch.BackgroundFetchResult.Failed);
+    });
+
+    it("returns Failed when authRepository.restoreSession throws", async () => {
+      mockRestoreSession.mockRejectedValueOnce(new Error("secure store error"));
 
       const result = await taskHandler();
 
