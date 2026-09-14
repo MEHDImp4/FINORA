@@ -93,6 +93,51 @@ describe("PlayerGestures", () => {
     });
   });
 
+  it("triggers double tap right when tapped twice quickly on the right side", () => {
+    const onDoubleTapRight = jest.fn();
+    const onDoubleTapLeft = jest.fn();
+
+    let root: any;
+    act(() => {
+      root = renderer.create(
+        <PlayerGestures
+          onSingleTap={jest.fn()}
+          onDoubleTapLeft={onDoubleTapLeft}
+          onDoubleTapRight={onDoubleTapRight}
+        >
+          <View testID="child-view" />
+        </PlayerGestures>
+      );
+    });
+
+    // Set a known container width
+    act(() => {
+      root.root.findByProps({ testID: "player-gestures" }).props.onLayout({
+        nativeEvent: { layout: { width: 400 } }
+      });
+    });
+
+    const surface = root.root.findByProps({ testID: "gesture-touch-surface" });
+
+    // Both taps on the right half (x > 200)
+    act(() => {
+      surface.props.onPress({ nativeEvent: { locationX: 310 } });
+    });
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+    act(() => {
+      surface.props.onPress({ nativeEvent: { locationX: 320 } });
+    });
+
+    expect(onDoubleTapRight).toHaveBeenCalledTimes(1);
+    expect(onDoubleTapLeft).not.toHaveBeenCalled();
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
   it("triggers long press start and end for 2x speed", () => {
     const onLongPressStart = jest.fn();
     const onLongPressEnd = jest.fn();
@@ -123,6 +168,72 @@ describe("PlayerGestures", () => {
       surface.props.onPressOut();
     });
     expect(onLongPressEnd).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  it("renders the volume HUD testID element structure when provided", () => {
+    let root: any;
+    act(() => {
+      root = renderer.create(
+        <PlayerGestures
+          onSingleTap={jest.fn()}
+          onDoubleTapLeft={jest.fn()}
+          onDoubleTapRight={jest.fn()}
+        >
+          <View testID="child-view" />
+        </PlayerGestures>
+      );
+    });
+
+    // HUDs are hidden by default
+    const volumeHUDs = root.root.findAllByProps({ testID: "hud-volume" });
+    const brightnessHUDs = root.root.findAllByProps({ testID: "hud-brightness" });
+    expect(volumeHUDs.length).toBe(0);
+    expect(brightnessHUDs.length).toBe(0);
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  it("does not fire single tap if long press was detected", () => {
+    const onSingleTap = jest.fn();
+
+    let root: any;
+    act(() => {
+      root = renderer.create(
+        <PlayerGestures
+          onSingleTap={onSingleTap}
+          onDoubleTapLeft={jest.fn()}
+          onDoubleTapRight={jest.fn()}
+          onLongPressStart={jest.fn()}
+          onLongPressEnd={jest.fn()}
+        >
+          <View testID="child-view" />
+        </PlayerGestures>
+      );
+    });
+
+    const surface = root.root.findByProps({ testID: "gesture-touch-surface" });
+
+    // Trigger long press
+    act(() => {
+      surface.props.onLongPress();
+    });
+
+    // Attempt a tap press — should be ignored because long press is active
+    act(() => {
+      surface.props.onPress({ nativeEvent: { locationX: 100 } });
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+
+    expect(onSingleTap).not.toHaveBeenCalled();
 
     act(() => {
       root.unmount();
