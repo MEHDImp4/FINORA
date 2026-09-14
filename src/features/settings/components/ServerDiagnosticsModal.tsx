@@ -29,7 +29,8 @@ export function ServerDiagnosticsModal({ visible, onClose }: ServerDiagnosticsMo
   const [diagResult, setDiagResult] = useState<ServerDiagnosticsResult | null>(null);
 
   const handleRunDiagnostics = async () => {
-    const url = session?.serverUrl || "https://azeur-jelly-web.smp4.xyz";
+    const url = session?.serverUrl;
+    if (!url) return; // No server configured — nothing to diagnose
     setIsRunning(true);
     try {
       const res = await diagnosticsService.runDiagnostics(url, session?.token);

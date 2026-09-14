@@ -6,8 +6,11 @@ import { useAuthStore } from "../../../stores/authStore";
 import { useOnboardingStore } from "../../../stores/onboardingStore";
 import { serverManager } from "../../../core/jellyfin/serverManager";
 
+/** Neutral test URL — never a personal server */
+const TEST_SERVER_URL = "https://jellyfin.example.com";
+
 jest.mock("../../../core/jellyfin/serverDiscovery", () => ({
-  DEFAULT_JELLYFIN_SERVER: "https://azeur-jelly-web.smp4.xyz",
+  DEFAULT_JELLYFIN_SERVER: "",
   validateAndDiscoverServer: jest.fn()
 }));
 
@@ -31,7 +34,11 @@ describe("OnboardingScreen", () => {
     jest.clearAllMocks();
   });
 
-  it("renders onboarding slides with default server info and elements", () => {
+  it("DEFAULT_JELLYFIN_SERVER is empty so no personal server is distributed", () => {
+    expect(DEFAULT_JELLYFIN_SERVER).toBe("");
+  });
+
+  it("renders onboarding slides and server input with empty default", () => {
     let component: ReactTestRenderer.ReactTestRenderer;
     ReactTestRenderer.act(() => {
       component = ReactTestRenderer.create(<OnboardingScreen />);
@@ -43,19 +50,19 @@ describe("OnboardingScreen", () => {
     expect(root.findByProps({ children: "Lecteur Intelligent" })).toBeDefined();
     expect(root.findByProps({ children: "Connexion au Serveur" })).toBeDefined();
 
-    // Check default prefilled server input
+    // Server input should start empty (no personal server pre-filled)
     const inputs = root.findAllByType("TextInput" as any);
-    const serverInput = inputs.find((i) => i.props.value === DEFAULT_JELLYFIN_SERVER);
+    const serverInput = inputs.find((i) => i.props.placeholder === "https://votre-serveur.com");
     expect(serverInput).toBeDefined();
-    expect(serverInput?.props.value).toBe("https://azeur-jelly-web.smp4.xyz");
+    expect(serverInput?.props.value).toBe("");
   });
 
-  it("handles test server action successfully", async () => {
+  it("handles test server action successfully with a user-provided URL", async () => {
     (validateAndDiscoverServer as jest.Mock).mockResolvedValueOnce({
       serverId: "srv-123",
-      serverName: "Jellyfin Bastoz",
+      serverName: "Jellyfin Home",
       version: "10.9.11",
-      url: "https://azeur-jelly-web.smp4.xyz",
+      url: TEST_SERVER_URL,
       isHttps: true,
       hasWarning: false
     });
@@ -66,14 +73,22 @@ describe("OnboardingScreen", () => {
     });
 
     const root = component!.root;
+
+    // Type a server URL first
+    const inputs = root.findAllByType("TextInput" as any);
+    const serverInput = inputs.find((i) => i.props.placeholder === "https://votre-serveur.com");
+    ReactTestRenderer.act(() => {
+      serverInput?.props.onChangeText(TEST_SERVER_URL);
+    });
+
     const testButton = root.findByProps({ children: "Tester" }).parent;
 
     await ReactTestRenderer.act(async () => {
       testButton?.props.onPress();
     });
 
-    expect(validateAndDiscoverServer).toHaveBeenCalledWith("https://azeur-jelly-web.smp4.xyz");
-    expect(root.findByProps({ children: "Serveur en ligne : Jellyfin Bastoz" })).toBeDefined();
+    expect(validateAndDiscoverServer).toHaveBeenCalledWith(TEST_SERVER_URL);
+    expect(root.findByProps({ children: "Serveur en ligne : Jellyfin Home" })).toBeDefined();
   });
 
   it("allows exploring without account and marks onboarding as complete", async () => {
@@ -105,7 +120,7 @@ describe("OnboardingScreen", () => {
         userId: "user-1",
         userName: "Bastoz",
         serverId: "srv-1",
-        serverUrl: "https://azeur-jelly-web.smp4.xyz"
+        serverUrl: TEST_SERVER_URL
       }
     });
 
@@ -116,9 +131,13 @@ describe("OnboardingScreen", () => {
 
     const root = component!.root;
     const textInputs = root.findAllByType("TextInput" as any);
+
+    // Must provide a server URL first (DEFAULT_JELLYFIN_SERVER is now "")
+    const serverInput = textInputs.find((i) => i.props.placeholder === "https://votre-serveur.com");
     const usernameInput = textInputs.find((i) => i.props.placeholder === "Votre identifiant");
 
     ReactTestRenderer.act(() => {
+      serverInput?.props.onChangeText(TEST_SERVER_URL);
       usernameInput?.props.onChangeText("Bastoz");
     });
 
@@ -130,7 +149,7 @@ describe("OnboardingScreen", () => {
 
     expect(loginMock).toHaveBeenCalledWith(
       { username: "Bastoz", password: "" },
-      "https://azeur-jelly-web.smp4.xyz"
+      expect.any(String)
     );
     expect(serverManager.saveAccount).toHaveBeenCalled();
     expect(useOnboardingStore.getState().isCompleted).toBe(true);
@@ -146,7 +165,7 @@ describe("OnboardingScreen", () => {
         userId: "user-1",
         userName: "Bastoz",
         serverId: "srv-1",
-        serverUrl: "https://azeur-jelly-web.smp4.xyz"
+        serverUrl: TEST_SERVER_URL
       }
     });
 

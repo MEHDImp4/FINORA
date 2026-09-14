@@ -319,7 +319,7 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                 <>
                   <Text style={styles.connectionTitle}>Connectez votre Jellyfin</Text>
                   <Text style={styles.connectionSubtitle}>
-                    Le serveur par défaut est pré-rempli. Saisissez vos identifiants pour démarrer.
+                    Saisissez l'adresse de votre serveur Jellyfin et vos identifiants pour démarrer.
                   </Text>
 
                   {session && (
