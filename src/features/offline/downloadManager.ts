@@ -5,12 +5,28 @@ import { logger } from "../../core/network/logger";
 import { notificationService } from "../../core/notifications/notificationService";
 import { isWifiConnected } from "../../core/network/networkStatusService";
 import { usePlaybackPreferencesStore } from "../../stores/playbackPreferencesStore";
+import { DownloadQuality, buildDownloadUrl, getDownloadHeaders } from "./downloadQuality";
+import {
+  DownloadAuthContext,
+  DownloadIdentity,
+  getDownloadAuthContext,
+  matchesDownloadIdentity,
+  normalizeServerUrl
+} from "./downloadAuthContext";
+import { AppState, AppStateStatus, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+/** Structural subset of expo-file-system's download result we care about. */
+type DownloadResultLike = { uri?: string; status?: number };
 
 export type DownloadListener = (downloads: DownloadItem[]) => void;
 
 export interface DownloadOptions {
   headers?: Record<string, string>;
+  /** Jellyfin quality profile used to build the URL. Persisted so it can be rebuilt. */
+  quality?: DownloadQuality;
+  /** Non-sensitive Jellyfin identity, so the download stays bound to its server/user. */
+  identity?: DownloadIdentity;
 }
 
 interface StoredDownloadTask {
@@ -20,11 +36,21 @@ interface StoredDownloadTask {
   >;
   metadata?: Partial<OfflineMediaRecord>;
   options?: DownloadOptions;
+  /** Jellyfin quality profile, needed to rebuild the download URL after a restart. */
+  quality?: DownloadQuality;
+  /** Non-sensitive Jellyfin identity this download belongs to. */
+  identity?: DownloadIdentity;
+  /** True when this task was rebuilt from persisted state, so a fresh session is required. */
+  restored?: boolean;
 }
 
 /**
  * Persisted snapshot of a download, stored in AsyncStorage.
- * Tokens are NEVER persisted here — they are re-obtained from the secure session at restore time.
+ *
+ * SECURITY: no credential may ever be added to this shape. Access tokens,
+ * API keys, passwords, Authorization / X-Emby-Token headers and iOS
+ * NSURLSession resume blobs (which embed request headers) must NOT be persisted
+ * — they are re-obtained from the secure session at resume time.
  */
 export interface PersistedDownloadEntry {
   itemId: string;
@@ -48,12 +74,33 @@ export interface PersistedDownloadEntry {
   episodeIndex?: number;
   posterPath?: string;
   posterLocalPath?: string;
-  quality?: string;
+  /** Non-sensitive: the Jellyfin quality profile used to build the request. */
+  quality?: DownloadQuality;
+  /** Non-sensitive: the Jellyfin server this download belongs to. */
+  serverId?: string;
+  /** Non-sensitive: the Jellyfin user this download belongs to. */
+  userId?: string;
+  /** Non-sensitive: the Jellyfin server URL this download belongs to. */
+  serverUrl?: string;
+  /** Non-sensitive: byte offset already present in the partial file (Android resume offset). */
+  resumeOffset?: number;
   metadata?: Partial<OfflineMediaRecord>;
 }
 
 export const MAX_CONCURRENT_DOWNLOADS = 3;
 export const DOWNLOAD_QUEUE_STORAGE_KEY = "@finora_download_queue";
+export const DOWNLOAD_QUEUE_ORDER_STORAGE_KEY = "@finora_download_order";
+
+/** Controlled, recoverable failure used when no usable Jellyfin session exists. */
+export const AUTH_REQUIRED_ERROR = "AUTH_REQUIRED";
+export const WIFI_REQUIRED_ERROR = "Connexion Wi-Fi requise (mode Wi-Fi uniquement activé)";
+
+/**
+ * Progress ticks are frequent, so persistence is throttled independently of
+ * state transitions (which are always persisted immediately).
+ */
+const PROGRESS_PERSIST_INTERVAL_MS = 3000;
+const PROGRESS_PERSIST_MIN_DELTA = 0.01;
 
 /**
  * Strips authentication tokens from a URL query string.
@@ -93,6 +140,19 @@ export class DownloadManager {
     { timestamp: number; bytes: number; speed: number }
   > = new Map();
   private persistDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Byte offset the active native task is resuming from, per item. */
+  private resumeOffsets: Map<string, number> = new Map();
+  /** Items that already consumed their single authorization refresh + retry. */
+  private authRetried: Set<string> = new Set();
+  /** Items that already restarted once after a corrupt (Range-ignored) response. */
+  private corruptionRestarted: Set<string> = new Set();
+  /** Throttling bookkeeping for the high-frequency progress persistence path. */
+  private progressPersistMarkers: Map<string, { at: number; progress: number }> = new Map();
+  /** Freshly resolved secure session, refreshed on auth failure. */
+  private authContext: DownloadAuthContext | null = null;
+  private initialized = false;
+  private appStateSubscription: { remove: () => void } | null = null;
 
   // ─── Persistence ───────────────────────────────────────────────────────────
 
@@ -146,28 +206,171 @@ export class DownloadManager {
           episodeIndex: item.episodeIndex,
           posterPath: item.posterPath,
           posterLocalPath: item.posterLocalPath,
+          quality: config?.quality,
+          serverId: config?.identity?.serverId,
+          userId: config?.identity?.userId,
+          serverUrl: config?.identity?.serverUrl,
+          resumeOffset: this.resumeOffsets.get(itemId),
           metadata: config?.metadata
         });
       }
 
       await AsyncStorage.setItem(DOWNLOAD_QUEUE_STORAGE_KEY, JSON.stringify(entries));
+      await AsyncStorage.setItem(
+        DOWNLOAD_QUEUE_ORDER_STORAGE_KEY,
+        JSON.stringify(this.queue.slice())
+      );
     } catch (err: any) {
       logger.warn("[DownloadManager] Failed to persist queue:", err?.message ?? err);
     }
   }
 
   /**
-   * Restores downloads from AsyncStorage after an app restart.
+   * Persists the current state immediately, cancelling any pending debounce.
+   * Used on app background so a hard kill loses as little state as possible.
+   */
+  public async flushPersist(): Promise<void> {
+    if (this.persistDebounceTimer) {
+      clearTimeout(this.persistDebounceTimer);
+      this.persistDebounceTimer = null;
+    }
+    await this.persistQueue();
+  }
+
+
+  /**
+   * Reads the persisted queue order (FIFO position of queued item ids).
+   * Tolerant of missing/corrupt data — order then falls back to file order.
+   */
+  private async readPersistedQueueOrder(): Promise<string[]> {
+    try {
+      const raw = await AsyncStorage.getItem(DOWNLOAD_QUEUE_ORDER_STORAGE_KEY);
+      if (typeof raw !== "string") return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Real size of a local file, or 0 when it is missing/unreadable. */
+  private async getExistingFileSize(path: string): Promise<number> {
+    if (!path || !path.startsWith("file://")) return 0;
+    try {
+      const info = await FileSystem.getInfoAsync(path);
+      if (info.exists && "size" in info) {
+        const size = (info as any).size;
+        return typeof size === "number" && size > 0 ? size : 0;
+      }
+    } catch {
+      // Unreadable path — treat as absent
+    }
+    return 0;
+  }
+
+  /** Best-effort server URL derived from a token-free download URL. */
+  private serverUrlFromDownloadUrl(url: string): string | undefined {
+    try {
+      return new URL(url).origin;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * A download belongs to a Jellyfin server AND user. Resuming it with another
+   * account's token is never allowed, so the stored identity is validated
+   * against the freshly restored session before anything is continued.
+   */
+  private isIdentityCompatible(
+    config: StoredDownloadTask,
+    context: DownloadAuthContext
+  ): boolean {
+    const identity = config.identity;
+    if (!identity?.serverUrl) {
+      // Entry persisted before identity tracking existed — nothing to validate.
+      return true;
+    }
+    if (identity.serverId && identity.userId) {
+      return matchesDownloadIdentity(identity, context);
+    }
+    // Partial legacy identity: the server URL is the strongest signal available.
+    return normalizeServerUrl(identity.serverUrl) === normalizeServerUrl(context.serverUrl);
+  }
+
+  /**
+   * Case D: the file on disk is already the full media, so rather than resuming
+   * anything we persist the offline catalogue record and drop the download job.
+   */
+  private async reconcileCompletedOnDisk(
+    entry: PersistedDownloadEntry,
+    size: number
+  ): Promise<void> {
+    try {
+      await offlineStorageService.saveOfflineMedia({
+        itemId: entry.itemId,
+        title: entry.title,
+        type: entry.type,
+        year: entry.year,
+        localPath: entry.localPath,
+        fileSizeBytes: size,
+        totalTicks: entry.metadata?.totalTicks || 0,
+        playbackPositionTicks: entry.metadata?.playbackPositionTicks || 0,
+        overview: entry.metadata?.overview,
+        posterPath: entry.metadata?.posterPath || entry.posterPath,
+        seriesPosterPath: entry.metadata?.seriesPosterPath || entry.seriesPosterPath,
+        posterLocalPath: entry.metadata?.posterLocalPath || entry.posterLocalPath,
+        seriesId: entry.seriesId,
+        seriesName: entry.seriesName,
+        seasonIndex: entry.seasonIndex,
+        episodeIndex: entry.episodeIndex,
+        savedAt: Date.now()
+      });
+      logger.info(
+        `[DownloadManager] Reconciled already-complete file for ${entry.itemId} (${size} bytes).`
+      );
+    } catch (err: any) {
+      logger.warn(
+        `[DownloadManager] Failed to reconcile complete file for ${entry.itemId}:`,
+        err?.message ?? err
+      );
+    }
+  }
+
+  /**
+   * Attaches an AppState listener that flushes persistence when the app leaves
+   * the foreground. Best effort only — Android may kill the process without any
+   * callback, which is why state is also persisted continuously while running.
+   */
+  private attachAppStateListener(): void {
+    if (this.appStateSubscription) return;
+    try {
+      this.appStateSubscription = AppState.addEventListener(
+        "change",
+        (state: AppStateStatus) => {
+          if (state === "background" || state === "inactive") {
+            this.flushPersist().catch(() => {});
+          }
+        }
+      );
+    } catch {
+      // AppState unavailable — the debounced persistence path still applies
+    }
+  }
+
+  /**
+   * Restores downloads from AsyncStorage after an app restart and reconciles
+   * the persisted metadata against the files that actually exist on disk.
    *
-   * Active downloads that were interrupted (downloading/queued) become
-   * "interrupted" status so the UI shows them correctly without lying that
-   * they're still downloading. The user can then resume them explicitly.
+   * Status routing preserves user intent:
+   *  - `downloading` / `queued` were active before the kill → requeued, in their
+   *    original order, so `initialize()` can continue them.
+   *  - `paused` stays paused — a deliberate pause is never auto-restarted.
+   *  - `failed` stays failed so the user retries explicitly.
+   *  - `completed` / `canceled` are not restored (no pending work).
    *
-   * Completed and canceled downloads are not restored (they have no pending work).
-   * Failed downloads are restored so the user can retry.
-   *
-   * NOTE: Authentication tokens are NOT stored. The caller is responsible for
-   * re-injecting fresh tokens from the secure session before resuming.
+   * This method never starts network work — `initialize()` does, once it has a
+   * fresh secure session. Tokens are never read from storage.
    */
   public async restorePersistedDownloads(): Promise<void> {
     try {
@@ -182,67 +385,61 @@ export class DownloadManager {
         return;
       }
 
+      const persistedOrder = await this.readPersistedQueueOrder();
       let restoredCount = 0;
 
       for (const entry of entries) {
         if (!entry.itemId || !entry.title) continue;
 
-        // Skip already-tracked downloads (avoid duplicates if restorePersistedDownloads is called twice)
+        // Skip already-tracked downloads (avoid duplicates if restore runs twice)
         if (this.downloads.has(entry.itemId)) continue;
 
-        // Verify local file state
-        let localFileExists = false;
-        let localFileSizeBytes = 0;
+        // Completed / canceled carry no pending work
+        if (entry.status === "completed" || entry.status === "canceled") continue;
 
-        if (entry.localPath && entry.localPath.startsWith("file://")) {
-          try {
-            const info = await FileSystem.getInfoAsync(entry.localPath);
-            if (info.exists) {
-              localFileExists = true;
-              localFileSizeBytes = "size" in info ? (info as any).size : 0;
-            }
-          } catch {
-            // File check failed — treat as not existing
-          }
+        const fileSizeBytes = await this.getExistingFileSize(entry.localPath);
+
+        // Case D — already fully downloaded on disk
+        if (entry.totalBytes > 0 && fileSizeBytes >= entry.totalBytes) {
+          await this.reconcileCompletedOnDisk(entry, fileSizeBytes);
+          continue;
         }
 
-        // Determine restored status
+        // Case B — metadata claims progress but nothing is on disk. Never show a
+        // fake percentage: reset the counters so the restart is honest.
+        // Case A — a real partial file exists, so reconcile the byte counters
+        // against it rather than trusting the last persisted sample.
+        const hasPartialFile = fileSizeBytes > 0;
+        const bytesDownloaded = hasPartialFile
+          ? Math.max(entry.bytesDownloaded, fileSizeBytes)
+          : 0;
+
         let restoredStatus: DownloadStatus;
-        if (entry.status === "completed") {
-          // Already completed — skip (shouldn't reach here since we don't persist completed)
-          continue;
-        } else if (entry.status === "canceled") {
-          // Canceled — skip
-          continue;
-        } else if (entry.status === "downloading" || entry.status === "queued") {
-          // Was actively downloading when the app was killed — mark as paused
-          // so UI shows it correctly. User can resume explicitly.
-          restoredStatus = "paused";
+        if (entry.status === "downloading" || entry.status === "queued") {
+          // Genuinely active before the kill → requeue for continuation.
+          restoredStatus = "queued";
         } else {
           // paused / failed — restore as-is
           restoredStatus = entry.status;
         }
 
-        // Restore progress from actual file size if partial file exists
-        const restoredBytesDownloaded = localFileExists
-          ? Math.max(entry.bytesDownloaded, localFileSizeBytes)
-          : entry.bytesDownloaded;
-
         const restoredProgress =
           entry.totalBytes > 0
-            ? Math.min(1, restoredBytesDownloaded / entry.totalBytes)
-            : entry.progress;
+            ? Math.min(1, bytesDownloaded / entry.totalBytes)
+            : hasPartialFile
+              ? entry.progress
+              : 0;
 
         const restoredItem: DownloadItem = {
           itemId: entry.itemId,
           title: entry.title,
           type: entry.type,
           year: entry.year,
-          downloadUrl: entry.downloadUrl, // Token-free URL — caller injects fresh token
+          downloadUrl: entry.downloadUrl, // Token-free URL — re-authenticated on resume
           localPath: entry.localPath,
           status: restoredStatus,
           progress: restoredProgress,
-          bytesDownloaded: restoredBytesDownloaded,
+          bytesDownloaded,
           totalBytes: entry.totalBytes,
           error: entry.error,
           startedAt: entry.startedAt,
@@ -258,7 +455,11 @@ export class DownloadManager {
 
         this.downloads.set(entry.itemId, restoredItem);
 
-        // Restore the download config so retry/resume works
+        // Rebuild the config so an authenticated request can be reconstructed.
+        // No headers are restored — they come from the secure session instead.
+        const restoredServerUrl =
+          entry.serverUrl || this.serverUrlFromDownloadUrl(entry.downloadUrl);
+
         this.downloadConfigs.set(entry.itemId, {
           item: {
             itemId: entry.itemId,
@@ -275,19 +476,92 @@ export class DownloadManager {
             posterPath: entry.posterPath,
             posterLocalPath: entry.posterLocalPath
           },
-          metadata: entry.metadata
+          metadata: entry.metadata,
+          quality: entry.quality,
+          identity: restoredServerUrl
+            ? {
+                serverId: entry.serverId || "",
+                userId: entry.userId || "",
+                serverUrl: restoredServerUrl
+              }
+            : undefined,
+          restored: true
         });
+
+        if (hasPartialFile) {
+          this.resumeOffsets.set(entry.itemId, bytesDownloaded);
+        }
 
         restoredCount++;
       }
 
+      // Restore the FIFO order so queue position survives a process death.
       if (restoredCount > 0) {
-        logger.info(`[DownloadManager] Restored ${restoredCount} download(s) from persistent storage.`);
+        const queuedIds = Array.from(this.downloads.values())
+          .filter((d) => d.status === "queued")
+          .map((d) => d.itemId);
+
+        const ordered: string[] = [];
+        for (const id of persistedOrder) {
+          if (queuedIds.includes(id) && !ordered.includes(id)) ordered.push(id);
+        }
+        for (const id of queuedIds) {
+          if (!ordered.includes(id)) ordered.push(id);
+        }
+        this.queue = ordered;
+
+        logger.info(
+          `[DownloadManager] Restored ${restoredCount} download(s) from persistent storage.`
+        );
         this.notify();
       }
     } catch (err: any) {
       logger.warn("[DownloadManager] Failed to restore persisted downloads:", err?.message ?? err);
     }
+  }
+
+  /**
+   * Boot-time entry point. Restores persisted downloads, reconciles them against
+   * the real files on disk, re-obtains a FRESH Jellyfin session from SecureStore
+   * (the Zustand store may still be empty right after a process death), then
+   * continues only the downloads that were genuinely active before the kill.
+   *
+   * Restored items are requeued and promoted through `processQueue()` so the
+   * MAX_CONCURRENT_DOWNLOADS cap is enforced by the existing scheduler.
+   */
+  public async initialize(): Promise<void> {
+    if (this.initialized) return;
+    this.initialized = true;
+
+    await this.restorePersistedDownloads();
+
+    this.authContext = await getDownloadAuthContext();
+
+    const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
+    const onWifi = wifiOnly ? await isWifiConnected() : true;
+
+    for (const item of this.downloads.values()) {
+      if (item.status !== "queued") continue;
+
+      // Wi-Fi-only preference with no Wi-Fi: stay queued rather than failing.
+      if (!onWifi) continue;
+
+      const config = this.downloadConfigs.get(item.itemId);
+      if (!this.authContext || !config || !this.isIdentityCompatible(config, this.authContext)) {
+        // Keep the partial file and metadata; the user can resume after signing
+        // back into the same server.
+        item.status = "paused";
+        item.error = AUTH_REQUIRED_ERROR;
+        this.queue = this.queue.filter((id) => id !== item.itemId);
+      }
+    }
+
+    this.schedulePersist();
+    this.notify();
+    this.processQueue();
+    this.attachAppStateListener();
+
+    logger.info(`[DownloadManager] Initialized (${this.downloads.size} tracked download(s)).`);
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
@@ -331,7 +605,13 @@ export class DownloadManager {
     metadata?: Partial<OfflineMediaRecord>,
     options?: DownloadOptions
   ): Promise<DownloadItem> {
-    this.downloadConfigs.set(item.itemId, { item, metadata, options });
+    this.downloadConfigs.set(item.itemId, {
+      item,
+      metadata,
+      options,
+      quality: options?.quality,
+      identity: options?.identity
+    });
 
     const existing = this.downloads.get(item.itemId);
     if (existing && (existing.status === "downloading" || existing.status === "queued")) {
@@ -407,6 +687,170 @@ export class DownloadManager {
     return downloadItem;
   }
 
+  /**
+   * Resolves the URL + headers used for a transfer.
+   *
+   * Fresh user-initiated downloads reuse the caller-provided headers. Restored
+   * downloads deliberately hold no headers — they are rebuilt here from the
+   * persisted metadata plus a FRESH session read from SecureStore. Tokens are
+   * never read from persisted storage.
+   *
+   * Returns null when the download cannot be authenticated.
+   */
+  private async resolveRequest(
+    itemId: string
+  ): Promise<{ url: string; headers: Record<string, string> } | null> {
+    const config = this.downloadConfigs.get(itemId);
+    const item = this.downloads.get(itemId);
+    if (!config || !item) return null;
+
+    const providedHeaders = config.options?.headers;
+    if (providedHeaders && Object.keys(providedHeaders).length > 0) {
+      return { url: item.downloadUrl, headers: providedHeaders };
+    }
+
+    const context = this.authContext || (this.authContext = await getDownloadAuthContext());
+
+    if (!context) {
+      // A restored download cannot be authenticated without a session. A fresh
+      // download that simply omitted headers keeps its caller-provided URL.
+      return config.restored ? null : { url: item.downloadUrl, headers: {} };
+    }
+
+    if (config.identity && !this.isIdentityCompatible(config, context)) {
+      // Belongs to another server/account — never resume it with these credentials.
+      return null;
+    }
+
+    const url = config.quality
+      ? buildDownloadUrl(context.serverUrl, item.itemId, context.accessToken, config.quality)
+      : item.downloadUrl;
+
+    return { url, headers: getDownloadHeaders(context.accessToken) };
+  }
+
+  /**
+   * Byte offset to continue from.
+   *
+   * On Android the native layer turns `resumeData` into `Range: bytes=N-` and
+   * opens the destination in append mode, so the offset is simply the current
+   * partial file size. On iOS `resumeData` is an opaque NSURLSession blob that
+   * embeds the original request headers (i.e. the access token), so it is never
+   * persisted — a partial file with no live in-memory task is restarted instead.
+   */
+  private resolveResumeOffset(partialBytes: number, totalBytes: number): number {
+    if (partialBytes <= 0) return 0;
+    if (totalBytes > 0 && partialBytes >= totalBytes) return 0;
+    return Platform.OS === "android" ? partialBytes : 0;
+  }
+
+  /**
+   * Discards a partial file and restarts the transfer from byte 0 exactly once,
+   * so a source that ignores HTTP Range can never leave a concatenated file behind.
+   */
+  private async restartFromZero(
+    itemId: string,
+    localPath: string,
+    reason: string
+  ): Promise<void> {
+    const item = this.downloads.get(itemId);
+    if (!item) return;
+
+    if (this.corruptionRestarted.has(itemId)) {
+      // Only one automatic restart — never loop against a source without Range support.
+      logger.error(`[DownloadManager] Restart already attempted for ${itemId} (${reason}).`);
+      this.markFailed(itemId, reason);
+      return;
+    }
+    this.corruptionRestarted.add(itemId);
+
+    await FileSystem.deleteAsync(localPath, { idempotent: true }).catch(() => {});
+    if (item.localPath !== localPath) {
+      await FileSystem.deleteAsync(item.localPath, { idempotent: true }).catch(() => {});
+    }
+
+    this.resumeOffsets.set(itemId, 0);
+    item.bytesDownloaded = 0;
+    item.totalBytes = 0;
+    item.progress = 0;
+    item.status = "downloading";
+    item.error = undefined;
+    this.schedulePersist();
+    this.notify();
+
+    this.executeDownload(itemId);
+  }
+
+  /**
+   * Applies the HTTP outcome of a transfer and enforces the resume safety rules.
+   */
+  private async handleDownloadResult(
+    itemId: string,
+    localPath: string,
+    result: DownloadResultLike,
+    metadata?: Partial<OfflineMediaRecord>
+  ): Promise<void> {
+    const downloadItem = this.downloads.get(itemId);
+    if (!downloadItem) return;
+
+    const status = result.status ?? 0;
+    const resumeOffset = this.resumeOffsets.get(itemId) ?? 0;
+
+    // Bounded authorization recovery: refresh once, retry once, never loop.
+    if ((status === 401 || status === 403) && !this.authRetried.has(itemId)) {
+      this.authRetried.add(itemId);
+      logger.warn(`[DownloadManager] HTTP ${status} for ${itemId} — refreshing session once.`);
+      this.authContext = await getDownloadAuthContext();
+      this.executeDownload(itemId);
+      return;
+    }
+
+    // 416 — requested range not satisfiable: either the file is already whole,
+    // or the recorded offset is stale and the transfer must start over.
+    if (status === 416) {
+      const size = await this.getExistingFileSize(localPath);
+      if (downloadItem.totalBytes > 0 && size >= downloadItem.totalBytes) {
+        await this.completeDownload(itemId, size, { ...metadata, localPath });
+        return;
+      }
+      await this.restartFromZero(itemId, localPath, "Plage HTTP non satisfiable");
+      return;
+    }
+
+    // We asked to continue from an offset but the server returned the FULL body.
+    // The native layer appends on resume, so the file is now corrupt.
+    if (resumeOffset > 0 && status === 200) {
+      logger.warn(
+        `[DownloadManager] Source ignored Range for ${itemId} — discarding corrupt partial file.`
+      );
+      await this.restartFromZero(itemId, localPath, "Reprise non supportée par la source");
+      return;
+    }
+
+    if (status >= 400) {
+      // Keep the partial file: authorization and network failures are recoverable.
+      logger.error(`[DownloadManager] HTTP ${status} while downloading ${itemId}.`);
+      this.markFailed(itemId, `Erreur HTTP ${status} lors du téléchargement`);
+      return;
+    }
+
+    if (!result.uri) return;
+
+    // Integrity check — never mark a file complete that is missing or short.
+    const finalSize = await this.getExistingFileSize(result.uri);
+    const expectedSize = downloadItem.totalBytes;
+    if (finalSize <= 0 || (expectedSize > 0 && finalSize < expectedSize)) {
+      logger.error(
+        `[DownloadManager] Incomplete file for ${itemId} (${finalSize}/${expectedSize} bytes).`
+      );
+      this.markFailed(itemId, "Fichier téléchargé incomplet");
+      return;
+    }
+
+    logger.info(`[DownloadManager] Download complete: ${downloadItem.title} (${finalSize} bytes)`);
+    await this.completeDownload(itemId, finalSize, { ...metadata, localPath: result.uri });
+  }
+
   private async executeDownload(itemId: string): Promise<void> {
     const downloadItem = this.downloads.get(itemId);
     const config = this.downloadConfigs.get(itemId);
@@ -416,79 +860,88 @@ export class DownloadManager {
     if (wifiOnly) {
       const isWifi = await isWifiConnected();
       if (!isWifi) {
-        const errorMsg = "Connexion Wi-Fi requise (mode Wi-Fi uniquement activé)";
-        logger.warn(`[DownloadManager] Execution halted for ${downloadItem.title}: ${errorMsg}`);
-        this.markFailed(itemId, errorMsg);
+        logger.warn(`[DownloadManager] Execution halted for ${downloadItem.title}: ${WIFI_REQUIRED_ERROR}`);
+        this.markFailed(itemId, WIFI_REQUIRED_ERROR);
         return;
       }
     }
 
-    const { item, metadata, options } = config;
+    const { item, metadata } = config;
     const localPath = downloadItem.localPath;
+
+    const request = await this.resolveRequest(itemId);
+    if (!request) {
+      // No usable Jellyfin session: keep the partial file and metadata so the
+      // download can resume after signing back into the same server.
+      logger.warn(`[DownloadManager] No usable session for ${item.itemId} — pausing until re-auth.`);
+      this.markAuthRequired(itemId);
+      return;
+    }
 
     logger.info(`[DownloadManager] Executing download: ${item.title} -> ${localPath}`);
 
-    // Start real network download with expo-file-system if available
-    if (typeof FileSystem.createDownloadResumable === "function" && localPath.startsWith("file://")) {
-      try {
-        const downloadResumable = FileSystem.createDownloadResumable(
-          item.downloadUrl,
-          localPath,
-          {
-            headers: options?.headers || {}
-          },
-          (progressData) => {
-            this.updateProgress(
-              item.itemId,
-              progressData.totalBytesWritten,
-              progressData.totalBytesExpectedToWrite
-            );
-          }
-        );
+    if (typeof FileSystem.createDownloadResumable !== "function" || !localPath.startsWith("file://")) {
+      return;
+    }
 
-        this.activeTasks.set(item.itemId, downloadResumable);
+    try {
+      // Reconcile against the real partial file before starting.
+      const partialBytes = await this.getExistingFileSize(localPath);
 
-        // Execute download in background
-        downloadResumable
-          .downloadAsync()
-          .then(async (result) => {
-            this.activeTasks.delete(item.itemId);
-            if (result) {
-              if (result.status && result.status >= 400) {
-                const errMsg = `Erreur HTTP ${result.status} lors du téléchargement`;
-                logger.error(`[DownloadManager] ${errMsg} for ${item.itemId}`);
-                if (localPath && typeof FileSystem.deleteAsync === "function") {
-                  await FileSystem.deleteAsync(localPath, { idempotent: true }).catch(() => {});
-                }
-                this.markFailed(item.itemId, errMsg);
-                return;
-              }
-
-              if (result.uri) {
-                const fileInfo = await FileSystem.getInfoAsync(result.uri).catch(() => null);
-                const finalSize =
-                  fileInfo && "size" in fileInfo
-                    ? (fileInfo as any).size
-                    : downloadItem.bytesDownloaded || 1000000;
-                logger.info(
-                  `[DownloadManager] Download complete: ${item.title} (${finalSize} bytes)`
-                );
-                await this.completeDownload(item.itemId, finalSize, {
-                  ...metadata,
-                  localPath: result.uri
-                });
-              }
-            }
-          })
-          .catch((err) => {
-            this.activeTasks.delete(item.itemId);
-            logger.error(`[DownloadManager] Download error for ${item.itemId}:`, err?.message || err);
-            this.markFailed(item.itemId, err?.message || "Échec du téléchargement");
-          });
-      } catch (err: any) {
-        logger.error(`[DownloadManager] Initialization error for ${item.itemId}:`, err?.message || err);
-        this.markFailed(item.itemId, err?.message || "Erreur d'initialisation du téléchargement");
+      if (downloadItem.totalBytes > 0 && partialBytes >= downloadItem.totalBytes) {
+        // The file on disk is already complete — no transfer needed.
+        await this.completeDownload(item.itemId, partialBytes, { ...metadata, localPath });
+        return;
       }
+
+      const resumeOffset = this.resolveResumeOffset(partialBytes, downloadItem.totalBytes);
+
+      if (resumeOffset === 0 && partialBytes > 0 && Platform.OS !== "android") {
+        // Cannot safely continue this partial file without persisting credentials.
+        logger.info(
+          `[DownloadManager] Discarding partial file for ${item.itemId} (resume unsupported on this platform).`
+        );
+        await FileSystem.deleteAsync(localPath, { idempotent: true }).catch(() => {});
+        downloadItem.bytesDownloaded = 0;
+        downloadItem.progress = 0;
+      }
+
+      const downloadResumable = FileSystem.createDownloadResumable(
+        request.url,
+        localPath,
+        { headers: request.headers },
+        (progressData) => {
+          this.updateProgress(
+            item.itemId,
+            progressData.totalBytesWritten,
+            progressData.totalBytesExpectedToWrite
+          );
+        },
+        resumeOffset > 0 ? String(resumeOffset) : undefined
+      );
+
+      this.resumeOffsets.set(item.itemId, resumeOffset);
+      this.activeTasks.set(item.itemId, downloadResumable);
+
+      // Execute download in background
+      downloadResumable
+        .downloadAsync()
+        .then(async (result) => {
+          this.activeTasks.delete(item.itemId);
+          if (result) {
+            await this.handleDownloadResult(item.itemId, localPath, result, metadata);
+          }
+        })
+        .catch((err) => {
+          this.activeTasks.delete(item.itemId);
+          logger.error(`[DownloadManager] Download error for ${item.itemId}:`, err?.message || err);
+          // Keep the partial file so a retry can genuinely resume it.
+          this.markFailed(item.itemId, err?.message || "Échec du téléchargement");
+        });
+    } catch (err: any) {
+      this.activeTasks.delete(item.itemId);
+      logger.error(`[DownloadManager] Initialization error for ${item.itemId}:`, err?.message || err);
+      this.markFailed(item.itemId, err?.message || "Erreur d'initialisation du téléchargement");
     }
   }
 
@@ -515,6 +968,9 @@ export class DownloadManager {
   public async retryDownload(itemId: string): Promise<void> {
     const config = this.downloadConfigs.get(itemId);
     if (config) {
+      // A manual retry gets a fresh authorization and restart budget.
+      this.authRetried.delete(itemId);
+      this.corruptionRestarted.delete(itemId);
       await this.startDownload(config.item, config.metadata, config.options);
     }
   }
@@ -571,9 +1027,25 @@ export class DownloadManager {
       item.status = "completed";
       item.completedAt = Date.now();
       this.speedTrackers.delete(itemId);
+      // A state transition is always persisted immediately.
+      this.schedulePersist();
+      this.notify();
+      return;
     }
 
-    this.schedulePersist();
+    // Progress ticks are throttled — writing on every tick would hammer storage
+    // during a multi-gigabyte transfer. Resume relies on the real file size anyway.
+    const marker = this.progressPersistMarkers.get(itemId);
+    const progressPersistDue =
+      !marker ||
+      now - marker.at >= PROGRESS_PERSIST_INTERVAL_MS ||
+      Math.abs(item.progress - marker.progress) >= PROGRESS_PERSIST_MIN_DELTA;
+
+    if (progressPersistDue) {
+      this.progressPersistMarkers.set(itemId, { at: now, progress: item.progress });
+      this.schedulePersist();
+    }
+
     this.notify();
   }
 
@@ -582,6 +1054,7 @@ export class DownloadManager {
     if (!item || item.status !== "downloading") return;
 
     this.speedTrackers.delete(itemId);
+    this.progressPersistMarkers.delete(itemId);
     item.speedBytesPerSecond = undefined;
     item.estimatedSecondsRemaining = undefined;
 
@@ -602,16 +1075,20 @@ export class DownloadManager {
 
   public async resumeDownload(itemId: string): Promise<void> {
     const item = this.downloads.get(itemId);
-    if (!item || (item.status !== "paused" && item.status !== ("interrupted" as DownloadStatus))) return;
+    if (!item || item.status !== "paused") return;
 
     const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
     if (wifiOnly) {
       const isWifi = await isWifiConnected();
       if (!isWifi) {
-        this.markFailed(itemId, "Connexion Wi-Fi requise (mode Wi-Fi uniquement activé)");
+        this.markFailed(itemId, WIFI_REQUIRED_ERROR);
         return;
       }
     }
+
+    // A manual resume is a fresh attempt: the user may have just re-authenticated.
+    this.authRetried.delete(itemId);
+    this.corruptionRestarted.delete(itemId);
 
     const activeCount = Array.from(this.downloads.values()).filter(
       (d) => d.status === "downloading"
@@ -619,6 +1096,7 @@ export class DownloadManager {
 
     if (activeCount < MAX_CONCURRENT_DOWNLOADS) {
       item.status = "downloading";
+      item.error = undefined;
       const task = this.activeTasks.get(itemId);
       if (task && typeof task.resumeAsync === "function") {
         try {
@@ -627,6 +1105,7 @@ export class DownloadManager {
           // Safe execution
         }
       } else {
+        // No live task after a process death — rebuild it from the partial file.
         this.executeDownload(itemId);
       }
     } else {
@@ -645,6 +1124,10 @@ export class DownloadManager {
     if (!item) return;
 
     this.speedTrackers.delete(itemId);
+    this.progressPersistMarkers.delete(itemId);
+    this.resumeOffsets.delete(itemId);
+    this.authRetried.delete(itemId);
+    this.corruptionRestarted.delete(itemId);
     this.queue = this.queue.filter((id) => id !== itemId);
 
     const task = this.activeTasks.get(itemId);
@@ -675,6 +1158,7 @@ export class DownloadManager {
     if (!item) return;
 
     this.speedTrackers.delete(itemId);
+    this.progressPersistMarkers.delete(itemId);
     item.speedBytesPerSecond = undefined;
     item.estimatedSecondsRemaining = undefined;
     item.status = "completed";
@@ -729,10 +1213,32 @@ export class DownloadManager {
     if (!item) return;
 
     this.speedTrackers.delete(itemId);
+    this.progressPersistMarkers.delete(itemId);
     item.speedBytesPerSecond = undefined;
     item.estimatedSecondsRemaining = undefined;
     item.status = "failed";
     item.error = error;
+    // The partial file and its resume offset are deliberately kept so a later
+    // retry can continue the transfer instead of starting over.
+    this.schedulePersist();
+    this.notify();
+    this.processQueue();
+  }
+
+  /**
+   * Parks a download that cannot be authenticated. The partial file and the
+   * metadata stay intact so it can resume after signing back into the server.
+   */
+  private markAuthRequired(itemId: string): void {
+    const item = this.downloads.get(itemId);
+    if (!item) return;
+
+    this.speedTrackers.delete(itemId);
+    this.progressPersistMarkers.delete(itemId);
+    item.speedBytesPerSecond = undefined;
+    item.estimatedSecondsRemaining = undefined;
+    item.status = "paused";
+    item.error = AUTH_REQUIRED_ERROR;
     this.schedulePersist();
     this.notify();
     this.processQueue();

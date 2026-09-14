@@ -37,6 +37,11 @@ export default function DetailsScreen() {
   const userId = session?.userId || "";
   const serverUrl = session?.serverUrl || "";
   const token = session?.token || "";
+  // Non-sensitive identity persisted with each download so it is never resumed
+  // with another server's or another account's credentials.
+  const downloadIdentity = session
+    ? { serverId: session.serverId, userId: session.userId, serverUrl: session.serverUrl }
+    : undefined;
 
   const { data: item, isLoading, isError, refetch } = useItemDetails(userId, id);
   const toggleFavoriteMutation = useToggleFavorite(userId);
@@ -120,7 +125,7 @@ export default function DetailsScreen() {
         overview: mediaItem.overview,
         posterPath: mediaItem.primaryImageTag
       },
-      { headers }
+      { headers, quality, identity: downloadIdentity }
     );
 
     hapticService.notificationSuccess();
@@ -163,7 +168,7 @@ export default function DetailsScreen() {
           seasonIndex: ep.seasonIndex,
           episodeIndex: ep.episodeIndex
         },
-        { headers }
+        { headers, quality, identity: downloadIdentity }
       );
     }
 

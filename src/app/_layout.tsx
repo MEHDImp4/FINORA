@@ -52,8 +52,9 @@ export default function RootLayout() {
       .catch(() => {});
     useNotificationStore.getState().loadPersisted().catch(() => {});
 
-    // Restore persisted downloads — interrupted downloads appear as paused after restart
-    downloadManager.restorePersistedDownloads().catch(() => {});
+    // Restore persisted downloads and resume the ones that were active before
+    // the process died. Runs outside React state so it works right after a kill.
+    downloadManager.initialize().catch(() => {});
   }, [restoreSession, loadOnboardingStatus]);
 
   // Deep linking: when user taps a notification on their device
