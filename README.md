@@ -19,6 +19,7 @@ It delivers a cinematic, polished streaming experience comparable to Netflix, Pr
 - **Offline Subsystem**: Sandboxed downloads with pause, resume, cancel, and reconnection watch progress sync.
 - **Hardware-Secured Credentials**: Zero plaintext storage. Authentication tokens are managed strictly via `expo-secure-store` (Android Keystore / iOS Keychain). Passwords are discarded immediately from memory upon authentication.
 - **Comprehensive Media Library**: Multi-column responsive grid, live search with history, and instant category filtering.
+- **Background Notifications**: Background fetch checks for new Jellyfin content (new episodes, movies, series) while the app is suspended.
 
 ---
 
@@ -33,17 +34,23 @@ It delivers a cinematic, polished streaming experience comparable to Netflix, Pr
 | **Images & Caching**| `expo-image` (multi-tier memory + disk caching) |
 | **State Management**| TanStack Query v5 (server cache), Zustand (client stores) |
 | **Security & Auth** | `expo-secure-store`, `react-native-url-polyfill` |
+| **Background Tasks** | `expo-background-fetch`, `expo-task-manager` |
 | **Language** | TypeScript Strict Mode |
 
 ---
 
 ## Getting Started
 
+> **FINORA requires a [development build](https://docs.expo.dev/develop/development-builds/introduction/) — it cannot run on Expo Go.**
+>
+> Native modules used by FINORA (`expo-video`, `expo-background-fetch`, `expo-task-manager`, `expo-secure-store`, etc.) are not available in the Expo Go sandbox.
+
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (LTS recommended, v18+ or v20+)
-- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
-- [Expo Go](https://expo.dev/go) app on your mobile device (iOS or Android) or a simulator/emulator
+- [Node.js](https://nodejs.org/) v22+ (LTS recommended)
+- [npm](https://www.npmjs.com/)
+- [EAS CLI](https://docs.expo.dev/eas/): `npm install -g eas-cli`
+- An Android emulator / physical device **or** an iOS simulator / physical device
 - A running [Jellyfin Server](https://jellyfin.org/)
 
 ### Installation
@@ -59,28 +66,41 @@ It delivers a cinematic, polished streaming experience comparable to Netflix, Pr
    npm install
    ```
 
-3. **Start the development server:**
+3. **Build a local development build:**
    ```bash
-   npx expo start
+   # Android
+   npx expo run:android
+
+   # iOS (macOS only)
+   npx expo run:ios
    ```
 
-4. **Run on your device:**
-   - Scan the QR code displayed in the terminal with the Expo Go app (Android) or the Camera app (iOS).
-   - Or press `a` for Android emulator / `i` for iOS simulator.
+   Or build via EAS and install on your device:
+   ```bash
+   eas build --profile development --platform android
+   # Then install the generated .apk / scan the QR from EAS dashboard
+   ```
+
+4. **Start the dev server** (after installing the development build on your device/emulator):
+   ```bash
+   npx expo start --dev-client
+   ```
 
 ---
 
 ## Verification & Testing
 
-FINORA enforces strict automated testing and TypeScript validation:
+FINORA enforces strict automated testing, TypeScript validation, and CI on every push:
 
 ```bash
-# Run the full test suite (57 test suites, 302 unit tests)
+# Run the full test suite (71 test suites, 393 unit tests)
 npm test
 
 # Run TypeScript typecheck in strict mode
 npm run typecheck
 ```
+
+CI runs automatically via GitHub Actions on every push and PR to `master` — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 
