@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 status: Awaiting next milestone
 stopped_at: Milestone v1.0 complete and archived; ready for /gsd-new-milestone
-last_updated: "2026-09-11T23:59:00.000Z"
-last_activity: 2026-09-11
-last_activity_desc: Milestone v1.0 completed and archived
+last_updated: "2026-09-14T13:00:00.000Z"
+last_activity: 2026-09-14
+last_activity_desc: Quick task fix-player-brightness-volume-controls completed (player overlay pass-through + volume wiring)
 state_head: 63b8795
 progress:
   total_phases: 10
@@ -107,6 +107,7 @@ Items acknowledged and carried forward from previous milestone close:
 |------|------|-------------|--------|
 | device-profile-platform-fix | 2026-09-14 | Resolve device profile platform via Platform.OS for iOS & Android | Complete ✓ |
 | player-quality-selector-fix | 2026-09-14 | Implement dynamic player quality selector with real Jellyfin transcoding | Complete ✓ |
+| fix-player-brightness-volume-controls | 2026-09-14 | Fix player brightness/volume controls unavailable and left/right tap not dismissing overlay | Complete ✓ |
 
 ## Session Continuity
  
