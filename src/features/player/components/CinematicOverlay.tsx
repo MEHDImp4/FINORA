@@ -1,8 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import {
   View,
-  StyleSheet,
-  Pressable
+  StyleSheet
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FinoraText } from "../../../design-system/components/FinoraText";
@@ -100,15 +99,8 @@ export function CinematicOverlay({
       ]}
       testID="cinematic-overlay"
     >
-      {/* Backdrop touch area to dismiss overlay */}
-      <Pressable
-        style={styles.overlayBackdrop}
-        onPress={onToggleVisible}
-        testID="overlay-backdrop"
-      />
-
       {/* Top Bar (Back, Title, Actions) */}
-      <View style={styles.topBar} testID="overlay-top-bar">
+      <View style={styles.topBar} pointerEvents="box-none" testID="overlay-top-bar">
         <FinoraIconButton
           accessibilityLabel="Go back"
           onPress={onBack}
@@ -119,7 +111,7 @@ export function CinematicOverlay({
           <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
         </FinoraIconButton>
 
-        <View style={styles.titleColumn}>
+        <View style={styles.titleColumn} pointerEvents="none">
           {Boolean(seriesTitle) && (
             <FinoraText variant="caption" style={styles.seriesText} numberOfLines={1}>
               {seriesTitle}
@@ -130,7 +122,7 @@ export function CinematicOverlay({
           </FinoraText>
         </View>
 
-        <View style={styles.headerActions}>
+        <View style={styles.headerActions} pointerEvents="box-none">
           {Boolean(onOpenStats) && (
             <FinoraIconButton
               accessibilityLabel="Stats"
@@ -183,7 +175,7 @@ export function CinematicOverlay({
       </View>
 
       {/* Center Controls (Seek -10, Play/Pause, Seek +10) */}
-      <View style={styles.centerControls} testID="overlay-center-controls">
+      <View style={styles.centerControls} pointerEvents="box-none" testID="overlay-center-controls">
         <FinoraIconButton
           accessibilityLabel="Seek backward 10 seconds"
           onPress={() => {
@@ -241,7 +233,7 @@ export function CinematicOverlay({
       </View>
 
       {/* Bottom Scrubber */}
-      <View style={styles.bottomBar} testID="overlay-bottom-bar">
+      <View style={styles.bottomBar} pointerEvents="box-none" testID="overlay-bottom-bar">
         <TimelineScrubber
           currentTimeSeconds={currentTimeSeconds}
           durationSeconds={durationSeconds}
@@ -271,10 +263,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: spacing.lg,
     zIndex: 20
-  },
-  overlayBackdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0, 0, 0, 0.02)"
   },
   topBar: {
     flexDirection: "row",
