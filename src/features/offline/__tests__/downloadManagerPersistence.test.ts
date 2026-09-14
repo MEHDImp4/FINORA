@@ -114,7 +114,7 @@ describe("DownloadManager — persistence", () => {
     expect(restored2?.error).toBe("Network error");
   });
 
-  it("converts 'downloading' status to 'paused' on restore (process was killed mid-download)", async () => {
+  it("requeues a 'downloading' download for continuation on restore (process was killed mid-download)", async () => {
     const persisted = [
       {
         itemId: "movie-was-downloading",
@@ -135,11 +135,13 @@ describe("DownloadManager — persistence", () => {
     await manager.restorePersistedDownloads();
 
     const item = manager.getDownload("movie-was-downloading");
-    // Must never say "downloading" when the process was killed
-    expect(item?.status).toBe("paused");
+    // Must never still claim "downloading" when no task exists after a kill, and
+    // must be scheduled for continuation rather than silently reset to paused.
+    expect(item?.status).toBe("queued");
+    expect(manager.getQueueLength()).toBe(1);
   });
 
-  it("converts 'queued' status to 'paused' on restore", async () => {
+  it("keeps a 'queued' download queued on restore", async () => {
     const persisted = [
       {
         itemId: "movie-was-queued",
@@ -160,7 +162,8 @@ describe("DownloadManager — persistence", () => {
     await manager.restorePersistedDownloads();
 
     const item = manager.getDownload("movie-was-queued");
-    expect(item?.status).toBe("paused");
+    expect(item?.status).toBe("queued");
+    expect(manager.getQueueLength()).toBe(1);
   });
 
   it("does NOT restore completed downloads (they have no pending work)", async () => {
