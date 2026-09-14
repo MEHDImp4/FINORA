@@ -404,6 +404,7 @@ export function PlayerScreen({
         onSingleTap={handleToggleControls}
         onLongPressStart={() => controls.setRate(2.0)}
         onLongPressEnd={() => controls.setRate(preferredPlaybackSpeed)}
+        onVolumeChange={(volume) => controls.setVolume(volume)}
       >
         {/* Native Video Surface */}
         <VideoView

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -34,6 +34,7 @@ export interface PlayerGesturesProps {
   onSingleTap: () => void;
   onLongPressStart?: () => void;
   onLongPressEnd?: () => void;
+  onVolumeChange?: (volume: number) => void;
   children: React.ReactNode;
 }
 
@@ -45,6 +46,7 @@ export function PlayerGestures({
   onSingleTap,
   onLongPressStart,
   onLongPressEnd,
+  onVolumeChange,
   children
 }: PlayerGesturesProps) {
   const [containerWidth, setContainerWidth] = useState(0);
@@ -61,6 +63,13 @@ export function PlayerGestures({
   const volumeRef = useRef(0.7);
   // Brightness (0–1)
   const brightnessRef = useRef(0.7);
+
+  // Latest volume callback kept in a ref: the PanResponder is created once and
+  // would otherwise capture a stale prop from the first render.
+  const onVolumeChangeRef = useRef(onVolumeChange);
+  useEffect(() => {
+    onVolumeChangeRef.current = onVolumeChange;
+  }, [onVolumeChange]);
 
   const lastTapTimeRef = useRef(0);
   const lastTapSideRef = useRef<"left" | "right" | null>(null);
@@ -162,6 +171,7 @@ export function PlayerGestures({
         } else {
           volumeRef.current = newValue;
           showSwipeHUD("volume", newValue);
+          onVolumeChangeRef.current?.(newValue);
         }
       },
       onPanResponderRelease: () => {
