@@ -224,18 +224,35 @@ export function PlayerScreen({
     }
   }, [preferredPlaybackSpeed, controls]);
 
-  // Seed the brightness slider from the current screen brightness
+  // Seed the brightness slider from the current screen brightness, and hand the
+  // screen back on exit so the player's override doesn't linger after leaving.
   useEffect(() => {
     let active = true;
+    let originalBrightness: number | null = null;
+
     if (BrightnessModule?.getBrightnessAsync) {
       BrightnessModule.getBrightnessAsync()
         .then((value) => {
-          if (active) setBrightness(value);
+          if (active) {
+            originalBrightness = value;
+            setBrightness(value);
+          }
         })
         .catch(() => {});
     }
+
     return () => {
       active = false;
+      if (!BrightnessModule) return;
+
+      // Android keeps the activity brightness override after the player closes, so
+      // hand control back to the OS. iOS persists the value, so restore the one
+      // captured when the player opened.
+      if (Platform.OS === "android" && BrightnessModule.restoreSystemBrightnessAsync) {
+        BrightnessModule.restoreSystemBrightnessAsync().catch(() => {});
+      } else if (originalBrightness !== null && BrightnessModule.setBrightnessAsync) {
+        BrightnessModule.setBrightnessAsync(originalBrightness).catch(() => {});
+      }
     };
   }, []);
 
