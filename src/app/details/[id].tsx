@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, ActivityIndicator } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAuthStore } from "../../stores/authStore";
@@ -14,6 +14,7 @@ import { SeriesDetailsView } from "../../features/details/components/SeriesDetai
 import { CollectionDetailsView } from "../../features/details/components/CollectionDetailsView";
 import { FinoraText } from "../../design-system/components/FinoraText";
 import { FinoraButton } from "../../design-system/components/FinoraButton";
+import { DetailsSkeleton } from "../../design-system/components/DetailsSkeleton";
 import { colors, spacing } from "../../design-system/tokens";
 import { MediaItem } from "../../types/media";
 import { hapticService } from "../../core/feedback/hapticService";
@@ -185,8 +186,8 @@ export default function DetailsScreen() {
 
   if (isLoading || seriesTargetId) {
     return (
-      <View style={styles.centerContainer} testID="details-loading">
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={styles.loadingContainer} testID="details-loading">
+        <DetailsSkeleton />
       </View>
     );
   }
@@ -344,6 +345,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: spacing.lg
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: colors.background
   },
   errorTitle: {
     marginBottom: spacing.md,

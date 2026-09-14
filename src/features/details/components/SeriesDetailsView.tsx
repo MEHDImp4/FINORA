@@ -4,7 +4,6 @@ import {
   StyleSheet,
   ScrollView,
   Dimensions,
-  ActivityIndicator,
   Pressable,
   NativeScrollEvent,
   NativeSyntheticEvent
@@ -21,6 +20,8 @@ import {
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { FinoraButton } from "../../../design-system/components/FinoraButton";
 import { FinoraIconButton } from "../../../design-system/components/FinoraIconButton";
+import { ShimmerSkeleton } from "../../../design-system/components/ShimmerSkeleton";
+import { EpisodeListSkeleton } from "../../../design-system/components/EpisodeSkeleton";
 import { colors, spacing } from "../../../design-system/tokens";
 import { useSeasons, useEpisodes } from "../../../hooks/useMediaQueries";
 import { SeasonPicker } from "./SeasonPicker";
@@ -331,7 +332,11 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
 
         {/* Season Picker Tabs */}
         {isLoadingSeasons ? (
-          <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />
+          <View style={styles.seasonSkeletonRow}>
+            {[0, 1, 2].map((index) => (
+              <ShimmerSkeleton key={index} width={96} height={32} borderRadius={16} />
+            ))}
+          </View>
         ) : (
           <SeasonPicker
             seasons={seasons}
@@ -346,7 +351,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
             Episodes
           </FinoraText>
           {isLoadingEpisodes ? (
-            <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />
+            <EpisodeListSkeleton count={6} />
           ) : episodes.length > 0 ? (
             visibleEpisodes.map((ep) => (
               <EpisodeCard
@@ -556,7 +561,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: "600"
   },
-  loader: {
+  seasonSkeletonRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
     marginVertical: spacing.md
   },
   episodesSection: {

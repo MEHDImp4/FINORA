@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, StyleSheet, ScrollView, RefreshControl, Pressable, ActivityIndicator, Animated } from "react-native";
+import { View, StyleSheet, ScrollView, RefreshControl, Pressable, Animated } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,6 +30,7 @@ import { hapticService } from "../../core/feedback/hapticService";
 import { useNetworkDiagnostic } from "../../core/network/networkStatusService";
 import { NetworkFailureStateView } from "../../design-system/components/NetworkFailureStateView";
 import { OfflineBanner } from "../../design-system/components/OfflineBanner";
+import { HomeSkeleton } from "../../design-system/components/HomeSkeleton";
 import {
   getRecommendedForYou,
   getBecauseYouWatched
@@ -389,16 +390,13 @@ export default function HomeScreen() {
   if (!hasAnyContent && (isInitialLoading || isDiagChecking)) {
     return (
       <FinoraScreen safeTop={true} safeBottom={false}>
-        <View style={styles.loadingFullContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <FinoraText
-            variant="body"
-            color="textSecondary"
-            style={{ marginTop: spacing.md, textAlign: "center" }}
-          >
-            Connexion au serveur Jellyfin...
-          </FinoraText>
-        </View>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <HomeSkeleton sections={3} />
+        </ScrollView>
       </FinoraScreen>
     );
   }

@@ -1,8 +1,9 @@
 import React, { useCallback } from "react";
-import { View, FlatList, ActivityIndicator, StyleSheet, Dimensions } from "react-native";
+import { View, FlatList, StyleSheet, Dimensions } from "react-native";
 import { MediaCard } from "../../home/components/MediaCard";
 import { MediaItem } from "../../../types/media";
 import { FinoraText } from "../../../design-system/components/FinoraText";
+import { PosterGridSkeleton } from "../../../design-system/components/PosterGridSkeleton";
 import { colors, spacing } from "../../../design-system/tokens";
 
 interface LibraryGridViewProps {
@@ -54,8 +55,8 @@ export const LibraryGridView = React.memo(function LibraryGridView({
 
   if (isLoading && items.length === 0) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={styles.loadingContainer}>
+        <PosterGridSkeleton rows={4} />
         <FinoraText variant="caption" style={styles.loadingText}>
           {loadingMessage}
         </FinoraText>
@@ -103,9 +104,14 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     marginTop: spacing.xxl
   },
+  loadingContainer: {
+    flex: 1,
+    paddingTop: spacing.sm
+  },
   loadingText: {
     color: colors.textSecondary,
-    marginTop: spacing.md
+    marginTop: spacing.md,
+    textAlign: "center"
   },
   emptyTitle: {
     fontWeight: "700",
