@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   StyleSheet,
   ScrollView,
   Dimensions,
   ActivityIndicator,
-  Pressable
+  Pressable,
+  NativeScrollEvent,
+  NativeSyntheticEvent
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
@@ -47,6 +49,8 @@ export interface SeriesDetailsViewProps {
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BACKDROP_HEIGHT = Math.round(SCREEN_WIDTH * 0.72);
+const EPISODES_PAGE_SIZE = 10;
+const LOAD_MORE_THRESHOLD_PX = 600;
 
 export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
   ({
@@ -107,6 +111,40 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
       userId
     );
 
+    // Long seasons (100+ episodes) must not mount every card on first paint, so the
+    // list is revealed in pages as the user scrolls. The full array stays in memory
+    // for "next unplayed" and the download flow.
+    const [visibleEpisodeCount, setVisibleEpisodeCount] = useState(EPISODES_PAGE_SIZE);
+    const isLoadingMoreRef = useRef(false);
+
+    useEffect(() => {
+      setVisibleEpisodeCount(EPISODES_PAGE_SIZE);
+      isLoadingMoreRef.current = false;
+    }, [selectedSeasonId]);
+
+    useEffect(() => {
+      isLoadingMoreRef.current = false;
+    }, [visibleEpisodeCount]);
+
+    const visibleEpisodes = useMemo(
+      () => episodes.slice(0, visibleEpisodeCount),
+      [episodes, visibleEpisodeCount]
+    );
+
+    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (isLoadingMoreRef.current || visibleEpisodeCount >= episodes.length) return;
+
+      const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+      const distanceFromBottom =
+        contentSize.height - (contentOffset.y + layoutMeasurement.height);
+      if (distanceFromBottom > LOAD_MORE_THRESHOLD_PX) return;
+
+      isLoadingMoreRef.current = true;
+      setVisibleEpisodeCount((count) =>
+        Math.min(episodes.length, count + EPISODES_PAGE_SIZE)
+      );
+    };
+
     // Compute next episode to play: first unplayed episode or episode 1
     const nextEpisodeToPlay = useMemo(() => {
       if (episodes.length === 0) return null;
@@ -127,6 +165,8 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         {/* Backdrop Header */}
         <View style={styles.headerContainer}>
@@ -308,7 +348,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
           {isLoadingEpisodes ? (
             <ActivityIndicator size="small" color={colors.primary} style={styles.loader} />
           ) : episodes.length > 0 ? (
-            episodes.map((ep) => (
+            visibleEpisodes.map((ep) => (
               <EpisodeCard
                 key={ep.id}
                 episode={ep}
