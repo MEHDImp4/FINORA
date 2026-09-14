@@ -8,6 +8,13 @@ import { Image } from "expo-image";
 import { useAuthStore } from "../stores/authStore";
 import { useNotificationStore } from "../stores/notificationStore";
 import { notificationService } from "../core/notifications/notificationService";
+// Side-effect import: registers the background task with TaskManager at module load time.
+// Must be imported before Expo Router renders any screens.
+import "../core/notifications/backgroundFetchTask";
+import {
+  registerBackgroundFetch,
+  unregisterBackgroundFetch
+} from "../core/notifications/backgroundFetchTask";
 import { QueryProvider } from "../providers/QueryProvider";
 import { offlineSyncManager } from "../features/offline/offlineSyncManager";
 import { offlineStorageService } from "../features/offline/offlineStorage";
@@ -32,7 +39,9 @@ export default function RootLayout() {
       offlineStorageService.cleanupOrphanDiskFiles().catch(() => {});
     }).catch(() => {});
     // Initialize notification engine and load stored notifications
-    notificationService.init().catch(() => {});
+    notificationService.init()
+      .then(() => registerBackgroundFetch())
+      .catch(() => {});
     useNotificationStore.getState().loadPersisted().catch(() => {});
 
     // Ensure splash screen remains visible for at least 2 seconds
@@ -58,6 +67,9 @@ export default function RootLayout() {
     if (status === "authenticated" && session?.userId) {
       offlineSyncManager.syncPendingProgress(session.userId).catch(() => {});
       offlineStorageService.cleanupExpiredWatchedMedia(48).catch(() => {});
+    } else if (status === "unauthenticated") {
+      // Unregister background task on logout so we don't fire stale notifications
+      unregisterBackgroundFetch().catch(() => {});
     }
   }, [status, session?.userId]);
 
