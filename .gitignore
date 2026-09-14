@@ -54,6 +54,9 @@ ehthumbs.db
 *.swp
 *.swo
 
+# Agent tooling state (machine-local)
+.commandcode/
+
 # TypeScript
 *.tsbuildinfo
 

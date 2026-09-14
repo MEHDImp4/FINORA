@@ -29,7 +29,10 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/finora-icon-f.png",
         "backgroundColor": "#0A0A0C"
-      }
+      },
+      "permissions": [
+        "android.permission.WRITE_SETTINGS"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -56,6 +59,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1c9dc2aa-e932-47ad-9f8c-05e6081f2892"
+      }
+    },
+    "owner": "mehdimp3"
   }
 }
