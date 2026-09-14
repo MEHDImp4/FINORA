@@ -239,11 +239,6 @@ export function PlayerScreen({
     };
   }, []);
 
-  // Keep the volume slider in sync with the engine
-  useEffect(() => {
-    setVolume(snapshot.volume);
-  }, [snapshot.volume]);
-
   // Jellyfin Playback Session Reporting Hook
   const { stopSession } = usePlaybackSession({
     itemId: item.id,

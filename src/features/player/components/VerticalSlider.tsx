@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -35,8 +35,8 @@ export function VerticalSlider({
   accessibilityLabel,
   testID
 }: VerticalSliderProps) {
-  const [trackHeight, setTrackHeight] = useState(DEFAULT_TRACK_HEIGHT);
   const trackHeightRef = useRef(DEFAULT_TRACK_HEIGHT);
+  const currentValueRef = useRef(clamp01(value));
   const dragStartValueRef = useRef(clamp01(value));
 
   const onValueChangeRef = useRef(onValueChange);
@@ -44,11 +44,14 @@ export function VerticalSlider({
     onValueChangeRef.current = onValueChange;
   }, [onValueChange]);
 
+  useEffect(() => {
+    currentValueRef.current = clamp01(value);
+  }, [value]);
+
   const handleTrackLayout = (e: LayoutChangeEvent) => {
     const height = e.nativeEvent.layout.height;
     if (height > 0) {
       trackHeightRef.current = height;
-      setTrackHeight(height);
     }
   };
 
@@ -56,12 +59,10 @@ export function VerticalSlider({
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt: GestureResponderEvent) => {
-        const height = trackHeightRef.current || DEFAULT_TRACK_HEIGHT;
-        // locationY is measured from the top of the track, and the value grows upward.
-        const next = clamp01(1 - evt.nativeEvent.locationY / height);
-        dragStartValueRef.current = next;
-        onValueChangeRef.current(next);
+      onPanResponderGrant: () => {
+        // Grab semantics: adjust relative to the current value instead of jumping
+        // to the touch position, so a light touch can't slam the value to 0.
+        dragStartValueRef.current = currentValueRef.current;
       },
       onPanResponderMove: (_evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
         const height = trackHeightRef.current || DEFAULT_TRACK_HEIGHT;
