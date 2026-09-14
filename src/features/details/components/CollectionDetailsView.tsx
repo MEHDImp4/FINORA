@@ -6,7 +6,9 @@ import {
   Dimensions,
   Pressable,
   ActivityIndicator,
-  Animated
+  Animated,
+  NativeScrollEvent,
+  NativeSyntheticEvent
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
@@ -33,6 +35,8 @@ export interface CollectionDetailsViewProps {
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BACKDROP_HEIGHT = Math.round(SCREEN_WIDTH * 0.72);
+const COLLECTION_PAGE_SIZE = 10;
+const LOAD_MORE_THRESHOLD_PX = 600;
 
 function CollectionMovieRow({
   item,
@@ -175,6 +179,39 @@ export const CollectionDetailsView: React.FC<CollectionDetailsViewProps> = React
       enabled: Boolean(userId && collection.id)
     });
 
+    // Long collections must not mount every row on first paint, so items are
+    // revealed in pages as the user scrolls.
+    const [visibleCount, setVisibleCount] = useState(COLLECTION_PAGE_SIZE);
+    const isLoadingMoreRef = React.useRef(false);
+
+    React.useEffect(() => {
+      setVisibleCount(COLLECTION_PAGE_SIZE);
+      isLoadingMoreRef.current = false;
+    }, [collection.id]);
+
+    React.useEffect(() => {
+      isLoadingMoreRef.current = false;
+    }, [visibleCount]);
+
+    const visibleItems = React.useMemo(
+      () => collectionItems.slice(0, visibleCount),
+      [collectionItems, visibleCount]
+    );
+
+    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (isLoadingMoreRef.current || visibleCount >= collectionItems.length) return;
+
+      const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+      const distanceFromBottom =
+        contentSize.height - (contentOffset.y + layoutMeasurement.height);
+      if (distanceFromBottom > LOAD_MORE_THRESHOLD_PX) return;
+
+      isLoadingMoreRef.current = true;
+      setVisibleCount((count) =>
+        Math.min(collectionItems.length, count + COLLECTION_PAGE_SIZE)
+      );
+    };
+
     const backdropUri = collection.backdropImageTag
       ? getBackdropUrl(serverUrl, collection.id, collection.backdropImageTag, 1080)
       : null;
@@ -185,6 +222,8 @@ export const CollectionDetailsView: React.FC<CollectionDetailsViewProps> = React
           style={styles.scroll}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 90 }]}
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
         >
           {/* Backdrop Header */}
           <View style={styles.backdropContainer}>
@@ -316,7 +355,7 @@ export const CollectionDetailsView: React.FC<CollectionDetailsViewProps> = React
             </View>
           ) : (
             <View style={styles.moviesList}>
-              {collectionItems.map((item, idx) => (
+              {visibleItems.map((item, idx) => (
                 <CollectionMovieRow
                   key={item.id}
                   item={item}

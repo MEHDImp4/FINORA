@@ -5,7 +5,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import {
   useLibraries,
-  useLibraryItems,
+  useInfiniteLibraryItems,
   useWatchlistItems,
   useGenres
 } from "../../hooks/useMediaQueries";
@@ -154,13 +154,16 @@ export default function LibraryScreen() {
     isWatchlist ? undefined : activeLibraryId
   );
 
-  // Fetch library items
+  // Fetch library items in pages so a large library is not downloaded in one request
   const {
-    data: libraryItems = [],
+    data: libraryItemsPages,
     isLoading: isItemsLoading,
     isError: isItemsError,
-    refetch: refetchItems
-  } = useLibraryItems(
+    refetch: refetchItems,
+    fetchNextPage: fetchNextLibraryPage,
+    hasNextPage: hasNextLibraryPage,
+    isFetchingNextPage: isFetchingNextLibraryPage
+  } = useInfiniteLibraryItems(
     currentUserId,
     isWatchlist ? undefined : activeLibraryId,
     {
@@ -171,6 +174,12 @@ export default function LibraryScreen() {
       searchTerm: debouncedSearchQuery.trim().length >= 2 ? debouncedSearchQuery.trim() : undefined
     }
   );
+
+  const libraryItems = useMemo(
+    () => (libraryItemsPages?.pages ?? []).flatMap((page) => page.items),
+    [libraryItemsPages]
+  );
+  const libraryItemTotal = libraryItemsPages?.pages?.[0]?.total ?? libraryItems.length;
 
   // Fetch watchlist items
   const {
@@ -202,7 +211,14 @@ export default function LibraryScreen() {
   }, [rawWatchlistItems, debouncedSearchQuery]);
 
   const items = isWatchlist ? watchlistItems : libraryItems;
+  const itemCount = isWatchlist ? watchlistItems.length : libraryItemTotal;
   const isLoading = isWatchlist ? isWatchlistLoading : (isItemsLoading || isLibrariesLoading);
+
+  const handleLoadMoreItems = useCallback(() => {
+    if (!isWatchlist && hasNextLibraryPage && !isFetchingNextLibraryPage) {
+      fetchNextLibraryPage();
+    }
+  }, [isWatchlist, hasNextLibraryPage, isFetchingNextLibraryPage, fetchNextLibraryPage]);
   const isAnyError = isWatchlist ? Boolean(isWatchlistError) : Boolean(isLibrariesError || isItemsError);
 
   const { failureType, isChecking: isDiagChecking, runDiagnostic } = useNetworkDiagnostic(
@@ -400,16 +416,16 @@ export default function LibraryScreen() {
           </Pressable>
 
           <FinoraText variant="caption" style={styles.resultsCount}>
-            {items.length}{" "}
+            {itemCount}{" "}
             {isWatchlist
-              ? items.length <= 1
+              ? itemCount <= 1
                 ? "titre dans la liste"
                 : "titres dans la liste"
               : isCollectionTab
-              ? items.length <= 1
+              ? itemCount <= 1
                 ? "collection"
                 : "collections"
-              : items.length <= 1
+              : itemCount <= 1
               ? "titre"
               : "titres"}
             {debouncedSearchQuery.trim() ? ` pour "${debouncedSearchQuery.trim()}"` : ""}
@@ -488,6 +504,8 @@ export default function LibraryScreen() {
           isLoading={isLoading}
           onItemPress={handleItemPress}
           onItemLongPress={handleItemLongPress}
+          onEndReached={handleLoadMoreItems}
+          isFetchingMore={!isWatchlist && isFetchingNextLibraryPage}
           loadingMessage="Chargement de vos médias..."
           emptyTitle={
             isWatchlist

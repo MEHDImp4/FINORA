@@ -106,6 +106,19 @@ export class MediaRepository {
     options: GetItemsOptions = {},
     customClient?: HttpClient
   ): Promise<MediaItem[]> {
+    const { items } = await this.getItemsPage(userId, options, customClient);
+    return items;
+  }
+
+  /**
+   * Page-returning variant of {@link getItems}. Also exposes the server's total
+   * record count so callers can lazy-load in chunks while showing the real total.
+   */
+  public async getItemsPage(
+    userId: string,
+    options: GetItemsOptions = {},
+    customClient?: HttpClient
+  ): Promise<{ items: MediaItem[]; total: number }> {
     if (!userId) {
       throw new FinoraError("User ID is required to fetch items", "INVALID_PARAMS");
     }
@@ -143,14 +156,22 @@ export class MediaRepository {
       params.SearchTerm = options.searchTerm.trim();
     }
 
-    const response = await http.request<{ Items?: any[] }>(`/Users/${userId}/Items`, {
-      params
-    });
+    const response = await http.request<{ Items?: any[]; TotalRecordCount?: number }>(
+      `/Users/${userId}/Items`,
+      { params }
+    );
 
-    const items = response?.Items || [];
-    return items
+    const items = (response?.Items || [])
       .filter(isValidMediaDto)
       .map(mapJellyfinItemToMediaItem);
+
+    return {
+      items,
+      total:
+        typeof response?.TotalRecordCount === "number"
+          ? response.TotalRecordCount
+          : items.length
+    };
   }
 
   public async getResumeItems(

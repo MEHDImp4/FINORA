@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { View, FlatList, StyleSheet, Dimensions } from "react-native";
+import { View, FlatList, ActivityIndicator, StyleSheet, Dimensions } from "react-native";
 import { MediaCard } from "../../home/components/MediaCard";
 import { MediaItem } from "../../../types/media";
 import { FinoraText } from "../../../design-system/components/FinoraText";
@@ -15,6 +15,8 @@ interface LibraryGridViewProps {
   emptyTitle?: string;
   emptyMessage?: string;
   loadingMessage?: string;
+  onEndReached?: () => void;
+  isFetchingMore?: boolean;
 }
 
 const HORIZONTAL_PADDING = spacing.md; // 16
@@ -28,7 +30,9 @@ export const LibraryGridView = React.memo(function LibraryGridView({
   onItemLongPress,
   emptyTitle = "No Items",
   emptyMessage = "No media found in this library",
-  loadingMessage = "Loading library items..."
+  loadingMessage = "Loading library items...",
+  onEndReached,
+  isFetchingMore = false
 }: LibraryGridViewProps) {
   const screenWidth = Dimensions.get("window").width || 375;
   const cardWidth = Math.max(90, Math.floor((screenWidth - (HORIZONTAL_PADDING * 2) - (GRID_GAP * 2)) / 3));
@@ -76,6 +80,18 @@ export const LibraryGridView = React.memo(function LibraryGridView({
       maxToRenderPerBatch={12}
       windowSize={5}
       removeClippedSubviews={true}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={0.6}
+      ListFooterComponent={
+        isFetchingMore ? (
+          <ActivityIndicator
+            size="small"
+            color={colors.primary}
+            style={styles.footerLoader}
+            testID="library-grid-loading-more"
+          />
+        ) : null
+      }
       ListEmptyComponent={
         !isLoading ? (
           <View style={styles.centerContainer}>
@@ -107,6 +123,9 @@ const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
     paddingTop: spacing.sm
+  },
+  footerLoader: {
+    paddingVertical: spacing.lg
   },
   loadingText: {
     color: colors.textSecondary,

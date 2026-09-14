@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { mediaRepository, GetItemsOptions } from "../core/repositories/mediaRepository";
 import { MediaItem, MediaLibrary } from "../types/media";
 
@@ -41,6 +41,33 @@ export function useLibraryItems(
   return useQuery<MediaItem[]>({
     queryKey: mediaKeys.items(userId || "", parentId, options),
     queryFn: () => mediaRepository.getItems(userId!, { ...options, parentId }),
+    enabled: Boolean(userId)
+  });
+}
+
+/**
+ * Paginated variant of {@link useLibraryItems}. Fetches the library in pages so a
+ * very large library is not downloaded in a single request; `total` from the first
+ * page is the server's real record count.
+ */
+export function useInfiniteLibraryItems(
+  userId?: string,
+  parentId?: string,
+  options?: GetItemsOptions,
+  pageSize: number = 100
+) {
+  return useInfiniteQuery({
+    queryKey: [...mediaKeys.items(userId || "", parentId, options), "infinite", pageSize],
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      mediaRepository.getItemsPage(userId!, {
+        ...options,
+        parentId,
+        limit: pageSize,
+        startIndex: pageParam
+      }),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.items.length < pageSize ? undefined : allPages.length * pageSize,
     enabled: Boolean(userId)
   });
 }

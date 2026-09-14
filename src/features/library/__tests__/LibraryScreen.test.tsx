@@ -50,6 +50,15 @@ jest.mock("../../../hooks/useMediaQueries", () => ({
   useLibraries: () => ({ data: mockLibraries, isLoading: false }),
   useGenres: () => ({ data: mockGenres, isLoading: false }),
   useLibraryItems: () => ({ data: mockItems, isLoading: false }),
+  useInfiniteLibraryItems: () => ({
+    data: { pages: [{ items: mockItems, total: mockItems.length }] },
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+    fetchNextPage: jest.fn(),
+    hasNextPage: false,
+    isFetchingNextPage: false
+  }),
   useWatchlistItems: () => ({ data: [], isLoading: false })
 }));
 
