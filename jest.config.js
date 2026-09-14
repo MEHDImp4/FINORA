@@ -11,7 +11,7 @@ module.exports = {
     "^expo-notifications$": "<rootDir>/__mocks__/expo-notifications.js",
     "^expo-network$": "<rootDir>/__mocks__/expo-network.js",
     "^expo-task-manager$": "<rootDir>/__mocks__/expo-task-manager.js",
-    "^expo-background-fetch$": "<rootDir>/__mocks__/expo-background-fetch.js",
+    "^expo-background-task$": "<rootDir>/__mocks__/expo-background-task.js",
     "^expo-image$": "<rootDir>/__mocks__/expo-image.js",
     "^react-test-renderer$": "<rootDir>/__mocks__/react-test-renderer.js",
     "\\.(png|jpg|jpeg|gif|svg)$": "<rootDir>/__mocks__/fileMock.js"

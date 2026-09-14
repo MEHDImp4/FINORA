@@ -1,5 +1,5 @@
 import * as TaskManager from "expo-task-manager";
-import * as BackgroundFetch from "expo-background-fetch";
+import * as BackgroundTask from "expo-background-task";
 
 // Mock authRepository (headless session restore) before importing the task module
 jest.mock("../../../core/jellyfin/authRepository", () => ({
@@ -35,9 +35,8 @@ import {
 
 const mockDefineTask = TaskManager.defineTask as jest.Mock;
 const mockIsTaskRegisteredAsync = TaskManager.isTaskRegisteredAsync as jest.Mock;
-const mockGetStatusAsync = BackgroundFetch.getStatusAsync as jest.Mock;
-const mockRegisterTaskAsync = BackgroundFetch.registerTaskAsync as jest.Mock;
-const mockUnregisterTaskAsync = BackgroundFetch.unregisterTaskAsync as jest.Mock;
+const mockRegisterTaskAsync = BackgroundTask.registerTaskAsync as jest.Mock;
+const mockUnregisterTaskAsync = BackgroundTask.unregisterTaskAsync as jest.Mock;
 const mockRestoreSession = authRepository.restoreSession as jest.Mock;
 const mockSyncNewMedia = syncNewMediaNotifications as jest.Mock;
 
@@ -69,26 +68,27 @@ describe("backgroundFetchTask", () => {
       jest.clearAllMocks();
     });
 
-    it("returns NoData when authRepository.restoreSession returns null (headless — Zustand not hydrated)", async () => {
-      // Simulates the real headless background scenario where Zustand is NOT hydrated
+    it("returns Success when authRepository.restoreSession returns null (headless — Zustand not hydrated)", async () => {
+      // Simulates the real headless background scenario where Zustand is NOT hydrated.
+      // The new API returns Success (not NoData) for a no-op run.
       mockRestoreSession.mockResolvedValueOnce(null);
 
       const result = await taskHandler();
 
-      expect(result).toBe(BackgroundFetch.BackgroundFetchResult.NoData);
+      expect(result).toBe(BackgroundTask.BackgroundTaskResult.Success);
       expect(mockSyncNewMedia).not.toHaveBeenCalled();
     });
 
-    it("returns NoData when restored session has no userId", async () => {
+    it("returns Success when restored session has no userId", async () => {
       mockRestoreSession.mockResolvedValueOnce({ serverUrl: "https://test", token: "tok" });
 
       const result = await taskHandler();
 
-      expect(result).toBe(BackgroundFetch.BackgroundFetchResult.NoData);
+      expect(result).toBe(BackgroundTask.BackgroundTaskResult.Success);
       expect(mockSyncNewMedia).not.toHaveBeenCalled();
     });
 
-    it("calls syncNewMediaNotifications with the restored userId and returns NewData on success", async () => {
+    it("calls syncNewMediaNotifications with the restored userId and returns Success on success", async () => {
       mockRestoreSession.mockResolvedValueOnce({
         userId: "user-1",
         userName: "Bastoz",
@@ -101,7 +101,7 @@ describe("backgroundFetchTask", () => {
       const result = await taskHandler();
 
       expect(mockSyncNewMedia).toHaveBeenCalledWith("user-1");
-      expect(result).toBe(BackgroundFetch.BackgroundFetchResult.NewData);
+      expect(result).toBe(BackgroundTask.BackgroundTaskResult.Success);
     });
 
     it("returns Failed when syncNewMediaNotifications throws", async () => {
@@ -114,7 +114,7 @@ describe("backgroundFetchTask", () => {
 
       const result = await taskHandler();
 
-      expect(result).toBe(BackgroundFetch.BackgroundFetchResult.Failed);
+      expect(result).toBe(BackgroundTask.BackgroundTaskResult.Failed);
     });
 
     it("returns Failed when authRepository.restoreSession throws", async () => {
@@ -122,7 +122,7 @@ describe("backgroundFetchTask", () => {
 
       const result = await taskHandler();
 
-      expect(result).toBe(BackgroundFetch.BackgroundFetchResult.Failed);
+      expect(result).toBe(BackgroundTask.BackgroundTaskResult.Failed);
     });
   });
 
@@ -131,24 +131,7 @@ describe("backgroundFetchTask", () => {
       jest.clearAllMocks();
     });
 
-    it("skips registration when status is Restricted", async () => {
-      mockGetStatusAsync.mockResolvedValueOnce(BackgroundFetch.BackgroundFetchStatus.Restricted);
-
-      await registerBackgroundFetch();
-
-      expect(mockRegisterTaskAsync).not.toHaveBeenCalled();
-    });
-
-    it("skips registration when status is Denied", async () => {
-      mockGetStatusAsync.mockResolvedValueOnce(BackgroundFetch.BackgroundFetchStatus.Denied);
-
-      await registerBackgroundFetch();
-
-      expect(mockRegisterTaskAsync).not.toHaveBeenCalled();
-    });
-
     it("skips registration when task is already registered", async () => {
-      mockGetStatusAsync.mockResolvedValueOnce(BackgroundFetch.BackgroundFetchStatus.Available);
       mockIsTaskRegisteredAsync.mockResolvedValueOnce(true);
 
       await registerBackgroundFetch();
@@ -156,22 +139,18 @@ describe("backgroundFetchTask", () => {
       expect(mockRegisterTaskAsync).not.toHaveBeenCalled();
     });
 
-    it("registers the task with correct options when available and not registered", async () => {
-      mockGetStatusAsync.mockResolvedValueOnce(BackgroundFetch.BackgroundFetchStatus.Available);
+    it("registers the task with correct options when not yet registered", async () => {
       mockIsTaskRegisteredAsync.mockResolvedValueOnce(false);
       mockRegisterTaskAsync.mockResolvedValueOnce(undefined);
 
       await registerBackgroundFetch();
 
       expect(mockRegisterTaskAsync).toHaveBeenCalledWith(FINORA_BG_FETCH_TASK, {
-        minimumInterval: 15 * 60,
-        stopOnTerminate: false,
-        startOnBoot: true
+        minimumInterval: 15 * 60
       });
     });
 
     it("does not throw when registerTaskAsync rejects", async () => {
-      mockGetStatusAsync.mockResolvedValueOnce(BackgroundFetch.BackgroundFetchStatus.Available);
       mockIsTaskRegisteredAsync.mockResolvedValueOnce(false);
       mockRegisterTaskAsync.mockRejectedValueOnce(new Error("register failed"));
 

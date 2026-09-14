@@ -17,7 +17,7 @@
     "@tanstack/react-query": "^5.102.8",
     "expo": "^57.0.22",
     "expo-asset": "~57.0.17",
-    "expo-background-fetch": "~57.0.17",
+    "expo-background-task": "^57.0.17",
     "expo-brightness": "~57.0.2",
     "expo-build-properties": "~57.0.17",
     "expo-constants": "~57.0.18",
