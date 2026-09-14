@@ -16,7 +16,13 @@
     "icon": "./assets/finora-icon-f.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.finora.app"
+      "bundleIdentifier": "com.finora.app",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true,
+          "NSAllowsArbitraryLoads": false
+        }
+      }
     },
     "android": {
       "package": "com.finora.app",
@@ -31,11 +37,20 @@
       "expo-video",
       "expo-asset",
       "expo-splash-screen",
+      "expo-brightness",
       [
         "expo-notifications",
         {
           "icon": "./assets/finora-icon-f.png",
           "color": "#E50914"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
         }
       ]
     ],

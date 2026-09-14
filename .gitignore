@@ -17,6 +17,9 @@ ios/
 .env*.local
 *.env
 
+# EAS secrets (Google Play service account, Apple credentials)
+.secrets/
+
 # Native credentials, keys & certificates
 *.jks
 *.p8
