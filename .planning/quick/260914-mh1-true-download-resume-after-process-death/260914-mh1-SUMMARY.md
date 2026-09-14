@@ -79,31 +79,31 @@ token is never used. Only non-sensitive fields are logged, and `logger.ts` addit
 ## Tests
 
 ```
-TypeScript:  PASS (npx tsc --noEmit, exit 0)
-Jest:        PASS for this work — 12/12 new tests, all 5 pre-existing offline .ts suites green
-Suites:      73 total (72 baseline + 1 new)
-Tests:       419 total (407 baseline + 12 new)
-Baseline:    35 suites / 137 tests fail on master before this work
-After:       35 suites / 137 tests fail — identical, i.e. no new failures
-GitHub Actions: Cannot be verified from here; CI runs `npm run typecheck` (passes) and
-                `npm test -- --ci --no-coverage --forceExit --passWithNoTests`, which is ALREADY RED
-                on master for reasons unrelated to this change (see Limitations).
+TypeScript:     PASS (npx tsc --noEmit, exit 0)
+Jest:           PASS — 73/73 suites, 419/419 tests
+Suites:         73 (72 before + 1 new)
+Tests:          419 (407 before + 12 new)
+GitHub Actions: PASS — run 34862626985 on 6f5ea00
+                "Test Suites: 73 passed, 73 total"
+                "Tests:       419 passed, 419 total"
+                typecheck OK (job 1m13s)
 ```
 
-### Pre-existing failure (not caused by this change)
+### Local environment caveat (this cost some time — recorded so it is not repeated)
 
-35 suites / 137 tests fail on `master` **before** any of this work. Every failing suite is a `.tsx`
-React component test and the error is:
+Initial local runs reported 35 failing suites / 137 failing tests, and the first version of this
+summary wrongly concluded that `master` was already red in CI.
 
-```
-TypeError: (0, react_test_renderer_1.act) is not a function
-```
+That was an artifact of the local Windows shell having **`NODE_ENV=production` exported**. React's
+*production* build strips `act`, so `react-test-renderer`'s `exports.act = React.act` evaluates to
+`undefined` and every component suite fails with
+`TypeError: (0, react_test_renderer_1.act) is not a function`. With `NODE_ENV=test` (what Jest and CI
+use) `React.act` is a function and the whole suite is green.
 
-React 19.2.3 no longer exports `act` (verified: it is absent from `Object.keys(require("react"))`), and
-`react-test-renderer` 19 no longer provides it either, but the 35 suites still
-`import { act } from "react-test-renderer"`. This needs a deliberate test-renderer migration.
-It was left untouched because it is unrelated to download resume and a shim would have produced
-false-green tests. **No test was weakened to make this task look green.**
+`master` was never red. Verified by `gh run view --job=104029664159 --log` on the parent commit
+`c5873fa`: `Test Suites: 72 passed, 72 total` / `Tests: 407 passed, 407 total`.
+
+No test was weakened and no source workaround was added for this.
 
 ## Deviations from the plan
 
