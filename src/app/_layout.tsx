@@ -18,6 +18,7 @@ import {
 import { QueryProvider } from "../providers/QueryProvider";
 import { offlineSyncManager } from "../features/offline/offlineSyncManager";
 import { offlineStorageService } from "../features/offline/offlineStorage";
+import { downloadManager } from "../features/offline/downloadManager";
 import { useOnboardingStore } from "../stores/onboardingStore";
 import { OnboardingScreen } from "../features/onboarding/components/OnboardingScreen";
 
@@ -32,24 +33,27 @@ export default function RootLayout() {
   const [minSplashDone, setMinSplashDone] = React.useState(false);
 
   useEffect(() => {
-    restoreSession();
-    loadOnboardingStatus();
-    // Auto-cleanup watched downloads older than 48h (2-3 days policy) and any orphaned disk files
+    // Boot sequence — no artificial delay, splash disappears when real data is ready
+    Promise.all([
+      restoreSession(),
+      loadOnboardingStatus()
+    ]).finally(() => {
+      setMinSplashDone(true);
+    });
+
+    // Auto-cleanup watched downloads older than 48h and any orphaned disk files
     offlineStorageService.cleanupExpiredWatchedMedia(48).then(() => {
       offlineStorageService.cleanupOrphanDiskFiles().catch(() => {});
     }).catch(() => {});
+
     // Initialize notification engine and load stored notifications
     notificationService.init()
       .then(() => registerBackgroundFetch())
       .catch(() => {});
     useNotificationStore.getState().loadPersisted().catch(() => {});
 
-    // Ensure splash screen remains visible for at least 2 seconds
-    const timer = setTimeout(() => {
-      setMinSplashDone(true);
-    }, 2000);
-
-    return () => clearTimeout(timer);
+    // Restore persisted downloads — interrupted downloads appear as paused after restart
+    downloadManager.restorePersistedDownloads().catch(() => {});
   }, [restoreSession, loadOnboardingStatus]);
 
   // Deep linking: when user taps a notification on their device

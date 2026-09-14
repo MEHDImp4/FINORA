@@ -5,6 +5,7 @@ import { logger } from "../../core/network/logger";
 import { notificationService } from "../../core/notifications/notificationService";
 import { isWifiConnected } from "../../core/network/networkStatusService";
 import { usePlaybackPreferencesStore } from "../../stores/playbackPreferencesStore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type DownloadListener = (downloads: DownloadItem[]) => void;
 
@@ -21,12 +22,65 @@ interface StoredDownloadTask {
   options?: DownloadOptions;
 }
 
+/**
+ * Persisted snapshot of a download, stored in AsyncStorage.
+ * Tokens are NEVER persisted here — they are re-obtained from the secure session at restore time.
+ */
+export interface PersistedDownloadEntry {
+  itemId: string;
+  title: string;
+  type: "Movie" | "Episode";
+  year?: number;
+  /** Download URL WITHOUT authentication tokens. Tokens are injected from secure session on resume. */
+  downloadUrl: string;
+  localPath: string;
+  status: DownloadStatus;
+  progress: number;
+  bytesDownloaded: number;
+  totalBytes: number;
+  error?: string;
+  startedAt: number;
+  completedAt?: number;
+  seriesId?: string;
+  seriesName?: string;
+  seriesPosterPath?: string;
+  seasonIndex?: number;
+  episodeIndex?: number;
+  posterPath?: string;
+  posterLocalPath?: string;
+  quality?: string;
+  metadata?: Partial<OfflineMediaRecord>;
+}
+
 export const MAX_CONCURRENT_DOWNLOADS = 3;
+export const DOWNLOAD_QUEUE_STORAGE_KEY = "@finora_download_queue";
+
+/**
+ * Strips authentication tokens from a URL query string.
+ * Tokens must come from the live secure session, never from persisted storage.
+ */
+function stripTokensFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.delete("api_key");
+    parsed.searchParams.delete("ApiKey");
+    parsed.searchParams.delete("Token");
+    return parsed.toString();
+  } catch {
+    // URL parsing failed (e.g., relative path) — return as-is
+    return url;
+  }
+}
 
 /**
  * DownloadManager coordinates media downloads, progress tracking,
  * queue scheduling with concurrency limitation (max 3), pausing,
  * resuming, retry, and cancellation with safe file system operations.
+ *
+ * PERSISTENCE: The queue and download states are persisted to AsyncStorage
+ * so that downloads survive app kills, crashes, and OS-initiated process
+ * termination. Tokens are NEVER persisted — they are re-obtained from the
+ * authenticated session at resume time.
  */
 export class DownloadManager {
   private downloads: Map<string, DownloadItem> = new Map();
@@ -38,6 +92,205 @@ export class DownloadManager {
     string,
     { timestamp: number; bytes: number; speed: number }
   > = new Map();
+  private persistDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // ─── Persistence ───────────────────────────────────────────────────────────
+
+  /**
+   * Schedules a debounced persistence write (200ms) to avoid excessive I/O
+   * during rapid progress callbacks.
+   */
+  private schedulePersist(): void {
+    if (this.persistDebounceTimer) {
+      clearTimeout(this.persistDebounceTimer);
+    }
+    this.persistDebounceTimer = setTimeout(() => {
+      this.persistQueue().catch(() => {});
+    }, 200);
+  }
+
+  /**
+   * Serializes and writes the current download state to AsyncStorage.
+   * Completed and canceled downloads are excluded to keep storage lean.
+   * Tokens are stripped from URLs before persistence.
+   */
+  private async persistQueue(): Promise<void> {
+    try {
+      const entries: PersistedDownloadEntry[] = [];
+
+      for (const [itemId, item] of this.downloads.entries()) {
+        // Skip completed and canceled — they don't need restoration
+        if (item.status === "completed" || item.status === "canceled") continue;
+
+        const config = this.downloadConfigs.get(itemId);
+
+        entries.push({
+          itemId: item.itemId,
+          title: item.title,
+          type: item.type,
+          year: item.year,
+          // Strip tokens — they are re-injected from live session on resume
+          downloadUrl: stripTokensFromUrl(item.downloadUrl),
+          localPath: item.localPath,
+          status: item.status,
+          progress: item.progress,
+          bytesDownloaded: item.bytesDownloaded,
+          totalBytes: item.totalBytes,
+          error: item.error,
+          startedAt: item.startedAt,
+          completedAt: item.completedAt,
+          seriesId: item.seriesId,
+          seriesName: item.seriesName,
+          seriesPosterPath: item.seriesPosterPath,
+          seasonIndex: item.seasonIndex,
+          episodeIndex: item.episodeIndex,
+          posterPath: item.posterPath,
+          posterLocalPath: item.posterLocalPath,
+          metadata: config?.metadata
+        });
+      }
+
+      await AsyncStorage.setItem(DOWNLOAD_QUEUE_STORAGE_KEY, JSON.stringify(entries));
+    } catch (err: any) {
+      logger.warn("[DownloadManager] Failed to persist queue:", err?.message ?? err);
+    }
+  }
+
+  /**
+   * Restores downloads from AsyncStorage after an app restart.
+   *
+   * Active downloads that were interrupted (downloading/queued) become
+   * "interrupted" status so the UI shows them correctly without lying that
+   * they're still downloading. The user can then resume them explicitly.
+   *
+   * Completed and canceled downloads are not restored (they have no pending work).
+   * Failed downloads are restored so the user can retry.
+   *
+   * NOTE: Authentication tokens are NOT stored. The caller is responsible for
+   * re-injecting fresh tokens from the secure session before resuming.
+   */
+  public async restorePersistedDownloads(): Promise<void> {
+    try {
+      const raw = await AsyncStorage.getItem(DOWNLOAD_QUEUE_STORAGE_KEY);
+      if (!raw) return;
+
+      let entries: PersistedDownloadEntry[];
+      try {
+        entries = JSON.parse(raw);
+        if (!Array.isArray(entries)) return;
+      } catch {
+        return;
+      }
+
+      let restoredCount = 0;
+
+      for (const entry of entries) {
+        if (!entry.itemId || !entry.title) continue;
+
+        // Skip already-tracked downloads (avoid duplicates if restorePersistedDownloads is called twice)
+        if (this.downloads.has(entry.itemId)) continue;
+
+        // Verify local file state
+        let localFileExists = false;
+        let localFileSizeBytes = 0;
+
+        if (entry.localPath && entry.localPath.startsWith("file://")) {
+          try {
+            const info = await FileSystem.getInfoAsync(entry.localPath);
+            if (info.exists) {
+              localFileExists = true;
+              localFileSizeBytes = "size" in info ? (info as any).size : 0;
+            }
+          } catch {
+            // File check failed — treat as not existing
+          }
+        }
+
+        // Determine restored status
+        let restoredStatus: DownloadStatus;
+        if (entry.status === "completed") {
+          // Already completed — skip (shouldn't reach here since we don't persist completed)
+          continue;
+        } else if (entry.status === "canceled") {
+          // Canceled — skip
+          continue;
+        } else if (entry.status === "downloading" || entry.status === "queued") {
+          // Was actively downloading when the app was killed — mark as paused
+          // so UI shows it correctly. User can resume explicitly.
+          restoredStatus = "paused";
+        } else {
+          // paused / failed — restore as-is
+          restoredStatus = entry.status;
+        }
+
+        // Restore progress from actual file size if partial file exists
+        const restoredBytesDownloaded = localFileExists
+          ? Math.max(entry.bytesDownloaded, localFileSizeBytes)
+          : entry.bytesDownloaded;
+
+        const restoredProgress =
+          entry.totalBytes > 0
+            ? Math.min(1, restoredBytesDownloaded / entry.totalBytes)
+            : entry.progress;
+
+        const restoredItem: DownloadItem = {
+          itemId: entry.itemId,
+          title: entry.title,
+          type: entry.type,
+          year: entry.year,
+          downloadUrl: entry.downloadUrl, // Token-free URL — caller injects fresh token
+          localPath: entry.localPath,
+          status: restoredStatus,
+          progress: restoredProgress,
+          bytesDownloaded: restoredBytesDownloaded,
+          totalBytes: entry.totalBytes,
+          error: entry.error,
+          startedAt: entry.startedAt,
+          completedAt: entry.completedAt,
+          seriesId: entry.seriesId,
+          seriesName: entry.seriesName,
+          seriesPosterPath: entry.seriesPosterPath,
+          seasonIndex: entry.seasonIndex,
+          episodeIndex: entry.episodeIndex,
+          posterPath: entry.posterPath,
+          posterLocalPath: entry.posterLocalPath
+        };
+
+        this.downloads.set(entry.itemId, restoredItem);
+
+        // Restore the download config so retry/resume works
+        this.downloadConfigs.set(entry.itemId, {
+          item: {
+            itemId: entry.itemId,
+            title: entry.title,
+            type: entry.type,
+            year: entry.year,
+            downloadUrl: entry.downloadUrl,
+            localPath: entry.localPath,
+            seriesId: entry.seriesId,
+            seriesName: entry.seriesName,
+            seriesPosterPath: entry.seriesPosterPath,
+            seasonIndex: entry.seasonIndex,
+            episodeIndex: entry.episodeIndex,
+            posterPath: entry.posterPath,
+            posterLocalPath: entry.posterLocalPath
+          },
+          metadata: entry.metadata
+        });
+
+        restoredCount++;
+      }
+
+      if (restoredCount > 0) {
+        logger.info(`[DownloadManager] Restored ${restoredCount} download(s) from persistent storage.`);
+        this.notify();
+      }
+    } catch (err: any) {
+      logger.warn("[DownloadManager] Failed to restore persisted downloads:", err?.message ?? err);
+    }
+  }
+
+  // ─── Public API ────────────────────────────────────────────────────────────
 
   public subscribe(listener: DownloadListener): () => void {
     this.listeners.add(listener);
@@ -113,6 +366,7 @@ export class DownloadManager {
           startedAt: Date.now()
         };
         this.downloads.set(item.itemId, downloadItem);
+        this.schedulePersist();
         this.notify();
         return downloadItem;
       }
@@ -142,8 +396,10 @@ export class DownloadManager {
         this.queue.push(item.itemId);
       }
       logger.info(`[DownloadManager] Queued: ${item.title} (position ${this.queue.length})`);
+      this.schedulePersist();
       this.notify();
     } else {
+      this.schedulePersist();
       this.notify();
       this.executeDownload(item.itemId);
     }
@@ -317,6 +573,7 @@ export class DownloadManager {
       this.speedTrackers.delete(itemId);
     }
 
+    this.schedulePersist();
     this.notify();
   }
 
@@ -338,13 +595,14 @@ export class DownloadManager {
     }
 
     item.status = "paused";
+    this.schedulePersist();
     this.notify();
     this.processQueue();
   }
 
   public async resumeDownload(itemId: string): Promise<void> {
     const item = this.downloads.get(itemId);
-    if (!item || item.status !== "paused") return;
+    if (!item || (item.status !== "paused" && item.status !== ("interrupted" as DownloadStatus))) return;
 
     const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
     if (wifiOnly) {
@@ -378,6 +636,7 @@ export class DownloadManager {
       }
     }
 
+    this.schedulePersist();
     this.notify();
   }
 
@@ -404,6 +663,9 @@ export class DownloadManager {
 
     item.status = "canceled";
     this.downloads.delete(itemId);
+
+    // Remove from persistence immediately
+    this.schedulePersist();
     this.notify();
     this.processQueue();
   }
@@ -420,6 +682,7 @@ export class DownloadManager {
     item.bytesDownloaded = totalBytes;
     item.totalBytes = totalBytes;
     item.completedAt = Date.now();
+    this.schedulePersist();
     this.notify();
   }
 
@@ -470,6 +733,7 @@ export class DownloadManager {
     item.estimatedSecondsRemaining = undefined;
     item.status = "failed";
     item.error = error;
+    this.schedulePersist();
     this.notify();
     this.processQueue();
   }
