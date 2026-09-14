@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 status: Awaiting next milestone
 stopped_at: Milestone v1.0 complete and archived; ready for /gsd-new-milestone
-last_updated: "2026-09-14T14:30:00.000Z"
+last_updated: "2026-09-14T15:45:00.000Z"
 last_activity: 2026-09-14
-last_activity_desc: Quick task lazy-load-series-episodes completed (incremental episode rendering)
-state_head: 63b8795
+last_activity_desc: Quick task true-download-resume-after-process-death completed (real byte-range download resume after process death)
+state_head: 3dd90fb
 progress:
   total_phases: 10
   completed_phases: 10
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-11)
 Phase: Milestone v1.0 complete (Phases 1–10)
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-09-11 — Milestone v1.0 completed and archived
+Last activity: 2026-09-14 — Completed quick task true-download-resume-after-process-death (real byte-range download resume after process death)
 
 ## Performance Metrics
 
@@ -110,6 +110,7 @@ Items acknowledged and carried forward from previous milestone close:
 | fix-player-brightness-volume-controls | 2026-09-14 | Fix player brightness/volume controls unavailable and left/right tap not dismissing overlay | Complete ✓ |
 | add-vertical-brightness-and-volume-sliders | 2026-09-14 | Add vertical brightness and volume sliders to the player overlay | Complete ✓ |
 | lazy-load-series-episodes | 2026-09-14 | Render series episodes incrementally (10 at a time on scroll) instead of all at once | Complete ✓ |
+| true-download-resume-after-process-death | 2026-09-14 | Reconstruct and truly resume downloads after a process death from the existing partial file, re-authenticating from SecureStore | Complete ✓ |
 
 ## Session Continuity
  
