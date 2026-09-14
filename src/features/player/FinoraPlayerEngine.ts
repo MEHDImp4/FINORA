@@ -291,10 +291,23 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
 
   public setVolume(volume: number): void {
     const clamped = Math.max(0, Math.min(1.0, volume));
+    const shouldMute = clamped <= 0;
+
+    // Reflect the requested value immediately instead of waiting for the native echo.
+    this.updateSnapshot({ volume: clamped, isMuted: shouldMute });
+
     if (this.player && !this.isDestroyed) {
-      this.player.volume = clamped;
-    } else {
-      this.updateSnapshot({ volume: clamped });
+      try {
+        // Android treats `volume = 0` as full volume (expo/expo#39209), so never
+        // assign 0 directly. Silence is achieved through `muted`, which is reliable
+        // on both platforms. Setting the volume does not unmute, so clear it first.
+        this.player.muted = shouldMute;
+        if (!shouldMute) {
+          this.player.volume = clamped;
+        }
+      } catch {
+        // The native player can be released mid-transition; the snapshot is already updated.
+      }
     }
   }
 

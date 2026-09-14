@@ -126,6 +126,29 @@ describe("FinoraPlayerEngine", () => {
     expect(mockPlayer.muted).toBe(true);
   });
 
+  it("mutes through the muted flag instead of assigning volume 0", () => {
+    const mockPlayer = createMockPlayer();
+    const engine = new FinoraPlayerEngine(mockPlayer);
+
+    engine.setVolume(0.4);
+    expect(mockPlayer.volume).toBe(0.4);
+    expect(mockPlayer.muted).toBe(false);
+
+    // Android treats `volume = 0` as full volume (expo/expo#39209), so muting must
+    // not write volume 0 — it flips `muted` and leaves the last level untouched.
+    engine.setVolume(0);
+    expect(mockPlayer.volume).toBe(0.4);
+    expect(mockPlayer.muted).toBe(true);
+    expect(engine.getSnapshot().volume).toBe(0);
+    expect(engine.getSnapshot().isMuted).toBe(true);
+
+    // Raising the volume again unmutes and applies the level.
+    engine.setVolume(0.6);
+    expect(mockPlayer.muted).toBe(false);
+    expect(mockPlayer.volume).toBe(0.6);
+    expect(engine.getSnapshot().isMuted).toBe(false);
+  });
+
   it("cleans up subscriptions on destroy", () => {
     const mockPlayer = createMockPlayer();
     const engine = new FinoraPlayerEngine(mockPlayer);
