@@ -8,6 +8,7 @@ import { FinoraText } from "../../../design-system/components/FinoraText";
 import { FinoraIconButton } from "../../../design-system/components/FinoraIconButton";
 import { Ionicons } from "@expo/vector-icons";
 import { TimelineScrubber } from "./TimelineScrubber";
+import { VerticalSlider } from "./VerticalSlider";
 import { colors, spacing } from "../../../design-system/tokens";
 
 export interface CinematicOverlayProps {
@@ -29,6 +30,10 @@ export interface CinematicOverlayProps {
   isLandscape?: boolean;
   onScrubbingChange?: (isScrubbing: boolean) => void;
   onScrubMove?: (seconds: number, percent: number) => void;
+  brightness: number;
+  onBrightnessChange: (value: number) => void;
+  volume: number;
+  onVolumeChange: (value: number) => void;
   autoHideMs?: number;
 }
 
@@ -51,6 +56,10 @@ export function CinematicOverlay({
   isLandscape = false,
   onScrubbingChange,
   onScrubMove,
+  brightness,
+  onBrightnessChange,
+  volume,
+  onVolumeChange,
   autoHideMs = 4000
 }: CinematicOverlayProps) {
   const insets = useSafeAreaInsets();
@@ -79,6 +88,16 @@ export function CinematicOverlay({
 
   const handleInteraction = () => {
     resetTimer();
+  };
+
+  const handleBrightnessChange = (value: number) => {
+    resetTimer();
+    onBrightnessChange(value);
+  };
+
+  const handleVolumeChange = (value: number) => {
+    resetTimer();
+    onVolumeChange(value);
   };
 
   if (!visible) {
@@ -253,6 +272,36 @@ export function CinematicOverlay({
           onScrubMove={onScrubMove}
         />
       </View>
+
+      {/* Brightness rail (left edge) */}
+      <View
+        style={[styles.sideRail, { left: Math.max(insets.left, spacing.sm) }]}
+        pointerEvents="box-none"
+      >
+        <VerticalSlider
+          value={brightness}
+          onValueChange={handleBrightnessChange}
+          iconName={brightness < 0.3 ? "sunny-outline" : "sunny"}
+          label="Luminosité"
+          accessibilityLabel="Brightness"
+          testID="brightness-slider"
+        />
+      </View>
+
+      {/* Volume rail (right edge) */}
+      <View
+        style={[styles.sideRail, { right: Math.max(insets.right, spacing.sm) }]}
+        pointerEvents="box-none"
+      >
+        <VerticalSlider
+          value={volume}
+          onValueChange={handleVolumeChange}
+          iconName={volume === 0 ? "volume-mute" : volume < 0.5 ? "volume-low" : "volume-high"}
+          label="Son"
+          accessibilityLabel="Volume"
+          testID="volume-slider"
+        />
+      </View>
     </View>
   );
 }
@@ -330,5 +379,11 @@ const styles = StyleSheet.create({
   bottomBar: {
     width: "100%",
     paddingBottom: spacing.sm
+  },
+  sideRail: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    justifyContent: "center"
   }
 });

@@ -13,16 +13,6 @@ import { FinoraText } from "../../../design-system/components/FinoraText";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../../../design-system/tokens";
 
-// expo-brightness is used for actual screen brightness control.
-// We import it with a try/catch fallback so unit tests (which mock native modules)
-// don't fail due to the native module being absent in the Jest environment.
-let BrightnessModule: typeof import("expo-brightness") | null = null;
-try {
-  BrightnessModule = require("expo-brightness");
-} catch {
-  // Running in a non-native environment (e.g., tests). Brightness control disabled.
-}
-
 // Minimum vertical movement (px) before a swipe gesture is recognized
 const SWIPE_THRESHOLD_PX = 10;
 // How much one pixel of vertical drag changes the value (0–1 range)
@@ -34,6 +24,9 @@ export interface PlayerGesturesProps {
   onSingleTap: () => void;
   onLongPressStart?: () => void;
   onLongPressEnd?: () => void;
+  brightness?: number;
+  onBrightnessChange?: (brightness: number) => void;
+  volume?: number;
   onVolumeChange?: (volume: number) => void;
   children: React.ReactNode;
 }
@@ -46,6 +39,9 @@ export function PlayerGestures({
   onSingleTap,
   onLongPressStart,
   onLongPressEnd,
+  brightness,
+  onBrightnessChange,
+  volume,
   onVolumeChange,
   children
 }: PlayerGesturesProps) {
@@ -58,14 +54,23 @@ export function PlayerGestures({
   const [swipeValue, setSwipeValue] = useState(0); // 0–1
   const swipeHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Volume (we track it internally; real system volume requires a native module
-  // beyond what Expo exposes cross-platform — we control what we can)
-  const volumeRef = useRef(0.7);
-  // Brightness (0–1)
-  const brightnessRef = useRef(0.7);
+  // Current brightness / volume (0–1), seeded from the controlled props and kept
+  // in refs so the once-created PanResponder never reads a stale closure.
+  const brightnessRef = useRef(brightness ?? 0.7);
+  const volumeRef = useRef(volume ?? 0.7);
+  useEffect(() => {
+    if (brightness !== undefined) brightnessRef.current = brightness;
+  }, [brightness]);
+  useEffect(() => {
+    if (volume !== undefined) volumeRef.current = volume;
+  }, [volume]);
 
-  // Latest volume callback kept in a ref: the PanResponder is created once and
-  // would otherwise capture a stale prop from the first render.
+  // Latest callbacks kept in refs for the same reason as above.
+  const onBrightnessChangeRef = useRef(onBrightnessChange);
+  useEffect(() => {
+    onBrightnessChangeRef.current = onBrightnessChange;
+  }, [onBrightnessChange]);
+
   const onVolumeChangeRef = useRef(onVolumeChange);
   useEffect(() => {
     onVolumeChangeRef.current = onVolumeChange;
@@ -108,29 +113,6 @@ export function PlayerGestures({
     }, 1200);
   };
 
-  const applyBrightness = async (value: number) => {
-    const clamped = Math.min(1, Math.max(0, value));
-    brightnessRef.current = clamped;
-    showSwipeHUD("brightness", clamped);
-    if (BrightnessModule) {
-      try {
-        await BrightnessModule.setBrightnessAsync(clamped);
-      } catch {
-        // Brightness change silently fails on devices where it's restricted
-      }
-    }
-  };
-
-  const applyVolume = (value: number) => {
-    const clamped = Math.min(1, Math.max(0, value));
-    volumeRef.current = clamped;
-    showSwipeHUD("volume", clamped);
-    // NOTE: System volume control requires expo-av or a native bridge module.
-    // The HUD correctly reflects the intended value; system volume integration
-    // requires a full native module not included in the current Expo SDK.
-    // Tracked as a known limitation: PLAY-VOLUME-NATIVE.
-  };
-
   // PanResponder for vertical swipe detection (volume / brightness)
   const panResponder = useRef(
     PanResponder.create({
@@ -165,9 +147,7 @@ export function PlayerGestures({
         if (swipeSideRef.current === "left") {
           brightnessRef.current = newValue;
           showSwipeHUD("brightness", newValue);
-          if (BrightnessModule) {
-            BrightnessModule.setBrightnessAsync(newValue).catch(() => {});
-          }
+          onBrightnessChangeRef.current?.(newValue);
         } else {
           volumeRef.current = newValue;
           showSwipeHUD("volume", newValue);

@@ -32,6 +32,16 @@ import { SubtitleStyleModal } from "./SubtitleStyleModal";
 import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
 import { useSubtitleCues } from "../useSubtitleCues";
 
+// expo-brightness drives the real screen brightness from the player slider.
+// Imported with a try/catch fallback so unit tests (which mock native modules)
+// don't fail when the native module is absent in the Jest environment.
+let BrightnessModule: typeof import("expo-brightness") | null = null;
+try {
+  BrightnessModule = require("expo-brightness");
+} catch {
+  // Non-native environment (e.g., tests). Brightness control disabled.
+}
+
 export interface PlayerScreenProps {
   item: MediaItem;
   serverUrl: string;
@@ -63,6 +73,10 @@ export function PlayerScreen({
   const autoSkipIntro = usePlaybackPreferencesStore((state) => state.preferences.autoSkipIntro);
   const preferredPlaybackSpeed = usePlaybackPreferencesStore((state) => state.preferences.playbackSpeed) || 1.0;
   const [hasAutoSkipped, setHasAutoSkipped] = useState(false);
+
+  // Brightness / volume shared by the overlay sliders and the swipe gestures
+  const [brightness, setBrightness] = useState(0.7);
+  const [volume, setVolume] = useState(1.0);
 
   // Compute best initial audio and subtitle stream index according to user / series preferences
   const { initialAudioIndex: bestAudioIndex, initialSubtitleIndex: bestSubtitleIndex } = useMemo(() => {
@@ -209,6 +223,26 @@ export function PlayerScreen({
       controls.setRate(preferredPlaybackSpeed);
     }
   }, [preferredPlaybackSpeed, controls]);
+
+  // Seed the brightness slider from the current screen brightness
+  useEffect(() => {
+    let active = true;
+    if (BrightnessModule?.getBrightnessAsync) {
+      BrightnessModule.getBrightnessAsync()
+        .then((value) => {
+          if (active) setBrightness(value);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Keep the volume slider in sync with the engine
+  useEffect(() => {
+    setVolume(snapshot.volume);
+  }, [snapshot.volume]);
 
   // Jellyfin Playback Session Reporting Hook
   const { stopSession } = usePlaybackSession({
@@ -374,6 +408,20 @@ export function PlayerScreen({
     setControlsVisible((prev) => !prev);
   };
 
+  const handleBrightnessChange = (value: number) => {
+    const clamped = Math.min(1, Math.max(0, value));
+    setBrightness(clamped);
+    if (BrightnessModule) {
+      BrightnessModule.setBrightnessAsync(clamped).catch(() => {});
+    }
+  };
+
+  const handleVolumeChange = (value: number) => {
+    const clamped = Math.min(1, Math.max(0, value));
+    setVolume(clamped);
+    controls.setVolume(clamped);
+  };
+
   const isBufferingOrLoading = snapshot.state === "loading" || snapshot.state === "buffering";
 
   useEffect(() => {
@@ -404,7 +452,10 @@ export function PlayerScreen({
         onSingleTap={handleToggleControls}
         onLongPressStart={() => controls.setRate(2.0)}
         onLongPressEnd={() => controls.setRate(preferredPlaybackSpeed)}
-        onVolumeChange={(volume) => controls.setVolume(volume)}
+        brightness={brightness}
+        onBrightnessChange={handleBrightnessChange}
+        volume={volume}
+        onVolumeChange={handleVolumeChange}
       >
         {/* Native Video Surface */}
         <VideoView
@@ -477,6 +528,10 @@ export function PlayerScreen({
           setScrubPositionSeconds(seconds);
           setScrubPositionPercent(percent);
         }}
+        brightness={brightness}
+        onBrightnessChange={handleBrightnessChange}
+        volume={volume}
+        onVolumeChange={handleVolumeChange}
         autoHideMs={overlayAutoHideMs}
       />
 
