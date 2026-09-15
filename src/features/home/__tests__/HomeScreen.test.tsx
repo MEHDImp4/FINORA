@@ -100,9 +100,7 @@ describe("HomeScreen", () => {
       refetch: jest.fn()
     });
 
-    (useToggleFavorite as jest.Mock).mockReturnValue({
-      mutate: jest.fn()
-    });
+    (useToggleFavorite as jest.Mock).mockReturnValue({ mutate: jest.fn() });
   });
 
   it("renders HeroBanner and carousels without crashing", () => {
@@ -113,9 +111,8 @@ describe("HomeScreen", () => {
     );
     const root = component.root;
 
-    // Check that sections render
-    expect(root.findByProps({ title: "Continue Watching" })).toBeDefined();
-    expect(root.findByProps({ title: "Recently Added" })).toBeDefined();
+    expect(root.findByProps({ title: "Continuer à regarder" })).toBeDefined();
+    expect(root.findByProps({ title: "Ajouts récents" })).toBeDefined();
 
     ReactTestRenderer.act(() => {
       component.unmount();
@@ -125,18 +122,8 @@ describe("HomeScreen", () => {
   it("rotates HeroBanner item dynamically on pull-to-refresh", async () => {
     (useRecentlyAdded as jest.Mock).mockReturnValue({
       data: [
-        {
-          id: "recent-1",
-          name: "Oppenheimer",
-          type: "Movie",
-          backdropImageTag: "backdrop-tag-opp"
-        },
-        {
-          id: "recent-2",
-          name: "Interstellar",
-          type: "Movie",
-          backdropImageTag: "backdrop-tag-inter"
-        }
+        { id: "recent-1", name: "Oppenheimer", type: "Movie", backdropImageTag: "backdrop-tag-opp" },
+        { id: "recent-2", name: "Interstellar", type: "Movie", backdropImageTag: "backdrop-tag-inter" }
       ],
       isLoading: false,
       refetch: jest.fn()
@@ -152,27 +139,20 @@ describe("HomeScreen", () => {
     });
 
     const root = component.root;
-    // Initial hero item should be Oppenheimer
-    expect(root.findByProps({ accessibilityLabel: "Featured: Oppenheimer" })).toBeDefined();
+    expect(root.findByProps({ accessibilityLabel: "À la une : Oppenheimer" })).toBeDefined();
 
-    // Find ScrollView and trigger onRefresh from refreshControl prop
     const scrollView = root.findByType("ScrollView" as any);
     expect(scrollView.props.refreshControl).toBeDefined();
 
     await ReactTestRenderer.act(async () => {
       await scrollView.props.refreshControl.props.onRefresh();
     });
+    expect(root.findByProps({ accessibilityLabel: "À la une : Interstellar" })).toBeDefined();
 
-    // Hero banner should now have rotated to Interstellar
-    expect(root.findByProps({ accessibilityLabel: "Featured: Interstellar" })).toBeDefined();
-
-    // Trigger onRefresh again to verify circular rotation
     await ReactTestRenderer.act(async () => {
       await scrollView.props.refreshControl.props.onRefresh();
     });
-
-    // Hero banner should cycle back to Oppenheimer
-    expect(root.findByProps({ accessibilityLabel: "Featured: Oppenheimer" })).toBeDefined();
+    expect(root.findByProps({ accessibilityLabel: "À la une : Oppenheimer" })).toBeDefined();
 
     ReactTestRenderer.act(() => {
       component.unmount();
@@ -185,34 +165,10 @@ describe("HomeScreen", () => {
       isChecking: false,
       runDiagnostic: jest.fn()
     });
-
-    (useResumeItems as jest.Mock).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: true,
-      refetch: jest.fn()
-    });
-
-    (useRecentlyAdded as jest.Mock).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: true,
-      refetch: jest.fn()
-    });
-
-    (useLibraries as jest.Mock).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: true,
-      refetch: jest.fn()
-    });
-
-    (useWatchlistItems as jest.Mock).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn()
-    });
+    (useResumeItems as jest.Mock).mockReturnValue({ data: [], isLoading: false, isError: true, refetch: jest.fn() });
+    (useRecentlyAdded as jest.Mock).mockReturnValue({ data: [], isLoading: false, isError: true, refetch: jest.fn() });
+    (useLibraries as jest.Mock).mockReturnValue({ data: [], isLoading: false, isError: true, refetch: jest.fn() });
+    (useWatchlistItems as jest.Mock).mockReturnValue({ data: [], isLoading: false, isError: false, refetch: jest.fn() });
 
     let component: any;
     await ReactTestRenderer.act(async () => {
@@ -224,12 +180,8 @@ describe("HomeScreen", () => {
     });
 
     const root = component.root;
-    // Should render NetworkFailureStateView with the go-to-downloads button
-    const failureView = root.findByProps({ testID: "network-failure-state-view" });
-    expect(failureView).toBeDefined();
-
-    const downloadsBtn = root.findByProps({ testID: "failure-go-downloads-button" });
-    expect(downloadsBtn).toBeDefined();
+    expect(root.findByProps({ testID: "network-failure-state-view" })).toBeDefined();
+    expect(root.findByProps({ testID: "failure-go-downloads-button" })).toBeDefined();
 
     ReactTestRenderer.act(() => {
       component.unmount();
@@ -244,8 +196,7 @@ describe("HomeScreen", () => {
     );
     const root = component.root;
 
-    // Press Watchlist pill
-    const watchlistPill = root.findByProps({ accessibilityLabel: "Browse Watchlist" });
+    const watchlistPill = root.findByProps({ accessibilityLabel: "Parcourir ma liste" });
     ReactTestRenderer.act(() => {
       watchlistPill.props.onPress();
     });
@@ -254,8 +205,7 @@ describe("HomeScreen", () => {
       params: { tab: "watchlist" }
     });
 
-    // Press Movies pill
-    const moviesPill = root.findByProps({ accessibilityLabel: "Browse Movies" });
+    const moviesPill = root.findByProps({ accessibilityLabel: "Parcourir les films" });
     ReactTestRenderer.act(() => {
       moviesPill.props.onPress();
     });
@@ -313,4 +263,3 @@ describe("HomeScreen", () => {
     });
   });
 });
-
