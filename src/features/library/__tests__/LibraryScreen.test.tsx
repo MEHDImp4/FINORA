@@ -2,7 +2,6 @@ import React from "react";
 import ReactTestRenderer, { act } from "react-test-renderer";
 import LibraryScreen from "../../../app/(tabs)/library";
 
-// Mock router
 const mockPush = jest.fn();
 let mockSearchParams: { tab?: string } = {};
 jest.mock("expo-router", () => ({
@@ -14,7 +13,6 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => mockSearchParams
 }));
 
-// Mock authStore
 jest.mock("../../../stores/authStore", () => ({
   useAuthStore: (selector: any) =>
     selector({
@@ -28,7 +26,6 @@ jest.mock("../../../stores/authStore", () => ({
     })
 }));
 
-// Mock media queries
 const mockLibraries = [
   { id: "lib-movies", name: "Movies", type: "movies" },
   { id: "lib-shows", name: "TV Shows", type: "tvshows" }
@@ -80,23 +77,12 @@ describe("LibraryScreen", () => {
       tree = ReactTestRenderer.create(<LibraryScreen />);
     });
 
-    // Check library tabs
-    const moviesTab = tree.root.findByProps({ accessibilityLabel: "Select library Movies" });
-    const showsTab = tree.root.findByProps({ accessibilityLabel: "Select library TV Shows" });
-    expect(moviesTab).toBeTruthy();
-    expect(showsTab).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Sélectionner la bibliothèque Movies" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Sélectionner la bibliothèque TV Shows" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Ouvrir les options de tri" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Afficher tous les genres" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Filtrer par genre Action" })).toBeTruthy();
 
-    // Check sort button
-    const sortBtn = tree.root.findByProps({ accessibilityLabel: "Open sort options" });
-    expect(sortBtn).toBeTruthy();
-
-    // Check genre chips
-    const allGenresChip = tree.root.findByProps({ accessibilityLabel: "Filter by all genres" });
-    const actionGenreChip = tree.root.findByProps({ accessibilityLabel: "Filter by genre Action" });
-    expect(allGenresChip).toBeTruthy();
-    expect(actionGenreChip).toBeTruthy();
-
-    // Check item rendering and navigation
     const mediaCard = tree.root.findByProps({ accessibilityLabel: "The Matrix, 1999" });
     expect(mediaCard).toBeTruthy();
 
@@ -113,12 +99,12 @@ describe("LibraryScreen", () => {
       tree = ReactTestRenderer.create(<LibraryScreen />);
     });
 
-    const sortBtn = tree.root.findByProps({ accessibilityLabel: "Open sort options" });
+    const sortBtn = tree.root.findByProps({ accessibilityLabel: "Ouvrir les options de tri" });
     act(() => {
       sortBtn.props.onPress();
     });
 
-    const closeBtn = tree.root.findByProps({ accessibilityLabel: "Close sort options" });
+    const closeBtn = tree.root.findByProps({ accessibilityLabel: "Fermer les options de tri" });
     expect(closeBtn).toBeTruthy();
 
     act(() => {
@@ -126,13 +112,13 @@ describe("LibraryScreen", () => {
     });
   });
 
-  it("renders watchlist tab and allows selecting it", async () => {
+  it("renders Ma liste tab and allows selecting it", async () => {
     let tree: any;
     await act(async () => {
       tree = ReactTestRenderer.create(<LibraryScreen />);
     });
 
-    const watchlistTab = tree.root.findByProps({ accessibilityLabel: "Select Watchlist" });
+    const watchlistTab = tree.root.findByProps({ accessibilityLabel: "Sélectionner Ma liste" });
     expect(watchlistTab).toBeTruthy();
 
     act(() => {
@@ -149,10 +135,10 @@ describe("LibraryScreen", () => {
       tree = ReactTestRenderer.create(<LibraryScreen />);
     });
 
-    const showsTab = tree.root.findByProps({ accessibilityLabel: "Select library TV Shows" });
+    const showsTab = tree.root.findByProps({ accessibilityLabel: "Sélectionner la bibliothèque TV Shows" });
     expect(showsTab.props.accessibilityState.selected).toBe(true);
 
-    const moviesTab = tree.root.findByProps({ accessibilityLabel: "Select library Movies" });
+    const moviesTab = tree.root.findByProps({ accessibilityLabel: "Sélectionner la bibliothèque Movies" });
     expect(moviesTab.props.accessibilityState.selected).toBe(false);
   });
 
@@ -163,7 +149,7 @@ describe("LibraryScreen", () => {
       tree = ReactTestRenderer.create(<LibraryScreen />);
     });
 
-    const showsTab = tree.root.findByProps({ accessibilityLabel: "Select library TV Shows" });
+    const showsTab = tree.root.findByProps({ accessibilityLabel: "Sélectionner la bibliothèque TV Shows" });
     expect(showsTab.props.accessibilityState.selected).toBe(true);
   });
 
@@ -173,20 +159,20 @@ describe("LibraryScreen", () => {
       tree = ReactTestRenderer.create(<LibraryScreen />);
     });
 
-    const searchToggle = tree.root.findByProps({ accessibilityLabel: "Open search" });
+    const searchToggle = tree.root.findByProps({ accessibilityLabel: "Rechercher dans cette bibliothèque" });
     expect(searchToggle).toBeTruthy();
 
     await act(async () => {
       searchToggle.props.onPress();
     });
 
-    const searchInput = tree.root.findByProps({ accessibilityLabel: "Search input" });
+    const searchInput = tree.root.findByProps({ accessibilityLabel: "Recherche" });
     expect(searchInput).toBeTruthy();
 
     await act(async () => {
       searchInput.props.onChangeText("Inception");
     });
 
-    expect(tree.root.findByProps({ accessibilityLabel: "Close search" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Fermer la recherche" })).toBeTruthy();
   });
 });
