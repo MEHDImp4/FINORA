@@ -4,7 +4,7 @@ import { StyleSheet, Platform, View, Pressable, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { hapticService } from "../../core/feedback/hapticService";
 
-const HIDDEN_ROUTES = new Set(["search", "downloads"]);
+const HIDDEN_ROUTES = new Set(["downloads"]);
 
 function FinoraPillTabBar({ state, descriptors, navigation, insets }: any) {
   const bottomInset = Platform.OS === "ios" ? insets.bottom + 6 : 14;
@@ -42,18 +42,19 @@ function FinoraPillTabBar({ state, descriptors, navigation, insets }: any) {
               accessibilityLabel={options.tabBarAccessibilityLabel || label}
               onPress={onPress}
               style={[styles.tabItem, isFocused && styles.tabItemActive]}
-              hitSlop={6}
+              hitSlop={4}
             >
               {options.tabBarIcon?.({
                 focused: isFocused,
-                color: isFocused ? "#E50914" : "#8A8A9E",
-                size: 24
+                color: isFocused ? "#E50914" : "#A0A0B2",
+                size: 23
               })}
               <Text
+                numberOfLines={1}
                 style={[
                   styles.tabLabel,
                   {
-                    color: isFocused ? "#FFFFFF" : "#8A8A9E",
+                    color: isFocused ? "#FFFFFF" : "#A0A0B2",
                     fontWeight: isFocused ? "700" : "500"
                   }
                 ]}
@@ -79,7 +80,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: "Accueil",
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
               name={focused ? "home" : "home-outline"}
@@ -92,13 +93,20 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          href: null
+          title: "Recherche",
+          tabBarIcon: ({ color, focused, size }) => (
+            <Ionicons
+              name={focused ? "search" : "search-outline"}
+              size={size || 24}
+              color={focused ? "#E50914" : color}
+            />
+          )
         }}
       />
       <Tabs.Screen
         name="library"
         options={{
-          title: "Library",
+          title: "Bibliothèque",
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
               name={focused ? "film" : "film-outline"}
@@ -117,7 +125,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Settings",
+          title: "Paramètres",
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
               name={focused ? "settings" : "settings-outline"}
@@ -144,11 +152,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(18, 18, 26, 0.78)",
-    height: 60,
+    backgroundColor: "rgba(18, 18, 26, 0.88)",
+    minHeight: 60,
+    width: "94%",
+    maxWidth: 430,
     borderRadius: 30,
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 4,
     borderWidth: 1.2,
     borderColor: "rgba(255, 255, 255, 0.18)",
     borderTopColor: "rgba(255, 255, 255, 0.32)",
@@ -159,11 +170,13 @@ const styles = StyleSheet.create({
     shadowRadius: 18
   },
   tabItem: {
-    width: 86,
-    height: 48,
+    flex: 1,
+    minWidth: 0,
+    minHeight: 48,
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 2,
     paddingVertical: 4
   },
   tabItemActive: {
@@ -172,9 +185,8 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.12)"
   },
   tabLabel: {
-    fontSize: 10.5,
-    marginTop: 2
+    fontSize: 10,
+    marginTop: 2,
+    maxWidth: "100%"
   }
 });
-
-
