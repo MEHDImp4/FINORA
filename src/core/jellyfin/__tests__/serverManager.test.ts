@@ -96,11 +96,9 @@ describe("ServerManager", () => {
       expect(session.serverId).toBe("server-B");
       expect(session.token).toBe("token-for-bob-server-b");
 
-      // Verify client updated to server B
       expect(mockClient.setServerUrl).toHaveBeenCalledWith("https://jellyfin-b.remote");
       expect(mockClient.setAuthToken).toHaveBeenCalledWith("token-for-bob-server-b");
 
-      // Active session updated
       expect(mockPrefStorage.setItem).toHaveBeenCalledWith(
         ACTIVE_SESSION_STORAGE_KEY,
         expect.objectContaining({
@@ -109,6 +107,37 @@ describe("ServerManager", () => {
           serverUrl: "https://jellyfin-b.remote"
         })
       );
+    });
+
+    it("rejects a legacy public HTTP saved account before mutating the active session", async () => {
+      mockPrefStorage.getItem.mockImplementation(async (key) => {
+        if (key === SAVED_ACCOUNTS_STORAGE_KEY) {
+          return [
+            {
+              serverId: "server-old",
+              serverName: "Legacy Remote",
+              serverUrl: "http://public-jellyfin.example.com:8096",
+              userId: "user-old",
+              userName: "Legacy",
+              lastUsedAt: 100
+            }
+          ];
+        }
+        return null;
+      });
+      mockSecureStorage.getToken.mockResolvedValue("legacy-token");
+
+      await expect(manager.switchAccount("server-old", "user-old")).rejects.toThrow(
+        "Unencrypted HTTP is only allowed for local/private Jellyfin servers"
+      );
+
+      expect(mockSecureStorage.getToken).not.toHaveBeenCalled();
+      expect(mockPrefStorage.setItem).not.toHaveBeenCalledWith(
+        ACTIVE_SESSION_STORAGE_KEY,
+        expect.anything()
+      );
+      expect(mockClient.setServerUrl).not.toHaveBeenCalled();
+      expect(mockClient.setAuthToken).not.toHaveBeenCalled();
     });
 
     it("throws error if account is not found", async () => {
