@@ -80,6 +80,8 @@ export function estimateTranscodedBytes(
 
 /**
  * Builds standard Jellyfin authentication headers for download requests.
+ * Credentials live in headers so they do not leak through URLs, proxy access
+ * logs, native download diagnostics, or persisted resume metadata.
  */
 export function getDownloadHeaders(token: string): Record<string, string> {
   if (!token) return {};
@@ -90,20 +92,22 @@ export function getDownloadHeaders(token: string): Record<string, string> {
 }
 
 /**
- * Builds the appropriate Jellyfin download URL.
- * If 'original', downloads the raw file directly via /Items/{id}/Download.
- * If transcode quality is selected, requests a progressive MP4 stream encoded by Jellyfin.
+ * Builds the appropriate Jellyfin download URL WITHOUT credentials.
+ * Authentication must be supplied separately through getDownloadHeaders().
+ *
+ * `_token` is retained for call-site compatibility while old callers migrate;
+ * it is intentionally never interpolated into the URL.
  */
 export function buildDownloadUrl(
   serverUrl: string,
   itemId: string,
-  token: string,
+  _token: string,
   quality: DownloadQuality = "original"
 ): string {
   const cleanUrl = serverUrl.replace(/\/+$/, "");
 
   if (quality === "original") {
-    return `${cleanUrl}/Items/${itemId}/Download?api_key=${encodeURIComponent(token)}`;
+    return `${cleanUrl}/Items/${itemId}/Download`;
   }
 
   const profile =
@@ -119,7 +123,6 @@ export function buildDownloadUrl(
     `maxHeight=${profile.maxHeight || 720}`,
     `maxWidth=${profile.maxWidth || 1280}`,
     `videoBitRate=${profile.videoBitRate || 3500000}`,
-    `api_key=${encodeURIComponent(token)}`,
     "deviceId=finora-mobile",
     `mediaSourceId=${encodeURIComponent(itemId)}`
   ];
