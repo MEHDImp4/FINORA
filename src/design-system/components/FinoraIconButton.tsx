@@ -18,14 +18,21 @@ export function FinoraIconButton({
   disabled = false,
   style,
   onPress,
+  hitSlop,
   ...props
 }: FinoraIconButtonProps) {
+  const minimumTarget = 44;
+  const extraHitArea = Math.max(0, (minimumTarget - size) / 2);
+  const resolvedHitSlop = hitSlop ?? (extraHitArea > 0 ? extraHitArea + 2 : 2);
+
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      hitSlop={resolvedHitSlop}
       style={({ pressed }) => [
         styles.button,
         {
