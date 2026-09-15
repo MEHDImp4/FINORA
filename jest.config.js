@@ -14,6 +14,7 @@ module.exports = {
     "^expo-background-task$": "<rootDir>/__mocks__/expo-background-task.js",
     "^expo-image$": "<rootDir>/__mocks__/expo-image.js",
     "^react-test-renderer$": "<rootDir>/__mocks__/react-test-renderer.js",
+    "^react-native-background-actions$": "<rootDir>/__mocks__/react-native-background-actions.js",
     "\\.(png|jpg|jpeg|gif|svg)$": "<rootDir>/__mocks__/fileMock.js"
   },
   transform: {

@@ -275,4 +275,54 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     });
     expect(activeCard).toBeTruthy();
   });
+
+  it("shows an estimated size and percentage for a transcoded download without Content-Length", async () => {
+    const transcoded = {
+      itemId: "active-transcode-1",
+      title: "Obsession (1080P)",
+      type: "Movie" as const,
+      downloadUrl: "https://jellyfin.example.com/Videos/x/stream.mp4",
+      localPath: "finora_downloads/transcode.mp4",
+      status: "downloading" as const,
+      progress: 0.42,
+      bytesDownloaded: 580000000,
+      // Jellyfin sends no Content-Length for transcodes
+      totalBytes: 0,
+      expectedBytes: 1400000000,
+      isEstimatedTotal: true,
+      speedBytesPerSecond: 3400000,
+      startedAt: Date.now()
+    };
+
+    jest.spyOn(downloadManager, "subscribe").mockImplementation((listener) => {
+      listener([transcoded]);
+      return () => {};
+    });
+
+    let tree: any;
+    await act(async () => {
+      tree = ReactTestRenderer.create(<DownloadsScreen />);
+    });
+
+    // Collect rendered text without JSON.stringify (React fibers are circular).
+    const collectText = (node: any, out: string[] = []): string[] => {
+      if (node == null) return out;
+      if (typeof node === "string" || typeof node === "number") {
+        out.push(String(node));
+        return out;
+      }
+      if (Array.isArray(node)) {
+        node.forEach((child) => collectText(child, out));
+        return out;
+      }
+      if (node.children) collectText(node.children, out);
+      return out;
+    };
+    const rendered = collectText(tree.toJSON()).join(" • ");
+
+    // The duration-based estimate stands in for the missing Content-Length,
+    // marked with "~" so it is never mistaken for an exact figure.
+    expect(rendered).toContain("553 MB / ~1.3 GB");
+    expect(rendered).toContain("~42%");
+  });
 });

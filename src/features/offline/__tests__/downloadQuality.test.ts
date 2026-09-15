@@ -1,6 +1,7 @@
 import {
   DOWNLOAD_QUALITIES,
   buildDownloadUrl,
+  estimateTranscodedBytes,
   DownloadQuality
 } from "../downloadQuality";
 
@@ -59,5 +60,35 @@ describe("Download Quality & Transcoding URL Builder", () => {
 
     const empty = getDownloadHeaders("");
     expect(empty).toEqual({});
+  });
+});
+
+describe("estimateTranscodedBytes", () => {
+  // Jellyfin ticks: 10 000 000 per second → 24 minutes = 14 400 s
+  const TWENTY_FOUR_MIN_TICKS = 24 * 60 * 10_000_000;
+
+  it("estimates a size for transcoded profiles from duration × bitrate", () => {
+    // 1080p targets 7 500 000 bps video + 128 000 bps audio over 1440 s
+    const bytes = estimateTranscodedBytes("1080p", TWENTY_FOUR_MIN_TICKS);
+    const expected = Math.round(((7_500_000 + 128_000) * 1440) / 8);
+    expect(bytes).toBe(expected);
+    // ~1.37 GB — sanity check the magnitude
+    expect(bytes).toBeGreaterThan(1_300_000_000);
+    expect(bytes).toBeLessThan(1_450_000_000);
+  });
+
+  it("scales the estimate with the duration", () => {
+    const short = estimateTranscodedBytes("720p", 60 * 10_000_000) as number;
+    const long = estimateTranscodedBytes("720p", 120 * 10_000_000) as number;
+    expect(long).toBe(short * 2);
+  });
+
+  it("returns undefined for original quality (real Content-Length is used)", () => {
+    expect(estimateTranscodedBytes("original", TWENTY_FOUR_MIN_TICKS)).toBeUndefined();
+  });
+
+  it("returns undefined when the duration is unknown", () => {
+    expect(estimateTranscodedBytes("1080p")).toBeUndefined();
+    expect(estimateTranscodedBytes("1080p", 0)).toBeUndefined();
   });
 });
