@@ -1,5 +1,6 @@
 import { HttpClient } from "../network/httpClient";
 import { jellyfinClient, JellyfinClient } from "./jellyfinClient";
+import { normalizeServerUrlForCredentials } from "./serverDiscovery";
 import {
   ISecureTokenStorage,
   IUserPreferencesStorage,
@@ -62,7 +63,9 @@ export class AuthRepository {
     serverUrl: string,
     httpClient?: HttpClient
   ): Promise<AuthSession> {
-    const targetUrl = serverUrl.replace(/\/+$/, "");
+    // Central security boundary: no UI path can bypass URL normalization or send
+    // credentials over cleartext HTTP to a public Internet host.
+    const targetUrl = normalizeServerUrlForCredentials(serverUrl).url;
     await this.client.initialize(targetUrl);
     this.client.setAuthToken(null);
     const clientHttp = httpClient || this.client.getHttpClient();
