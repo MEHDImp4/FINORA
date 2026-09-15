@@ -135,6 +135,12 @@ const AccessibilityInfo = {
   addEventListener: () => ({ remove: () => {} })
 };
 
+const useWindowDimensions = () => ({ width: 390, height: 844, scale: 3, fontScale: 1 });
+
+const Alert = {
+  alert: jest.fn()
+};
+
 class AnimatedValue {
   constructor(val) {
     this._value = val;
@@ -195,6 +201,8 @@ module.exports = {
   PanResponder,
   Modal,
   AccessibilityInfo,
+  useWindowDimensions,
+  Alert,
   Animated,
   Vibration: {
     vibrate: jest.fn(),

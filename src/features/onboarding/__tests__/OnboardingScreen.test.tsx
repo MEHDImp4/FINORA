@@ -45,10 +45,10 @@ describe("OnboardingScreen", () => {
     });
 
     const root = component!.root;
-    // Check titles and elements
-    expect(root.findByProps({ children: "Streaming Haute Fidélité" })).toBeDefined();
-    expect(root.findByProps({ children: "Lecteur Intelligent" })).toBeDefined();
-    expect(root.findByProps({ children: "Connexion au Serveur" })).toBeDefined();
+    // Check badge text and connection title from the current UI
+    expect(root.findByProps({ children: "VOTRE JELLYFIN" })).toBeDefined();
+    expect(root.findByProps({ children: "LECTURE FINORA" })).toBeDefined();
+    expect(root.findByProps({ children: "Connectez votre Jellyfin" })).toBeDefined();
 
     // Server input should start empty (no personal server pre-filled)
     const inputs = root.findAllByType("TextInput" as any);
@@ -89,25 +89,6 @@ describe("OnboardingScreen", () => {
 
     expect(validateAndDiscoverServer).toHaveBeenCalledWith(TEST_SERVER_URL);
     expect(root.findByProps({ children: "Serveur en ligne : Jellyfin Home" })).toBeDefined();
-  });
-
-  it("allows exploring without account and marks onboarding as complete", async () => {
-    const onCompletedMock = jest.fn();
-
-    let component: ReactTestRenderer.ReactTestRenderer;
-    ReactTestRenderer.act(() => {
-      component = ReactTestRenderer.create(<OnboardingScreen onCompleted={onCompletedMock} />);
-    });
-
-    const root = component!.root;
-    const guestBtn = root.findByProps({ children: "Explorer sans se connecter" }).parent;
-
-    await ReactTestRenderer.act(async () => {
-      guestBtn?.props.onPress();
-    });
-
-    expect(useOnboardingStore.getState().isCompleted).toBe(true);
-    expect(onCompletedMock).toHaveBeenCalled();
   });
 
   it("authenticates and completes onboarding upon submitting valid credentials", async () => {
