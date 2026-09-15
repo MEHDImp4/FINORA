@@ -74,6 +74,23 @@ export function useSubtitleCues({
         const sid = mediaSourceId || itemId;
         const targetStream = streams?.find((s) => s.index === subtitleStreamIndex);
 
+        // Image-based subtitles (PGS, VOBSUB) cannot be fetched as text — skip them gracefully
+        const codecLower = (targetStream?.codec || "").toLowerCase();
+        const isImageBased = ["dvdsub", "hdmv_pgs_subtitle", "pgs", "vobsub"].includes(codecLower) ||
+          (targetStream?.isExternal === false && !targetStream?.isTextSubtitleStream && !codecLower);
+
+        if (isImageBased) {
+          logger.info(
+            `[useSubtitleCues] Skipping image-based subtitle stream ${subtitleStreamIndex} (codec: ${codecLower || "unknown"}). Use native player subtitles for this track.`
+          );
+          if (isMounted) {
+            setCues([]);
+            setHasError(true);
+            setIsLoading(false);
+          }
+          return;
+        }
+
         // Build candidate URLs to try in order of priority
         const rawCandidates: string[] = [];
 
@@ -129,6 +146,21 @@ export function useSubtitleCues({
         // Candidate 10: Item direct ASS endpoint
         rawCandidates.push(
           `${cleanServerUrl}/Videos/${itemId}/Subtitles/${subtitleStreamIndex}/Stream.ass`
+        );
+
+        // Candidate 11: Format=SRT parameter (forces Jellyfin to convert to SRT)
+        rawCandidates.push(
+          `${cleanServerUrl}/Videos/${itemId}/${sid}/Subtitles/${subtitleStreamIndex}/Stream.srt?Format=SRT`
+        );
+
+        // Candidate 12: Format=VTT parameter (forces Jellyfin to convert to WebVTT)
+        rawCandidates.push(
+          `${cleanServerUrl}/Videos/${itemId}/${sid}/Subtitles/${subtitleStreamIndex}/Stream.vtt?Format=WebVTT`
+        );
+
+        // Candidate 13: Backup with different path structure (emby-style)
+        rawCandidates.push(
+          `${cleanServerUrl}/Videos/${itemId}/${sid}/${subtitleStreamIndex}/Stream.vtt`
         );
 
         // Deduplicate candidates and attach api_key query param if not already present

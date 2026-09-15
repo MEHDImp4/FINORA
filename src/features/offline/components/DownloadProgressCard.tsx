@@ -24,16 +24,22 @@ interface DownloadProgressCardProps {
   serverUrl?: string;
   onRetry: (itemId: string) => void;
   onCancel: (itemId: string) => void;
+  onPause?: (itemId: string) => void;
+  onResume?: (itemId: string) => void;
 }
 
 export function DownloadProgressCard({
   download,
   serverUrl = "",
   onRetry,
-  onCancel
+  onCancel,
+  onPause,
+  onResume
 }: DownloadProgressCardProps) {
   const isFailed = download.status === "failed";
   const isQueued = download.status === "queued";
+  const isPaused = download.status === "paused";
+  const isDownloading = download.status === "downloading";
   const progressPercent = Math.round(download.progress * 100);
 
   // Jellyfin sends no Content-Length for transcoded downloads, so fall back to
@@ -175,6 +181,28 @@ export function DownloadProgressCard({
             <Ionicons name="refresh" size={14} color="#FFFFFF" />
           </Pressable>
         )}
+        {isDownloading && onPause && (
+          <Pressable
+            style={styles.pauseButton}
+            onPress={() => onPause(download.itemId)}
+            accessibilityRole="button"
+            accessibilityLabel={`Mettre en pause ${mainTitle}`}
+            hitSlop={6}
+          >
+            <Ionicons name="pause" size={16} color="#FFFFFF" />
+          </Pressable>
+        )}
+        {isPaused && onResume && (
+          <Pressable
+            style={styles.resumeButton}
+            onPress={() => onResume(download.itemId)}
+            accessibilityRole="button"
+            accessibilityLabel={`Reprendre ${mainTitle}`}
+            hitSlop={6}
+          >
+            <Ionicons name="play" size={14} color="#FFFFFF" />
+          </Pressable>
+        )}
         <Pressable
           style={styles.cancelButton}
           onPress={() => onCancel(download.itemId)}
@@ -312,6 +340,22 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  pauseButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#F5A623",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  resumeButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#4A90E2",
     alignItems: "center",
     justifyContent: "center"
   },

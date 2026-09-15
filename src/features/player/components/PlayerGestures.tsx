@@ -17,6 +17,8 @@ import { colors, spacing } from "../../../design-system/tokens";
 const SWIPE_THRESHOLD_PX = 10;
 // How much one pixel of vertical drag changes the value (0–1 range)
 const SWIPE_SENSITIVITY = 0.003;
+// Dead zone around the center to prevent mis-detection when tapping near the midpoint
+const CENTER_DEAD_ZONE_PX = 30;
 
 export interface PlayerGesturesProps {
   onDoubleTapLeft: () => void;
@@ -177,10 +179,20 @@ export function PlayerGestures({
     const now = Date.now();
     const locationX = evt.nativeEvent.locationX;
     const midPoint = containerWidth > 0 ? containerWidth / 2 : 200;
-    const side: "left" | "right" = locationX < midPoint ? "left" : "right";
+
+    // Determine side with dead zone to prevent flicker near the center boundary
+    let side: "left" | "right";
+    if (locationX < midPoint - CENTER_DEAD_ZONE_PX) {
+      side = "left";
+    } else if (locationX > midPoint + CENTER_DEAD_ZONE_PX) {
+      side = "right";
+    } else {
+      // In the dead zone: use the last tap's side if available, otherwise default to right
+      side = lastTapSideRef.current || "right";
+    }
 
     const timeDiff = now - lastTapTimeRef.current;
-    const isDoubleTap = timeDiff < 300 && lastTapSideRef.current === side;
+    const isDoubleTap = timeDiff < 350 && lastTapSideRef.current === side;
 
     if (isDoubleTap) {
       if (singleTapTimerRef.current) {

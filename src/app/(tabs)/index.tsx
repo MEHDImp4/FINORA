@@ -217,10 +217,12 @@ export default function HomeScreen() {
       await queryClient.refetchQueries({ queryKey: mediaKeys.all, type: "active" });
       // 3. Re-run diagnostic
       await runDiagnostic();
+      // 4. Check for new media items and dispatch notifications
+      await runNotificationSync();
     } finally {
       setIsPullRefreshing(false);
     }
-  }, [queryClient, runDiagnostic]);
+  }, [queryClient, runDiagnostic, runNotificationSync]);
 
   const isFocusedRef = React.useRef(true);
 
@@ -232,6 +234,8 @@ export default function HomeScreen() {
       if (now - lastFocusRef.current > 15000) {
         lastFocusRef.current = now;
         queryClient.invalidateQueries({ queryKey: mediaKeys.all, refetchType: "active" });
+        // Check for new media items when screen comes into focus
+        runNotificationSync();
       }
       if (!hasAnyContent) {
         runDiagnostic();
@@ -239,7 +243,7 @@ export default function HomeScreen() {
       return () => {
         isFocusedRef.current = false;
       };
-    }, [queryClient, hasAnyContent, runDiagnostic])
+    }, [queryClient, hasAnyContent, runDiagnostic, runNotificationSync])
   );
 
   // Build candidate pool for the featured hero banner

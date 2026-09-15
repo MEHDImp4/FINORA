@@ -181,6 +181,9 @@ export default function PlayerRoute() {
       token={token}
       localPath={offlineRecord?.localPath}
       onBack={() => router.back()}
+      onNextEpisode={(episodeId) => {
+        router.replace({ pathname: "/player/[id]", params: { id: episodeId } });
+      }}
     />
   );
 }

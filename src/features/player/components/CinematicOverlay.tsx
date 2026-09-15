@@ -11,6 +11,8 @@ import { TimelineScrubber } from "./TimelineScrubber";
 import { VerticalSlider } from "./VerticalSlider";
 import { colors, spacing } from "../../../design-system/tokens";
 
+export type PlaybackModeLabel = "direct-play" | "direct-stream" | "transcode";
+
 export interface CinematicOverlayProps {
   visible: boolean;
   onToggleVisible: () => void;
@@ -35,6 +37,9 @@ export interface CinematicOverlayProps {
   volume: number;
   onVolumeChange: (value: number) => void;
   autoHideMs?: number;
+  playbackMode?: PlaybackModeLabel;
+  playbackRate?: number;
+  onCycleSpeed?: () => void;
 }
 
 export function CinematicOverlay({
@@ -60,7 +65,10 @@ export function CinematicOverlay({
   onBrightnessChange,
   volume,
   onVolumeChange,
-  autoHideMs = 4000
+  autoHideMs = 4000,
+  playbackMode,
+  playbackRate,
+  onCycleSpeed
 }: CinematicOverlayProps) {
   const insets = useSafeAreaInsets();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -142,6 +150,33 @@ export function CinematicOverlay({
         </View>
 
         <View style={styles.headerActions} pointerEvents="box-none">
+          {playbackMode === "transcode" && (
+            <View style={styles.transcodeBadge} testID="transcode-badge">
+              <Ionicons name="cloud-download-outline" size={12} color="#FF9500" />
+              <FinoraText variant="caption" style={styles.transcodeText}>
+                TRANS
+              </FinoraText>
+            </View>
+          )}
+
+          {Boolean(onCycleSpeed) && (
+            <FinoraIconButton
+              accessibilityLabel={`Playback speed ${playbackRate || 1}x`}
+              onPress={() => {
+                resetTimer();
+                onCycleSpeed?.();
+              }}
+              size={36}
+              backgroundColor="rgba(20, 20, 26, 0.6)"
+              style={styles.actionButton}
+              testID="overlay-speed-button"
+            >
+              <FinoraText variant="caption" style={styles.speedText}>
+                {playbackRate || 1}x
+              </FinoraText>
+            </FinoraIconButton>
+          )}
+
           {Boolean(onOpenStats) && (
             <FinoraIconButton
               accessibilityLabel="Stats"
@@ -335,6 +370,28 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     marginRight: spacing.sm
+  },
+  transcodeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 149, 0, 0.15)",
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginRight: spacing.sm,
+    borderWidth: 1,
+    borderColor: "rgba(255, 149, 0, 0.3)"
+  },
+  transcodeText: {
+    color: "#FF9500",
+    fontSize: 10,
+    fontWeight: "700",
+    marginLeft: 3
+  },
+  speedText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700"
   },
   iconGlyph: {
     fontSize: 28,

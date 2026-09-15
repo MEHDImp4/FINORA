@@ -53,8 +53,9 @@ export default function RootLayout() {
       }).catch(() => {});
     }).catch(() => {});
 
-    // Initialize notification engine and load stored notifications
+    // Initialize notification engine, request permissions, and register background task
     notificationService.init()
+      .then(() => notificationService.requestPermissions())
       .then(() => registerBackgroundFetch())
       .catch(() => {});
     useNotificationStore.getState().loadPersisted().catch(() => {});

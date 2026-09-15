@@ -558,7 +558,6 @@ export class DownloadManager {
    */
   public async initialize(): Promise<void> {
     if (this.initialized) return;
-    this.initialized = true;
 
     await this.restorePersistedDownloads();
 
@@ -586,6 +585,11 @@ export class DownloadManager {
         this.queue = this.queue.filter((id) => id !== item.itemId);
       }
     }
+
+    // Mark as initialized ONLY after all async work completes successfully.
+    // If getDownloadAuthContext() or restorePersistedDownloads() throws,
+    // the next call to initialize() will retry instead of being a silent no-op.
+    this.initialized = true;
 
     this.schedulePersist();
     this.notify();

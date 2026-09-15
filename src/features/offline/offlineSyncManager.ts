@@ -26,11 +26,11 @@ export class OfflineSyncManager {
 
     for (const entry of pendingEntries) {
       try {
-        // 1. Report progress
-        await playbackRepo.reportPlaybackProgress({
+        // 1. Report playback stopped with final position — this is what Jellyfin's
+        //    /UserItems/Resume endpoint uses to populate "Continue Watching".
+        await playbackRepo.reportPlaybackStopped({
           itemId: entry.itemId,
-          positionTicks: entry.positionTicks,
-          isPaused: false
+          positionTicks: entry.positionTicks
         });
 
         // 2. Mark played if applicable

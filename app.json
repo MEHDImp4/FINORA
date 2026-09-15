@@ -56,7 +56,9 @@
           }
         }
       ],
-      "./plugins/withBackgroundService"
+      "./plugins/withBackgroundService",
+      "./plugins/withSplashBackgroundColor",
+      "./plugins/withPiP"
     ],
     "experiments": {
       "typedRoutes": true

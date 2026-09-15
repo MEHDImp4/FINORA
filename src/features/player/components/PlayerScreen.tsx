@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -29,8 +29,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { mediaKeys } from "../../../hooks/useMediaQueries";
 import { FinoraSubtitleOverlay } from "./FinoraSubtitleOverlay";
 import { SubtitleStyleModal } from "./SubtitleStyleModal";
+import { NextEpisodeOverlay } from "./NextEpisodeOverlay";
 import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
 import { useSubtitleCues } from "../useSubtitleCues";
+
+const SPEED_OPTIONS = [1.0, 1.25, 1.5, 2.0];
 
 // expo-brightness drives the real screen brightness from the player slider.
 // Imported with a try/catch fallback so unit tests (which mock native modules)
@@ -48,6 +51,7 @@ export interface PlayerScreenProps {
   token?: string;
   localPath?: string;
   onBack: () => void;
+  onNextEpisode?: (episodeId: string) => void;
   playbackRepository?: any;
   overlayAutoHideMs?: number;
 }
@@ -58,6 +62,7 @@ export function PlayerScreen({
   token = "",
   localPath,
   onBack,
+  onNextEpisode,
   playbackRepository: customPlaybackRepo,
   overlayAutoHideMs = 4000
 }: PlayerScreenProps) {
@@ -89,6 +94,20 @@ export function PlayerScreen({
   const [selectedQuality, setSelectedQuality] = useState<string>("auto");
   const [isLandscape, setIsLandscape] = useState(false);
   const [showSubtitleStyleModal, setShowSubtitleStyleModal] = useState(false);
+  const [currentSpeed, setCurrentSpeed] = useState(preferredPlaybackSpeed);
+
+  const handleCycleSpeed = () => {
+    const currentIndex = SPEED_OPTIONS.indexOf(currentSpeed);
+    const nextIndex = (currentIndex + 1) % SPEED_OPTIONS.length;
+    const nextSpeed = SPEED_OPTIONS[nextIndex];
+    setCurrentSpeed(nextSpeed);
+    controls.setRate(nextSpeed);
+  };
+
+  // Next episode state (for series)
+  const [nextEpisode, setNextEpisode] = useState<{ id: string; name: string; label: string } | null>(null);
+  const [showNextEpisode, setShowNextEpisode] = useState(false);
+  const nextEpisodeFetchedRef = useRef(false);
 
   // High-fidelity custom subtitle cues
   const { cues, isCustomSubtitleActive } = useSubtitleCues({
@@ -366,6 +385,46 @@ export function PlayerScreen({
     }
   }, [isCustomSubtitleActive, player]);
 
+  // Detect playback ended for series → show next episode overlay
+  useEffect(() => {
+    if (
+      snapshot.state === "ended" &&
+      item.type === "Episode" &&
+      item.seriesId &&
+      item.seasonId &&
+      item.episodeIndex != null &&
+      !nextEpisodeFetchedRef.current
+    ) {
+      nextEpisodeFetchedRef.current = true;
+
+      const fetchNextEpisode = async () => {
+        try {
+          const url = `${serverUrl}/Shows/${item.seriesId}/Episodes?seasonId=${item.seasonId}${token ? `&api_key=${encodeURIComponent(token)}` : ""}&startItemId=${item.id}&limit=1&fields=IndexNumber,Name`;
+          const res = await fetch(url, {
+            headers: {
+              Authorization: formatAuthorizationHeader("finora-mobile", token)
+            }
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          const next = data.Items?.[0];
+          if (next && next.Id !== item.id) {
+            setNextEpisode({
+              id: next.Id,
+              name: next.Name || "",
+              label: `E${next.IndexNumber || (item.episodeIndex || 0) + 1}`
+            });
+            setShowNextEpisode(true);
+          }
+        } catch {
+          // Silently ignore — next episode overlay simply won't show
+        }
+      };
+
+      fetchNextEpisode();
+    }
+  }, [snapshot.state, item, serverUrl, token]);
+
   // Automatic intro skip if preference is enabled
   useEffect(() => {
     if (!autoSkipIntro || hasAutoSkipped || !item.chapters || item.chapters.length === 0) {
@@ -414,6 +473,19 @@ export function PlayerScreen({
     controls.pause();
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
     onBack();
+  };
+
+  const handlePlayNextEpisode = () => {
+    if (!nextEpisode) return;
+    setShowNextEpisode(false);
+    nextEpisodeFetchedRef.current = false;
+    stopSession();
+    controls.pause();
+    if (onNextEpisode) {
+      onNextEpisode(nextEpisode.id);
+    } else {
+      onBack();
+    }
   };
 
   const handleToggleControls = () => {
@@ -545,6 +617,9 @@ export function PlayerScreen({
         volume={volume}
         onVolumeChange={handleVolumeChange}
         autoHideMs={overlayAutoHideMs}
+        playbackMode={plan.mode}
+        playbackRate={currentSpeed}
+        onCycleSpeed={handleCycleSpeed}
       />
 
       {/* Audio / Subtitle / Quality Track Selection Bottom Sheet */}
@@ -638,6 +713,19 @@ export function PlayerScreen({
       <SubtitleStyleModal
         visible={showSubtitleStyleModal}
         onClose={() => setShowSubtitleStyleModal(false)}
+      />
+
+      {/* Next Episode Overlay (series only) */}
+      <NextEpisodeOverlay
+        visible={showNextEpisode && Boolean(nextEpisode)}
+        nextEpisodeName={nextEpisode?.name || ""}
+        nextEpisodeLabel={nextEpisode?.label || ""}
+        countdownSeconds={8}
+        onPlayNext={handlePlayNextEpisode}
+        onCancel={() => {
+          setShowNextEpisode(false);
+          nextEpisodeFetchedRef.current = false;
+        }}
       />
 
       {/* Stats for Nerds Technical Diagnostic Modal */}

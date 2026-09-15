@@ -132,6 +132,16 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     await downloadManager.retryDownload(itemId);
   }, []);
 
+  const handlePauseDownload = useCallback(async (itemId: string) => {
+    hapticService.impactLight();
+    await downloadManager.pauseDownload(itemId);
+  }, []);
+
+  const handleResumeDownload = useCallback(async (itemId: string) => {
+    hapticService.impactMedium();
+    await downloadManager.resumeDownload(itemId);
+  }, []);
+
   const handleCancelDownload = useCallback(async (itemId: string) => {
     hapticService.impactLight();
     await downloadManager.cancelDownload(itemId);
@@ -438,6 +448,8 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
               serverUrl={serverUrl}
               onRetry={handleRetry}
               onCancel={handleCancelDownload}
+              onPause={handlePauseDownload}
+              onResume={handleResumeDownload}
             />
           ))}
         </View>
