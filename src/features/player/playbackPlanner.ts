@@ -1,7 +1,7 @@
 import { MediaItem } from "../../types/media";
 import { DeviceProfile, getDefaultDeviceProfile } from "./deviceProfile";
 import { sanitizeData } from "../../core/network/logger";
-import { QUALITY_PRESETS, PlaybackQuality } from "./qualityPresets";
+import { QUALITY_PRESETS } from "./qualityPresets";
 
 export type PlaybackMode = "direct-play" | "direct-stream" | "transcode";
 
@@ -22,6 +22,10 @@ export interface PlaybackPlan {
 export interface PlaybackPlanOptions {
   item: MediaItem;
   serverUrl: string;
+  /**
+   * Kept for API compatibility with callers. Authentication is deliberately
+   * supplied through the native player's request headers, never the media URL.
+   */
   token?: string;
   deviceProfile?: DeviceProfile;
   platform?: string;
@@ -40,7 +44,6 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   const {
     item,
     serverUrl,
-    token = "",
     platform,
     deviceProfile = getDefaultDeviceProfile(platform),
     quality = "auto",
@@ -130,9 +133,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     const targetAudioCodec = isAudioSupported && normAudioCodec === "aac" ? "copy" : "aac";
     const audioChannelsParam = targetAudioCodec === "aac" ? "&audioChannels=2" : "";
 
-    const qualityStreamUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=${targetVideoCodec}&audioCodec=${targetAudioCodec}${audioChannelsParam}${qualityParams}${
-      token ? `&api_key=${encodeURIComponent(token)}` : ""
-    }${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`;
+    const qualityStreamUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=${targetVideoCodec}&audioCodec=${targetAudioCodec}${audioChannelsParam}${qualityParams}${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`;
 
     return {
       mode: "transcode",
@@ -155,9 +156,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     const isSourceAac = normAudioCodec === "aac";
     const targetAudioCodec = isSourceAac ? "copy" : "aac";
     const audioChannelsParam = !isSourceAac ? "&audioChannels=2" : "";
-    const directStreamUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=copy&audioCodec=${targetAudioCodec}${audioChannelsParam}${
-      token ? `&api_key=${encodeURIComponent(token)}` : ""
-    }${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls&allowVideoStreamCopy=true`;
+    const directStreamUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=copy&audioCodec=${targetAudioCodec}${audioChannelsParam}${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls&allowVideoStreamCopy=true`;
 
     return {
       mode: "direct-stream",
@@ -173,9 +172,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
 
   // Direct Play: container, video codec, and audio codec are all natively supported
   if (isDefaultAudioSelected && isContainerSupported && isVideoSupported && isAudioSupported) {
-    const directPlayUrl = `${cleanServerUrl}/Videos/${item.id}/stream?static=true${
-      token ? `&api_key=${encodeURIComponent(token)}` : ""
-    }${mediaSourceParam}`;
+    const directPlayUrl = `${cleanServerUrl}/Videos/${item.id}/stream?static=true${mediaSourceParam}`;
 
     return {
       mode: "direct-play",
@@ -191,9 +188,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
 
   // Direct Stream: Video and audio codecs match, but container is incompatible -> remux
   if (isVideoSupported && isAudioSupported && !isContainerSupported) {
-    const directStreamUrl = `${cleanServerUrl}/Videos/${item.id}/stream?videoCodec=copy&audioCodec=copy${
-      token ? `&api_key=${encodeURIComponent(token)}` : ""
-    }${mediaSourceParam}${audioIndexParam}${subtitleIndexParam}`;
+    const directStreamUrl = `${cleanServerUrl}/Videos/${item.id}/stream?videoCodec=copy&audioCodec=copy${mediaSourceParam}${audioIndexParam}${subtitleIndexParam}`;
 
     return {
       mode: "direct-stream",
@@ -222,9 +217,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   }
 
   const targetVideoCodec = isVideoSupported ? "copy" : "h264";
-  const transcodeUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=${targetVideoCodec}&audioCodec=aac&audioChannels=2${
-    token ? `&api_key=${encodeURIComponent(token)}` : ""
-  }${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`;
+  const transcodeUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=${targetVideoCodec}&audioCodec=aac&audioChannels=2${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`;
 
   return {
     mode: "transcode",
