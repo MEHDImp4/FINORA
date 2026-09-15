@@ -3,7 +3,6 @@ import ReactTestRenderer, { act } from "react-test-renderer";
 import SearchScreen from "../../../app/(tabs)/search";
 import { searchHistoryService } from "../searchHistory";
 
-// Mock router
 const mockPush = jest.fn();
 jest.mock("expo-router", () => ({
   useRouter: () => ({
@@ -13,7 +12,6 @@ jest.mock("expo-router", () => ({
   })
 }));
 
-// Mock authStore
 jest.mock("../../../stores/authStore", () => ({
   useAuthStore: (selector: any) =>
     selector({
@@ -27,7 +25,6 @@ jest.mock("../../../stores/authStore", () => ({
     })
 }));
 
-// Mock useSearchMedia
 const mockUseSearchMedia = jest.fn();
 jest.mock("../../../hooks/useSearchQueries", () => ({
   useSearchMedia: (...args: any[]) => mockUseSearchMedia(...args)
@@ -59,14 +56,9 @@ describe("SearchScreen", () => {
       tree = ReactTestRenderer.create(<SearchScreen />);
     });
 
-    const searchInput = tree.root.findByProps({ accessibilityLabel: "Search input" });
-    expect(searchInput).toBeTruthy();
-
-    const movieChip = tree.root.findByProps({ accessibilityLabel: "Filter by Movies" });
-    expect(movieChip).toBeTruthy();
-
-    const historyItem = tree.root.findByProps({ accessibilityLabel: "Search for Matrix" });
-    expect(historyItem).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Recherche" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Filtrer par Films" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: "Rechercher Matrix" })).toBeTruthy();
 
     act(() => {
       tree.unmount();
@@ -97,8 +89,7 @@ describe("SearchScreen", () => {
       tree = ReactTestRenderer.create(<SearchScreen />);
     });
 
-    // Enter text in search
-    const searchInput = tree.root.findByProps({ accessibilityLabel: "Search input" });
+    const searchInput = tree.root.findByProps({ accessibilityLabel: "Recherche" });
     act(() => {
       searchInput.props.onChangeText("Inter");
       jest.advanceTimersByTime(300);
@@ -143,7 +134,7 @@ describe("SearchScreen", () => {
       tree = ReactTestRenderer.create(<SearchScreen />);
     });
 
-    const searchInput = tree.root.findByProps({ accessibilityLabel: "Search input" });
+    const searchInput = tree.root.findByProps({ accessibilityLabel: "Recherche" });
     act(() => {
       searchInput.props.onChangeText("Ozymandias");
       jest.advanceTimersByTime(300);
@@ -163,4 +154,3 @@ describe("SearchScreen", () => {
     });
   });
 });
-
