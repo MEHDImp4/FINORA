@@ -44,6 +44,41 @@ export const DOWNLOAD_QUALITIES: DownloadQualityProfile[] = [
 ];
 
 /**
+ * Jellyfin ticks: 10 000 000 ticks per second.
+ */
+const TICKS_PER_SECOND = 10_000_000;
+
+/**
+ * The transcode request asks for stereo AAC; ~128 kbps covers it.
+ */
+const ESTIMATED_AUDIO_BITRATE = 128_000;
+
+/**
+ * Estimates the byte size of a transcoded download.
+ *
+ * Jellyfin does NOT send a `Content-Length` header for transcode responses —
+ * the size is only known once encoding finishes. Without an estimate the
+ * progress bar has no denominator and stays at 0 %. The media duration
+ * (`totalTicks`) and the profile's target bitrate give a usable approximation.
+ *
+ * Returns undefined for "original" quality (no bitrate target — the real
+ * Content-Length is available there) or when the duration is unknown.
+ */
+export function estimateTranscodedBytes(
+  quality: DownloadQuality,
+  totalTicks?: number
+): number | undefined {
+  if (quality === "original" || !totalTicks || totalTicks <= 0) return undefined;
+
+  const profile = DOWNLOAD_QUALITIES.find((q) => q.id === quality);
+  if (!profile?.videoBitRate) return undefined;
+
+  const durationSeconds = totalTicks / TICKS_PER_SECOND;
+  const totalBits = (profile.videoBitRate + ESTIMATED_AUDIO_BITRATE) * durationSeconds;
+  return Math.round(totalBits / 8);
+}
+
+/**
  * Builds standard Jellyfin authentication headers for download requests.
  */
 export function getDownloadHeaders(token: string): Record<string, string> {

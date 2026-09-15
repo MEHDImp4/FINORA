@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { View, StyleSheet, ActivityIndicator } from "react-native";
+import { View, StyleSheet, ActivityIndicator, Linking } from "react-native";
 import { Image } from "expo-image";
 import { useAuthStore } from "../stores/authStore";
 import { useNotificationStore } from "../stores/notificationStore";
@@ -41,9 +41,16 @@ export default function RootLayout() {
       setMinSplashDone(true);
     });
 
-    // Auto-cleanup watched downloads older than 48h and any orphaned disk files
-    offlineStorageService.cleanupExpiredWatchedMedia(48).then(() => {
-      offlineStorageService.cleanupOrphanDiskFiles().catch(() => {});
+    // Initialize download manager FIRST: restores persisted downloads and
+    // registers their file paths so that orphan cleanup does NOT delete
+    // partial files that belong to active or queued downloads.
+    downloadManager.initialize().then(() => {
+      const trackedPaths = downloadManager.getTrackedLocalPaths();
+      // Auto-cleanup watched downloads older than 48h and any orphaned disk files,
+      // but protect partial files still tracked by the download manager.
+      offlineStorageService.cleanupExpiredWatchedMedia(48).then(() => {
+        offlineStorageService.cleanupOrphanDiskFiles(trackedPaths).catch(() => {});
+      }).catch(() => {});
     }).catch(() => {});
 
     // Initialize notification engine and load stored notifications
@@ -51,10 +58,6 @@ export default function RootLayout() {
       .then(() => registerBackgroundFetch())
       .catch(() => {});
     useNotificationStore.getState().loadPersisted().catch(() => {});
-
-    // Restore persisted downloads and resume the ones that were active before
-    // the process died. Runs outside React state so it works right after a kill.
-    downloadManager.initialize().catch(() => {});
   }, [restoreSession, loadOnboardingStatus]);
 
   // Deep linking: when user taps a notification on their device
@@ -65,6 +68,20 @@ export default function RootLayout() {
 
     return () => {
       unsubscribe();
+    };
+  }, [router]);
+
+  // Tapping the ongoing download notification opens the Downloads tab so the
+  // user lands on the active transfers instead of Home.
+  useEffect(() => {
+    const handleUrl = ({ url }: { url: string }) => {
+      if (url.includes("downloads")) {
+        router.push("/downloads");
+      }
+    };
+    const subscription = Linking.addEventListener("url", handleUrl);
+    return () => {
+      subscription.remove();
     };
   }, [router]);
 

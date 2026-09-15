@@ -187,8 +187,11 @@ export class OfflineStorageService {
   /**
    * Scans the finora_downloads directory on disk and removes any media files
    * that do not belong to any record in the active catalog (prevents orphaned files).
+   *
+   * @param excludePaths Additional file paths to protect from deletion (e.g. files
+   *        actively tracked by the download manager as partial downloads).
    */
-  public async cleanupOrphanDiskFiles(): Promise<number> {
+  public async cleanupOrphanDiskFiles(excludePaths?: string[]): Promise<number> {
     let deletedCount = 0;
     try {
       if (FileSystem.documentDirectory && typeof FileSystem.readDirectoryAsync === "function") {
@@ -204,6 +207,13 @@ export class OfflineStorageService {
             .filter(Boolean)
             .map((p) => p.replace(/\\/g, "/"))
         );
+
+        // Protect partial files that belong to active or queued downloads.
+        if (excludePaths) {
+          for (const p of excludePaths) {
+            activePaths.add(p.replace(/\\/g, "/"));
+          }
+        }
 
         for (const file of files) {
           const filePath = `${mediaDir}${file}`;

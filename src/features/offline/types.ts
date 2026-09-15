@@ -17,6 +17,14 @@ export interface DownloadItem {
   progress: number; // 0.0 to 1.0
   bytesDownloaded: number;
   totalBytes: number;
+  /**
+   * Approximate size for transcoded downloads, where the server sends no
+   * Content-Length. Used only as a denominator for progress display — never for
+   * the completion integrity check, which uses the real totalBytes.
+   */
+  expectedBytes?: number;
+  /** True when `progress` is derived from `expectedBytes` rather than a real total. */
+  isEstimatedTotal?: boolean;
   speedBytesPerSecond?: number;
   estimatedSecondsRemaining?: number;
   error?: string;

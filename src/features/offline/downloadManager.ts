@@ -5,7 +5,13 @@ import { logger } from "../../core/network/logger";
 import { notificationService } from "../../core/notifications/notificationService";
 import { isWifiConnected } from "../../core/network/networkStatusService";
 import { usePlaybackPreferencesStore } from "../../stores/playbackPreferencesStore";
-import { DownloadQuality, buildDownloadUrl, getDownloadHeaders } from "./downloadQuality";
+import {
+  DownloadQuality,
+  buildDownloadUrl,
+  getDownloadHeaders,
+  estimateTranscodedBytes
+} from "./downloadQuality";
+import { formatBytes, formatSpeed, formatTimeRemaining } from "./offlineFormatting";
 import {
   DownloadAuthContext,
   DownloadIdentity,
@@ -14,6 +20,10 @@ import {
   normalizeServerUrl
 } from "./downloadAuthContext";
 import { AppState, AppStateStatus, Platform } from "react-native";
+import {
+  startDownloadForeground,
+  stopDownloadForeground
+} from "../../core/notifications/foregroundDownloadService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /** Structural subset of expo-file-system's download result we care about. */
@@ -84,6 +94,8 @@ export interface PersistedDownloadEntry {
   serverUrl?: string;
   /** Non-sensitive: byte offset already present in the partial file (Android resume offset). */
   resumeOffset?: number;
+  /** Non-sensitive: duration-based size estimate for transcoded downloads. */
+  expectedBytes?: number;
   metadata?: Partial<OfflineMediaRecord>;
 }
 
@@ -211,6 +223,7 @@ export class DownloadManager {
           userId: config?.identity?.userId,
           serverUrl: config?.identity?.serverUrl,
           resumeOffset: this.resumeOffsets.get(itemId),
+          expectedBytes: item.expectedBytes,
           metadata: config?.metadata
         });
       }
@@ -255,15 +268,19 @@ export class DownloadManager {
 
   /** Real size of a local file, or 0 when it is missing/unreadable. */
   private async getExistingFileSize(path: string): Promise<number> {
-    if (!path || !path.startsWith("file://")) return 0;
+    if (!path || !path.startsWith("file://")) {
+      logger.info(`[getExistingFileSize] SKIP path="${path}" startsWithFile=${String(path).startsWith("file://")}`);
+      return 0;
+    }
     try {
       const info = await FileSystem.getInfoAsync(path);
+      logger.info(`[getExistingFileSize] path=${path} exists=${info.exists} hasSize=${"size" in info}`);
       if (info.exists && "size" in info) {
         const size = (info as any).size;
         return typeof size === "number" && size > 0 ? size : 0;
       }
-    } catch {
-      // Unreadable path — treat as absent
+    } catch (e: any) {
+      logger.warn(`[getExistingFileSize] error for ${path.substring(path.lastIndexOf("/"))}: ${e?.message}`);
     }
     return 0;
   }
@@ -399,6 +416,12 @@ export class DownloadManager {
 
         const fileSizeBytes = await this.getExistingFileSize(entry.localPath);
 
+        logger.info(
+          `[DownloadManager] Restore ${entry.itemId}: ` +
+          `fileSize=${fileSizeBytes}, persistedBytes=${entry.bytesDownloaded}, ` +
+          `persistedStatus=${entry.status}, hasFile=${fileSizeBytes > 0}`
+        );
+
         // Case D — already fully downloaded on disk
         if (entry.totalBytes > 0 && fileSizeBytes >= entry.totalBytes) {
           await this.reconcileCompletedOnDisk(entry, fileSizeBytes);
@@ -423,9 +446,11 @@ export class DownloadManager {
           restoredStatus = entry.status;
         }
 
+        const restoredDenominator =
+          entry.totalBytes > 0 ? entry.totalBytes : entry.expectedBytes ?? 0;
         const restoredProgress =
-          entry.totalBytes > 0
-            ? Math.min(1, bytesDownloaded / entry.totalBytes)
+          restoredDenominator > 0
+            ? Math.min(1, bytesDownloaded / restoredDenominator)
             : hasPartialFile
               ? entry.progress
               : 0;
@@ -441,6 +466,8 @@ export class DownloadManager {
           progress: restoredProgress,
           bytesDownloaded,
           totalBytes: entry.totalBytes,
+          expectedBytes: entry.expectedBytes,
+          isEstimatedTotal: entry.totalBytes === 0 && (entry.expectedBytes ?? 0) > 0,
           error: entry.error,
           startedAt: entry.startedAt,
           completedAt: entry.completedAt,
@@ -536,8 +563,12 @@ export class DownloadManager {
     await this.restorePersistedDownloads();
 
     this.authContext = await getDownloadAuthContext();
-
     const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
+    logger.info(
+      `[DownloadManager] initialize(): auth=${this.authContext ? "ok" : "null"}, ` +
+      `wifiOnly=${wifiOnly}, tracked=${this.downloads.size}`
+    );
+
     const onWifi = wifiOnly ? await isWifiConnected() : true;
 
     for (const item of this.downloads.values()) {
@@ -560,8 +591,71 @@ export class DownloadManager {
     this.notify();
     this.processQueue();
     this.attachAppStateListener();
+    this.syncForegroundService();
 
     logger.info(`[DownloadManager] Initialized (${this.downloads.size} tracked download(s)).`);
+  }
+
+  /**
+   * Returns the set of local file paths actively tracked by the download manager,
+   * so that orphan cleanup does not delete partial files that are still being
+   * downloaded or queued for download.
+   */
+  public getTrackedLocalPaths(): string[] {
+    return Array.from(this.downloads.values())
+      .map((d) => d.localPath)
+      .filter((p): p is string => Boolean(p));
+  }
+
+  /**
+   * Keeps the foreground service in sync with the current download state and
+   * refreshes the notification content: progress, speed, transferred bytes, ETA.
+   */
+  private async syncForegroundService(): Promise<void> {
+    try {
+      const active = Array.from(this.downloads.values()).filter(
+        (d) => d.status === "downloading"
+      );
+
+      if (active.length === 0) {
+        await stopDownloadForeground();
+        return;
+      }
+
+      const primary = active[0];
+      const hasTotal = primary.totalBytes > 0 || (primary.expectedBytes ?? 0) > 0;
+      const percent = Math.round(primary.progress * 100);
+      const percentLabel = primary.isEstimatedTotal ? `~${percent} %` : `${percent} %`;
+
+      const details: string[] = [];
+      if (hasTotal) details.push(percentLabel);
+      if (primary.totalBytes > 0) {
+        details.push(
+          `${formatBytes(primary.bytesDownloaded)} / ${formatBytes(primary.totalBytes)}`
+        );
+      } else if (primary.expectedBytes) {
+        details.push(
+          `${formatBytes(primary.bytesDownloaded)} / ~${formatBytes(primary.expectedBytes)}`
+        );
+      } else {
+        details.push(formatBytes(primary.bytesDownloaded));
+      }
+      const speed = formatSpeed(primary.speedBytesPerSecond);
+      if (speed) details.push(speed);
+      const eta = formatTimeRemaining(primary.estimatedSecondsRemaining);
+      if (eta) details.push(eta);
+
+      const isMultiple = active.length > 1;
+      const title = isMultiple ? `${active.length} téléchargements` : primary.title;
+      const description = isMultiple
+        ? `${primary.title} — ${details.join(" · ")}`
+        : details.join(" · ");
+
+      // Unknown total with no estimate → indeterminate bar, never a fake 0 %.
+      await startDownloadForeground(title, description, hasTotal ? percent : undefined);
+    } catch {
+      // Non-fatal — downloads work without the foreground service
+    }
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
@@ -658,6 +752,13 @@ export class DownloadManager {
 
     const shouldQueue = activeCount >= MAX_CONCURRENT_DOWNLOADS;
 
+    // Transcode responses carry no Content-Length, so progress needs an estimate
+    // derived from the media duration and the profile's target bitrate.
+    const expectedBytes = estimateTranscodedBytes(
+      options?.quality ?? "original",
+      metadata?.totalTicks
+    );
+
     const downloadItem: DownloadItem = {
       ...item,
       localPath,
@@ -665,6 +766,8 @@ export class DownloadManager {
       progress: 0,
       bytesDownloaded: 0,
       totalBytes: 0,
+      expectedBytes,
+      isEstimatedTotal: false,
       error: undefined,
       startedAt: Date.now()
     };
@@ -796,6 +899,11 @@ export class DownloadManager {
     const status = result.status ?? 0;
     const resumeOffset = this.resumeOffsets.get(itemId) ?? 0;
 
+    logger.info(
+      `[DownloadManager] Result ${itemId}: HTTP ${status}, ` +
+      `resumeOffset=${resumeOffset}, uri=${result.uri ? "present" : "absent"}`
+    );
+
     // Bounded authorization recovery: refresh once, retry once, never loop.
     if ((status === 401 || status === 403) && !this.authRetried.has(itemId)) {
       this.authRetried.add(itemId);
@@ -888,6 +996,11 @@ export class DownloadManager {
       // Reconcile against the real partial file before starting.
       const partialBytes = await this.getExistingFileSize(localPath);
 
+      logger.info(
+        `[DownloadManager] Resume check ${itemId}: partialBytes=${partialBytes}, ` +
+        `totalBytes=${downloadItem.totalBytes}, platform=${Platform.OS}`
+      );
+
       if (downloadItem.totalBytes > 0 && partialBytes >= downloadItem.totalBytes) {
         // The file on disk is already complete — no transfer needed.
         await this.completeDownload(item.itemId, partialBytes, { ...metadata, localPath });
@@ -895,6 +1008,10 @@ export class DownloadManager {
       }
 
       const resumeOffset = this.resolveResumeOffset(partialBytes, downloadItem.totalBytes);
+      logger.info(
+        `[DownloadManager] resumeOffset=${resumeOffset} for ${itemId} ` +
+        `(will pass resumeData=${resumeOffset > 0 ? String(resumeOffset) : "none"})`
+      );
 
       if (resumeOffset === 0 && partialBytes > 0 && Platform.OS !== "android") {
         // Cannot safely continue this partial file without persisting credentials.
@@ -922,6 +1039,7 @@ export class DownloadManager {
 
       this.resumeOffsets.set(item.itemId, resumeOffset);
       this.activeTasks.set(item.itemId, downloadResumable);
+      this.syncForegroundService();
 
       // Execute download in background
       downloadResumable
@@ -983,6 +1101,14 @@ export class DownloadManager {
     const item = this.downloads.get(itemId);
     if (!item || item.status !== "downloading") return;
 
+    // Jellyfin sends no Content-Length for transcode responses. Fall back to the
+    // duration-based estimate for DISPLAY only — the real total stays
+    // authoritative for the completion and integrity checks below.
+    const realTotal = totalBytes > 0 ? totalBytes : 0;
+    const estimatedTotal =
+      item.expectedBytes && item.expectedBytes > 0 ? item.expectedBytes : 0;
+    const displayTotal = realTotal > 0 ? realTotal : estimatedTotal;
+
     // Calculate speed and ETA
     const now = Date.now();
     const prev = this.speedTrackers.get(itemId);
@@ -996,9 +1122,9 @@ export class DownloadManager {
             prev.speed > 0 ? prev.speed * 0.4 + currentSpeed * 0.6 : currentSpeed;
           item.speedBytesPerSecond = Math.round(smoothedSpeed);
 
-          if (totalBytes > bytesDownloaded && smoothedSpeed > 1024) {
+          if (displayTotal > bytesDownloaded && smoothedSpeed > 1024) {
             item.estimatedSecondsRemaining = Math.round(
-              (totalBytes - bytesDownloaded) / smoothedSpeed
+              (displayTotal - bytesDownloaded) / smoothedSpeed
             );
           } else {
             item.estimatedSecondsRemaining = undefined;
@@ -1020,8 +1146,10 @@ export class DownloadManager {
     }
 
     item.bytesDownloaded = bytesDownloaded;
-    item.totalBytes = totalBytes > 0 ? totalBytes : 0;
-    item.progress = totalBytes > 0 ? Math.min(1, bytesDownloaded / totalBytes) : 0;
+    item.totalBytes = realTotal;
+    item.isEstimatedTotal = realTotal === 0 && estimatedTotal > 0;
+    item.progress =
+      displayTotal > 0 ? Math.min(1, bytesDownloaded / displayTotal) : 0;
 
     if (bytesDownloaded >= totalBytes && totalBytes > 0) {
       item.status = "completed";
@@ -1044,6 +1172,8 @@ export class DownloadManager {
     if (progressPersistDue) {
       this.progressPersistMarkers.set(itemId, { at: now, progress: item.progress });
       this.schedulePersist();
+      // Refresh the foreground notification on the same throttle.
+      this.syncForegroundService();
     }
 
     this.notify();
@@ -1071,6 +1201,7 @@ export class DownloadManager {
     this.schedulePersist();
     this.notify();
     this.processQueue();
+    this.syncForegroundService();
   }
 
   public async resumeDownload(itemId: string): Promise<void> {
@@ -1151,6 +1282,7 @@ export class DownloadManager {
     this.schedulePersist();
     this.notify();
     this.processQueue();
+    this.syncForegroundService();
   }
 
   public markCompleted(itemId: string, totalBytes: number): void {
@@ -1168,6 +1300,7 @@ export class DownloadManager {
     item.completedAt = Date.now();
     this.schedulePersist();
     this.notify();
+    this.syncForegroundService();
   }
 
   public async completeDownload(
@@ -1206,6 +1339,7 @@ export class DownloadManager {
       this.notify();
     }
     this.processQueue();
+    this.syncForegroundService();
   }
 
   public markFailed(itemId: string, error: string): void {
@@ -1223,6 +1357,7 @@ export class DownloadManager {
     this.schedulePersist();
     this.notify();
     this.processQueue();
+    this.syncForegroundService();
   }
 
   /**
@@ -1242,6 +1377,7 @@ export class DownloadManager {
     this.schedulePersist();
     this.notify();
     this.processQueue();
+    this.syncForegroundService();
   }
 }
 

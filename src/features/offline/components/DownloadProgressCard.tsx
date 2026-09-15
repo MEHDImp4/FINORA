@@ -36,6 +36,16 @@ export function DownloadProgressCard({
   const isQueued = download.status === "queued";
   const progressPercent = Math.round(download.progress * 100);
 
+  // Jellyfin sends no Content-Length for transcoded downloads, so fall back to
+  // the duration-based estimate to keep a meaningful percentage and size.
+  const hasRealTotal = download.totalBytes > 0;
+  const displayTotal = hasRealTotal
+    ? download.totalBytes
+    : download.expectedBytes ?? 0;
+  const hasTotal = displayTotal > 0;
+  const isEstimated = !hasRealTotal && (download.expectedBytes ?? 0) > 0;
+  const percentLabel = isEstimated ? `~${progressPercent}%` : `${progressPercent}%`;
+
   // Poster resolution
   const posterTag = download.seriesPosterPath || download.posterPath;
   const posterTargetId = download.seriesId || download.itemId;
@@ -122,20 +132,20 @@ export function DownloadProgressCard({
                 style={[
                   styles.progressFill,
                   {
-                    width:
-                      download.totalBytes > 0
-                        ? `${progressPercent}%`
-                        : download.bytesDownloaded > 0
-                        ? "100%"
-                        : "5%"
+                    width: hasTotal
+                      ? `${Math.max(2, progressPercent)}%`
+                      : "35%",
+                    opacity: hasTotal ? 1 : 0.45
                   }
                 ]}
               />
             </View>
             <View style={styles.progressStatusRow}>
               <FinoraText variant="caption" style={styles.progressMeta} numberOfLines={1}>
-                {download.totalBytes > 0
+                {hasRealTotal
                   ? `${formatBytes(download.bytesDownloaded)} / ${formatBytes(download.totalBytes)}`
+                  : isEstimated
+                  ? `${formatBytes(download.bytesDownloaded)} / ~${formatBytes(displayTotal)}`
                   : download.bytesDownloaded > 0
                   ? `${formatBytes(download.bytesDownloaded)} reçus`
                   : "Connexion..."}
@@ -145,7 +155,7 @@ export function DownloadProgressCard({
                   : ""}
               </FinoraText>
               <FinoraText variant="caption" weight="700" style={styles.progressPercent}>
-                {download.totalBytes > 0 ? `${progressPercent}%` : "..."}
+                {hasTotal ? percentLabel : "..."}
               </FinoraText>
             </View>
           </View>
