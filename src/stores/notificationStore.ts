@@ -18,6 +18,10 @@ export interface FinoraNotification {
   mediaId?: string;
   seriesId?: string;
   seriesName?: string;
+  /**
+   * Runtime-only convenience URL. Jellyfin image URLs can contain api_key, so
+   * this field is deliberately stripped before anything is persisted.
+   */
   posterUrl?: string;
   seasonIndex?: number;
   episodeIndex?: number;
@@ -39,9 +43,58 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   downloadsCompleted: true
 };
 
-const STORAGE_KEY_NOTIFS = "@finora_notifications";
-const STORAGE_KEY_PREFS = "@finora_notification_prefs";
+/** Legacy unscoped inbox key. Removed during v2 migration because it may contain tokenized poster URLs. */
+export const LEGACY_NOTIFICATION_STORAGE_KEY = "@finora_notifications";
+export const NOTIFICATION_PREFS_STORAGE_KEY = "@finora_notification_prefs";
+const STORAGE_KEY_NOTIFS_PREFIX = "@finora_notifications_v2";
 const MAX_STORED_NOTIFICATIONS = 50;
+
+export function getNotificationStorageKey(serverId: string, userId: string): string {
+  return `${STORAGE_KEY_NOTIFS_PREFIX}:${encodeURIComponent(serverId)}:${encodeURIComponent(userId)}`;
+}
+
+function sanitizeForPersistence(notification: FinoraNotification): Omit<FinoraNotification, "posterUrl"> {
+  // posterUrl can embed Jellyfin api_key. Never serialize it to AsyncStorage.
+  const { posterUrl: _posterUrl, ...safeNotification } = notification;
+  return safeNotification;
+}
+
+function serializeSafeNotifications(notifications: FinoraNotification[]): string {
+  return JSON.stringify(notifications.map(sanitizeForPersistence));
+}
+
+function parseNotifications(raw: string | null): FinoraNotification[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item) => item && typeof item === "object" && typeof item.id === "string")
+      .map((item) => {
+        // Migration hardening: even if an old scoped payload somehow included posterUrl,
+        // drop it on read so a tokenized URL never gets re-persisted.
+        const { posterUrl: _posterUrl, ...safe } = item as FinoraNotification;
+        return safe as FinoraNotification;
+      });
+  } catch {
+    return [];
+  }
+}
+
+async function persistScopedNotifications(
+  scopeKey: string | null,
+  notifications: FinoraNotification[]
+): Promise<void> {
+  if (!scopeKey) return;
+  await AsyncStorage.setItem(scopeKey, serializeSafeNotifications(notifications));
+}
+
+export async function removePersistedNotificationScope(
+  serverId: string,
+  userId: string
+): Promise<void> {
+  await AsyncStorage.removeItem(getNotificationStorageKey(serverId, userId));
+}
 
 export interface NotificationState {
   notifications: FinoraNotification[];
@@ -49,8 +102,8 @@ export interface NotificationState {
   preferences: NotificationPreferences;
   hasPermissions: boolean;
   isLoaded: boolean;
+  activeScopeKey: string | null;
 
-  // Actions
   addNotification: (
     notif: Omit<FinoraNotification, "id" | "timestamp" | "read"> & {
       id?: string;
@@ -60,9 +113,10 @@ export interface NotificationState {
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearAll: () => void;
-  updatePreferences: (partial: Partial<NotificationPreferences>) => void;
+  updatePreferences: (partial: Partial<NotificationPreferences>) => Promise<void>;
   setHasPermissions: (granted: boolean) => void;
-  loadPersisted: () => Promise<void>;
+  loadPersisted: (serverId?: string, userId?: string) => Promise<void>;
+  resetActiveScope: () => void;
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
@@ -71,6 +125,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   preferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
   hasPermissions: false,
   isLoaded: false,
+  activeScopeKey: null,
 
   addNotification: (notifData) => {
     const newNotif: FinoraNotification = {
@@ -81,13 +136,11 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     };
 
     set((state) => {
-      // Deduplicate by ID if already exists
       const filtered = state.notifications.filter((n) => n.id !== newNotif.id);
       const updated = [newNotif, ...filtered].slice(0, MAX_STORED_NOTIFICATIONS);
       const unreadCount = updated.filter((n) => !n.read).length;
 
-      // Async persist
-      AsyncStorage.setItem(STORAGE_KEY_NOTIFS, JSON.stringify(updated)).catch(() => {});
+      persistScopedNotifications(state.activeScopeKey, updated).catch(() => {});
 
       return {
         notifications: updated,
@@ -103,7 +156,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       );
       const unreadCount = updated.filter((n) => !n.read).length;
 
-      AsyncStorage.setItem(STORAGE_KEY_NOTIFS, JSON.stringify(updated)).catch(() => {});
+      persistScopedNotifications(state.activeScopeKey, updated).catch(() => {});
 
       return {
         notifications: updated,
@@ -115,7 +168,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   markAllAsRead: () => {
     set((state) => {
       const updated = state.notifications.map((n) => ({ ...n, read: true }));
-      AsyncStorage.setItem(STORAGE_KEY_NOTIFS, JSON.stringify(updated)).catch(() => {});
+      persistScopedNotifications(state.activeScopeKey, updated).catch(() => {});
       return {
         notifications: updated,
         unreadCount: 0
@@ -124,41 +177,48 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   clearAll: () => {
-    set(() => {
-      AsyncStorage.removeItem(STORAGE_KEY_NOTIFS).catch(() => {});
-      return {
-        notifications: [],
-        unreadCount: 0
-      };
-    });
+    const scopeKey = get().activeScopeKey;
+    set({ notifications: [], unreadCount: 0 });
+    if (scopeKey) {
+      AsyncStorage.removeItem(scopeKey).catch(() => {});
+    }
   },
 
-  updatePreferences: (partial) => {
-    set((state) => {
-      const updated = { ...state.preferences, ...partial };
-      AsyncStorage.setItem(STORAGE_KEY_PREFS, JSON.stringify(updated)).catch(() => {});
-      return { preferences: updated };
-    });
+  updatePreferences: async (partial) => {
+    const updated = { ...get().preferences, ...partial };
+    set({ preferences: updated });
+    await AsyncStorage.setItem(NOTIFICATION_PREFS_STORAGE_KEY, JSON.stringify(updated));
   },
 
   setHasPermissions: (granted) => {
     set({ hasPermissions: granted });
   },
 
-  loadPersisted: async () => {
+  loadPersisted: async (serverId, userId) => {
+    const scopeKey = serverId && userId ? getNotificationStorageKey(serverId, userId) : null;
+    set({ activeScopeKey: scopeKey, isLoaded: false });
+
     try {
-      const [notifsJson, prefsJson] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEY_NOTIFS),
-        AsyncStorage.getItem(STORAGE_KEY_PREFS)
+      const [scopedNotifsJson, legacyNotifsJson, prefsJson] = await Promise.all([
+        scopeKey ? AsyncStorage.getItem(scopeKey) : Promise.resolve(null),
+        AsyncStorage.getItem(LEGACY_NOTIFICATION_STORAGE_KEY),
+        AsyncStorage.getItem(NOTIFICATION_PREFS_STORAGE_KEY)
       ]);
 
-      let notifs: FinoraNotification[] = [];
-      if (notifsJson) {
-        try {
-          notifs = JSON.parse(notifsJson);
-        } catch {
-          notifs = [];
-        }
+      // If a different account became active while storage was loading, discard this result.
+      if (get().activeScopeKey !== scopeKey) return;
+
+      let notifs = parseNotifications(scopedNotifsJson);
+
+      // The legacy inbox was global and could include posterUrl?api_key=... . Do not assign it
+      // to an arbitrary account. Delete it and start the scoped inbox clean.
+      if (legacyNotifsJson !== null) {
+        await AsyncStorage.removeItem(LEGACY_NOTIFICATION_STORAGE_KEY).catch(() => {});
+      }
+
+      // Rewrite any existing scoped payload in sanitized form so upgrades scrub posterUrl.
+      if (scopeKey && scopedNotifsJson) {
+        await persistScopedNotifications(scopeKey, notifs).catch(() => {});
       }
 
       let prefs = { ...DEFAULT_NOTIFICATION_PREFERENCES };
@@ -177,7 +237,18 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         isLoaded: true
       });
     } catch {
-      set({ isLoaded: true });
+      if (get().activeScopeKey === scopeKey) {
+        set({ notifications: [], unreadCount: 0, isLoaded: true });
+      }
     }
+  },
+
+  resetActiveScope: () => {
+    set({
+      notifications: [],
+      unreadCount: 0,
+      activeScopeKey: null,
+      isLoaded: false
+    });
   }
 }));
