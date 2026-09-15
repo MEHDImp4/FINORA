@@ -10,10 +10,10 @@ export interface SearchCategory {
 }
 
 export const SEARCH_CATEGORIES: SearchCategory[] = [
-  { id: "all", label: "All", itemTypes: ["Movie", "Series", "BoxSet"] },
-  { id: "movies", label: "Movies", itemTypes: ["Movie"] },
-  { id: "series", label: "Series", itemTypes: ["Series"] },
-  { id: "episodes", label: "Episodes", itemTypes: ["Episode"] }
+  { id: "all", label: "Tout", itemTypes: ["Movie", "Series", "BoxSet"] },
+  { id: "movies", label: "Films", itemTypes: ["Movie"] },
+  { id: "series", label: "Séries", itemTypes: ["Series"] },
+  { id: "episodes", label: "Épisodes", itemTypes: ["Episode"] }
 ];
 
 interface SearchCategoryChipsProps {
@@ -43,7 +43,7 @@ export function SearchCategoryChips({
               ]}
               onPress={() => onSelectCategory(cat)}
               accessibilityRole="button"
-              accessibilityLabel={`Filter by ${cat.label}`}
+              accessibilityLabel={`Filtrer par ${cat.label}`}
               accessibilityState={{ selected: isSelected }}
             >
               <FinoraText
@@ -72,10 +72,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   chip: {
+    minHeight: 44,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    borderWidth: 1
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center"
   },
   chipSelected: {
     backgroundColor: colors.primary,
