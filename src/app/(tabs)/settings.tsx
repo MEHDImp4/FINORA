@@ -4,12 +4,12 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert
+  Alert,
+  Pressable
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { FinoraScreen } from "../../design-system/components/FinoraScreen";
-import { FinoraButton } from "../../design-system/components/FinoraButton";
 import { colors, spacing } from "../../design-system/tokens";
 import { useAuthStore } from "../../stores/authStore";
 import { useServerStore } from "../../stores/serverStore";
@@ -37,7 +37,6 @@ import { notificationService } from "../../core/notifications/notificationServic
 import { useQueryClient } from "@tanstack/react-query";
 import { cacheService } from "../../core/cache/cacheService";
 
-// Options de langues audio (Strictement sans emojis)
 const AUDIO_LANG_OPTIONS: SelectionOption<string>[] = [
   { id: "fr", label: "Français", subtitle: "Piste audio française prioritaire" },
   { id: "en", label: "Anglais", subtitle: "Piste audio anglaise" },
@@ -47,7 +46,6 @@ const AUDIO_LANG_OPTIONS: SelectionOption<string>[] = [
   { id: "auto", label: "Original / Auto", subtitle: "Piste par défaut du média" }
 ];
 
-// Options de sous-titres (Sans emojis)
 const SUBTITLE_LANG_OPTIONS: SelectionOption<string>[] = [
   { id: "fr", label: "Français", subtitle: "Sous-titres complets en français" },
   { id: "en", label: "Anglais", subtitle: "Sous-titres en anglais" },
@@ -55,7 +53,6 @@ const SUBTITLE_LANG_OPTIONS: SelectionOption<string>[] = [
   { id: "none", label: "Désactivés", subtitle: "Aucun sous-titre par défaut" }
 ];
 
-// Modes d'activation des sous-titres
 const SUBTITLE_MODE_OPTIONS: SelectionOption<SubtitleMode>[] = [
   {
     id: "smart",
@@ -75,7 +72,6 @@ const SUBTITLE_MODE_OPTIONS: SelectionOption<SubtitleMode>[] = [
   }
 ];
 
-// Profils de qualité de téléchargement
 const DOWNLOAD_QUALITY_OPTIONS: SelectionOption<DownloadQuality>[] = [
   {
     id: "original",
@@ -100,7 +96,6 @@ const DOWNLOAD_QUALITY_OPTIONS: SelectionOption<DownloadQuality>[] = [
   }
 ];
 
-// Vitesse de lecture par défaut
 const PLAYBACK_SPEED_OPTIONS: SelectionOption<number>[] = [
   { id: 1.0, label: "1.0x", subtitle: "Vitesse standard" },
   { id: 1.25, label: "1.25x", subtitle: "Légère accélération" },
@@ -111,7 +106,6 @@ export default function SettingsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // Stores
   const session = useAuthStore((state) => state.session);
   const logout = useAuthStore((state) => state.logout);
   const savedAccounts = useServerStore((state) => state.savedAccounts);
@@ -129,7 +123,6 @@ export default function SettingsScreen() {
   const setDefaultDownloadQuality = usePlaybackPreferencesStore((state) => state.setDefaultDownloadQuality);
   const setHapticsEnabled = usePlaybackPreferencesStore((state) => state.setHapticsEnabled);
 
-  // Modals state
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [showDiagModal, setShowDiagModal] = useState(false);
   const [showSubtitleStyleModal, setShowSubtitleStyleModal] = useState(false);
@@ -212,6 +205,24 @@ export default function SettingsScreen() {
     );
   };
 
+  const handleRemoveAccount = (serverId: string, userId: string, userName: string) => {
+    hapticService.impactLight();
+    Alert.alert(
+      "Retirer ce compte ?",
+      `Le compte « ${userName} » sera retiré de FINORA. Vous pourrez toujours vous reconnecter plus tard.`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Retirer",
+          style: "destructive",
+          onPress: async () => {
+            await removeAccount(serverId, userId);
+          }
+        }
+      ]
+    );
+  };
+
   const audioLabel = AUDIO_LANG_OPTIONS.find((o) => o.id === preferences.preferredAudioLanguage)?.label || preferences.preferredAudioLanguage;
   const subtitleLabel = SUBTITLE_LANG_OPTIONS.find((o) => o.id === preferences.preferredSubtitleLanguage)?.label || preferences.preferredSubtitleLanguage;
   const subtitleModeLabel = SUBTITLE_MODE_OPTIONS.find((o) => o.id === preferences.subtitleMode)?.label || preferences.subtitleMode;
@@ -221,12 +232,10 @@ export default function SettingsScreen() {
   return (
     <FinoraScreen safeBottom={false}>
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Titre Principal Épuré */}
         <View style={styles.headerContainer}>
           <Text style={styles.pageTitle}>Paramètres</Text>
         </View>
 
-        {/* 1. COMPTE */}
         <SettingsSection title="Compte">
           {session ? (
             <View style={styles.sessionHeaderCard}>
@@ -246,7 +255,7 @@ export default function SettingsScreen() {
 
           <SettingsRow
             iconName="server-outline"
-            iconColor="#4F8EF7"
+            iconColor={colors.textSecondary}
             title="Changer de serveur"
             value={session ? "Connecté" : "Non connecté"}
             onPress={() => setShowConnectModal(true)}
@@ -254,32 +263,58 @@ export default function SettingsScreen() {
 
           {savedAccounts.length > 1 ? (
             <View style={styles.savedAccountsContainer}>
-              <Text style={styles.subCategoryHeader}>Comptes enregistrés</Text>
+              <Text style={styles.subCategoryHeader}>COMPTES ENREGISTRÉS</Text>
               {savedAccounts.map((acc, idx) => {
                 const isActive = session?.serverId === acc.serverId && session?.userId === acc.userId;
                 return (
-                  <View key={`${acc.serverId}-${acc.userId}`} style={[styles.accountItemRow, idx > 0 && styles.accountBorder]}>
-                    <View style={{ flex: 1, marginRight: 10 }}>
-                      <Text style={[styles.accountName, isActive && styles.accountNameActive]} numberOfLines={1}>
-                        {acc.userName} {isActive ? "(Actif)" : ""}
-                      </Text>
-                      <Text style={styles.accountUrl} numberOfLines={1}>{acc.serverUrl}</Text>
-                    </View>
-                    {!isActive ? (
-                      <View style={{ flexDirection: "row", gap: 8 }}>
-                        <FinoraButton
-                          label="Basculer"
-                          variant="primary"
-                          size="sm"
-                          onPress={() => switchAccount(acc.serverId, acc.userId)}
-                        />
-                        <FinoraButton
-                          label="Retirer"
-                          variant="secondary"
-                          size="sm"
-                          onPress={() => removeAccount(acc.serverId, acc.userId)}
+                  <View
+                    key={`${acc.serverId}-${acc.userId}`}
+                    style={[styles.accountItemRow, idx > 0 && styles.accountBorder]}
+                  >
+                    <Pressable
+                      style={styles.accountMainAction}
+                      disabled={isActive}
+                      onPress={() => {
+                        hapticService.selection();
+                        switchAccount(acc.serverId, acc.userId);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isActive, disabled: isActive }}
+                      accessibilityLabel={
+                        isActive
+                          ? `${acc.userName}, compte actif`
+                          : `Basculer vers le compte ${acc.userName}`
+                      }
+                    >
+                      <View style={[styles.accountAvatar, isActive && styles.accountAvatarActive]}>
+                        <Ionicons
+                          name={isActive ? "checkmark" : "person-outline"}
+                          size={18}
+                          color={isActive ? "#FFFFFF" : colors.textSecondary}
                         />
                       </View>
+                      <View style={styles.accountTextContainer}>
+                        <Text style={[styles.accountName, isActive && styles.accountNameActive]} numberOfLines={1}>
+                          {acc.userName}
+                        </Text>
+                        <Text style={styles.accountUrl} numberOfLines={1}>
+                          {acc.serverUrl}
+                        </Text>
+                      </View>
+                      {!isActive ? (
+                        <Ionicons name="swap-horizontal-outline" size={18} color={colors.textSecondary} />
+                      ) : null}
+                    </Pressable>
+
+                    {!isActive ? (
+                      <Pressable
+                        style={styles.accountRemoveButton}
+                        onPress={() => handleRemoveAccount(acc.serverId, acc.userId, acc.userName)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Retirer le compte ${acc.userName}`}
+                      >
+                        <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />
+                      </Pressable>
                     ) : null}
                   </View>
                 );
@@ -306,11 +341,10 @@ export default function SettingsScreen() {
           ) : null}
         </SettingsSection>
 
-        {/* 2. LECTURE */}
         <SettingsSection title="Lecture">
           <SettingsRow
             iconName="volume-medium-outline"
-            iconColor="#E50914"
+            iconColor={colors.primary}
             title="Audio"
             value={audioLabel}
             onPress={() => setActivePicker("audio")}
@@ -318,7 +352,7 @@ export default function SettingsScreen() {
 
           <SettingsSwitchRow
             iconName="play-skip-forward-outline"
-            iconColor="#E50914"
+            iconColor={colors.primary}
             title="Passer les intros"
             value={preferences.autoSkipIntro}
             onValueChange={setAutoSkipIntro}
@@ -326,7 +360,7 @@ export default function SettingsScreen() {
 
           <SettingsRow
             iconName="speedometer-outline"
-            iconColor="#E50914"
+            iconColor={colors.primary}
             title="Vitesse"
             value={speedLabel}
             isLast
@@ -334,11 +368,10 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
-        {/* 3. SOUS-TITRES */}
         <SettingsSection title="Sous-titres">
           <SettingsRow
             iconName="chatbubble-ellipses-outline"
-            iconColor="#00E5FF"
+            iconColor={colors.textSecondary}
             title="Langue"
             value={subtitleLabel}
             onPress={() => setActivePicker("sub")}
@@ -346,7 +379,7 @@ export default function SettingsScreen() {
 
           <SettingsRow
             iconName="options-outline"
-            iconColor="#00E5FF"
+            iconColor={colors.textSecondary}
             title="Affichage"
             value={subtitleModeLabel}
             onPress={() => setActivePicker("subMode")}
@@ -354,18 +387,17 @@ export default function SettingsScreen() {
 
           <SettingsRow
             iconName="color-wand-outline"
-            iconColor="#00E5FF"
+            iconColor={colors.textSecondary}
             title="Style et apparence"
             isLast
             onPress={() => setShowSubtitleStyleModal(true)}
           />
         </SettingsSection>
 
-        {/* 4. TÉLÉCHARGEMENTS */}
         <SettingsSection title="Téléchargements">
           <SettingsRow
             iconName="film-outline"
-            iconColor="#4BB543"
+            iconColor={colors.textSecondary}
             title="Qualité"
             value={downloadQualityLabel}
             onPress={() => setActivePicker("downloadQuality")}
@@ -373,7 +405,7 @@ export default function SettingsScreen() {
 
           <SettingsSwitchRow
             iconName="wifi-outline"
-            iconColor="#4BB543"
+            iconColor={colors.textSecondary}
             title="Wi-Fi uniquement"
             value={preferences.downloadWifiOnly}
             onValueChange={setDownloadWifiOnly}
@@ -381,25 +413,24 @@ export default function SettingsScreen() {
 
           <SettingsRow
             iconName="folder-open-outline"
-            iconColor="#4BB543"
+            iconColor={colors.textSecondary}
             title="Mes téléchargements"
             onPress={() => router.push("/(tabs)/downloads")}
           />
 
           <SettingsRow
             iconName="trash-outline"
-            iconColor="#8A8A9E"
+            iconColor={colors.textSecondary}
             title="Vider le cache"
             isLast
             onPress={handleClearCache}
           />
         </SettingsSection>
 
-        {/* 5. NOTIFICATIONS */}
         <SettingsSection title="Notifications">
           <SettingsSwitchRow
             iconName="notifications-outline"
-            iconColor="#FF3B30"
+            iconColor={colors.primary}
             title="Autoriser les notifications"
             value={notifPreferences.enabled}
             onValueChange={handleToggleGlobalNotifs}
@@ -410,7 +441,7 @@ export default function SettingsScreen() {
             <>
               <SettingsSwitchRow
                 iconName="tv-outline"
-                iconColor="#8B5CF6"
+                iconColor={colors.textSecondary}
                 title="Épisodes de mes séries"
                 value={notifPreferences.newEpisodes}
                 onValueChange={(val) => updateNotifPreferences({ newEpisodes: val })}
@@ -418,7 +449,7 @@ export default function SettingsScreen() {
 
               <SettingsSwitchRow
                 iconName="film-outline"
-                iconColor="#F59E0B"
+                iconColor={colors.textSecondary}
                 title="Nouveaux films ajoutés"
                 value={notifPreferences.newMovies}
                 onValueChange={(val) => updateNotifPreferences({ newMovies: val })}
@@ -426,7 +457,7 @@ export default function SettingsScreen() {
 
               <SettingsSwitchRow
                 iconName="sparkles-outline"
-                iconColor="#E50914"
+                iconColor={colors.textSecondary}
                 title="Nouvelles séries ajoutées"
                 value={notifPreferences.newSeries}
                 onValueChange={(val) => updateNotifPreferences({ newSeries: val })}
@@ -434,7 +465,7 @@ export default function SettingsScreen() {
 
               <SettingsSwitchRow
                 iconName="arrow-down-circle-outline"
-                iconColor="#10B981"
+                iconColor={colors.textSecondary}
                 title="Téléchargements terminés"
                 value={notifPreferences.downloadsCompleted}
                 onValueChange={(val) => updateNotifPreferences({ downloadsCompleted: val })}
@@ -442,7 +473,7 @@ export default function SettingsScreen() {
 
               <SettingsRow
                 iconName="paper-plane-outline"
-                iconColor="#00E5FF"
+                iconColor={colors.textSecondary}
                 title="Tester une notification"
                 showChevron={false}
                 isLast
@@ -452,11 +483,10 @@ export default function SettingsScreen() {
           ) : null}
         </SettingsSection>
 
-        {/* 6. APPLICATION */}
         <SettingsSection title="Application">
           <SettingsSwitchRow
             iconName="phone-portrait-outline"
-            iconColor="#D1D1E0"
+            iconColor={colors.textSecondary}
             title="Vibrations"
             value={preferences.hapticsEnabled}
             onValueChange={setHapticsEnabled}
@@ -464,7 +494,7 @@ export default function SettingsScreen() {
 
           <SettingsRow
             iconName="hardware-chip-outline"
-            iconColor="#D1D1E0"
+            iconColor={colors.textSecondary}
             title="Moteur"
             value="ExoPlayer"
             showChevron={false}
@@ -472,7 +502,7 @@ export default function SettingsScreen() {
 
           <SettingsRow
             iconName="information-circle-outline"
-            iconColor="#D1D1E0"
+            iconColor={colors.textSecondary}
             title="Version"
             value="1.0.0"
             showChevron={false}
@@ -480,9 +510,9 @@ export default function SettingsScreen() {
 
           <SettingsRow
             iconName="sparkles-outline"
-            iconColor="#E50914"
+            iconColor={colors.primary}
             title="Revoir la présentation FINORA"
-            subtitle="Relancer l'onboarding de bienvenue"
+            subtitle="Relancer la présentation de bienvenue"
             showChevron
             isLast
             onPress={() => {
@@ -505,7 +535,6 @@ export default function SettingsScreen() {
         </SettingsSection>
       </ScrollView>
 
-      {/* Modal Sélecteur Générique */}
       <SelectionPickerModal
         visible={activePicker === "audio"}
         title="Langue audio"
@@ -551,19 +580,16 @@ export default function SettingsScreen() {
         onClose={() => setActivePicker(null)}
       />
 
-      {/* Modal Ajout / Changement de Serveur */}
       <ServerConnectModal
         visible={showConnectModal}
         onClose={() => setShowConnectModal(false)}
       />
 
-      {/* Modal Diagnostics */}
       <ServerDiagnosticsModal
         visible={showDiagModal}
         onClose={() => setShowDiagModal(false)}
       />
 
-      {/* Modal Personnalisation Sous-titres */}
       <SubtitleStyleModal
         visible={showSubtitleStyleModal}
         onClose={() => setShowSubtitleStyleModal(false)}
@@ -576,7 +602,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: 110
+    paddingBottom: 120
   },
   headerContainer: {
     marginBottom: spacing.lg,
@@ -619,11 +645,12 @@ const styles = StyleSheet.create({
   },
   sessionUrl: {
     fontSize: 12,
-    color: "#6E6E82",
+    color: colors.textMuted,
     marginTop: 2
   },
   savedAccountsContainer: {
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     backgroundColor: "#161622",
     borderBottomWidth: 1,
     borderBottomColor: "#1E1E28"
@@ -631,19 +658,43 @@ const styles = StyleSheet.create({
   subCategoryHeader: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#8A8A9E",
+    color: colors.textSecondary,
     letterSpacing: 1,
-    marginBottom: spacing.sm
+    marginBottom: spacing.xs,
+    marginLeft: 4
   },
   accountItemRow: {
+    minHeight: 60,
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 8
+    alignItems: "center"
   },
   accountBorder: {
     borderTopWidth: 1,
     borderTopColor: "#20202E"
+  },
+  accountMainAction: {
+    flex: 1,
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingRight: 8
+  },
+  accountAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10
+  },
+  accountAvatarActive: {
+    backgroundColor: colors.primary
+  },
+  accountTextContainer: {
+    flex: 1,
+    marginRight: 8
   },
   accountName: {
     fontSize: 14,
@@ -655,7 +706,15 @@ const styles = StyleSheet.create({
   },
   accountUrl: {
     fontSize: 12,
-    color: "#8A8A9E",
+    color: colors.textSecondary,
     marginTop: 2
+  },
+  accountRemoveButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.04)"
   }
 });
