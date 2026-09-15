@@ -40,12 +40,10 @@ export default function LibraryScreen() {
   const currentUserId = session?.userId;
   const serverUrl = session?.serverUrl || "";
 
-  // Search state in library
   const [isSearchOpen, setIsSearchOpen] = useState(Boolean(params.q));
   const [searchQuery, setSearchQuery] = useState(params.q || "");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(params.q || "");
 
-  // Active library state
   const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(
     params.tab === "watchlist" ? WATCHLIST_ID : params.tab || null
   );
@@ -75,18 +73,14 @@ export default function LibraryScreen() {
     setSelectedGenre(null);
   }, [params.tab]);
 
-  // Sorting state
   const [currentSort, setCurrentSort] = useState<SortOption>(
     AVAILABLE_SORT_OPTIONS[0]
   );
   const [sortModalVisible, setSortModalVisible] = useState(false);
-
-  // Genre filter state
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
 
   const isWatchlist = selectedLibraryId === WATCHLIST_ID;
 
-  // Fetch libraries
   const {
     data: libraries = [],
     isLoading: isLibrariesLoading,
@@ -94,7 +88,6 @@ export default function LibraryScreen() {
     refetch: refetchLibraries
   } = useLibraries(currentUserId);
 
-  // Default to first library if none selected and not on watchlist
   const activeLibrary = useMemo(() => {
     if (isWatchlist) return undefined;
     if (selectedLibraryId) {
@@ -130,7 +123,6 @@ export default function LibraryScreen() {
     });
   }, [libraries]);
 
-  // Determine item types based on library collection type (prevents showing all episodes instead of series)
   const includeItemTypes = useMemo(() => {
     if (isCollectionTab) {
       return ["BoxSet"];
@@ -148,13 +140,11 @@ export default function LibraryScreen() {
     return ["Movie", "Series"];
   }, [activeLibrary, isCollectionTab]);
 
-  // Fetch genres for active library
   const { data: genres = [] } = useGenres(
     currentUserId,
     isWatchlist ? undefined : activeLibraryId
   );
 
-  // Fetch library items in pages so a large library is not downloaded in one request
   const {
     data: libraryItemsPages,
     isLoading: isItemsLoading,
@@ -181,7 +171,6 @@ export default function LibraryScreen() {
   );
   const libraryItemTotal = libraryItemsPages?.pages?.[0]?.total ?? libraryItems.length;
 
-  // Fetch watchlist items
   const {
     data: rawWatchlistItems = [],
     isLoading: isWatchlistLoading,
@@ -238,7 +227,7 @@ export default function LibraryScreen() {
   const handleLibrarySelect = useCallback((libraryId: string) => {
     hapticService.selection();
     setSelectedLibraryId(libraryId);
-    setSelectedGenre(null); // reset genre when switching library
+    setSelectedGenre(null);
   }, []);
 
   const toggleFavorite = useToggleFavorite(currentUserId || "");
@@ -296,14 +285,12 @@ export default function LibraryScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-      {/* Top Libraries Selector */}
       <View style={styles.tabsWrapper}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabsContainer}
         >
-          {/* Watchlist Tab */}
           <Pressable
             key="watchlist"
             style={[
@@ -312,7 +299,7 @@ export default function LibraryScreen() {
             ]}
             onPress={() => handleLibrarySelect(WATCHLIST_ID)}
             accessibilityRole="button"
-            accessibilityLabel="Select Watchlist"
+            accessibilityLabel="Sélectionner Ma liste"
             accessibilityState={{ selected: isWatchlist }}
           >
             <Ionicons
@@ -328,7 +315,7 @@ export default function LibraryScreen() {
                 isWatchlist && styles.libraryTabTextSelected
               ]}
             >
-              Watchlist
+              Ma liste
             </FinoraText>
           </Pressable>
 
@@ -343,7 +330,7 @@ export default function LibraryScreen() {
                 ]}
                 onPress={() => handleLibrarySelect(lib.id)}
                 accessibilityRole="button"
-                accessibilityLabel={`Select library ${lib.name}`}
+                accessibilityLabel={`Sélectionner la bibliothèque ${lib.name}`}
                 accessibilityState={{ selected: isSelected }}
               >
                 <FinoraText
@@ -359,7 +346,6 @@ export default function LibraryScreen() {
             );
           })}
 
-          {/* Dedicated Collections Tab if not present in server libraries views */}
           {!hasCollectionLib ? (
             <Pressable
               key="collections"
@@ -369,7 +355,7 @@ export default function LibraryScreen() {
               ]}
               onPress={() => handleLibrarySelect("collections")}
               accessibilityRole="button"
-              accessibilityLabel="Select Collections"
+              accessibilityLabel="Sélectionner Collections"
               accessibilityState={{ selected: isCollectionTab }}
             >
               <Ionicons
@@ -392,7 +378,6 @@ export default function LibraryScreen() {
         </ScrollView>
       </View>
 
-      {/* Action bar: Search trigger, Results count, & Sort trigger */}
       <View style={styles.actionBar}>
         <View style={styles.actionBarLeft}>
           <Pressable
@@ -406,16 +391,16 @@ export default function LibraryScreen() {
               setIsSearchOpen((prev) => !prev);
             }}
             accessibilityRole="button"
-            accessibilityLabel={isSearchOpen ? "Close search" : "Open search"}
+            accessibilityLabel={isSearchOpen ? "Fermer la recherche" : "Rechercher dans cette bibliothèque"}
           >
             <Ionicons
               name={isSearchOpen ? "close" : "search-outline"}
-              size={18}
+              size={19}
               color={isSearchOpen ? colors.primary : colors.textPrimary}
             />
           </Pressable>
 
-          <FinoraText variant="caption" style={styles.resultsCount}>
+          <FinoraText variant="caption" style={styles.resultsCount} numberOfLines={1}>
             {itemCount}{" "}
             {isWatchlist
               ? itemCount <= 1
@@ -428,7 +413,7 @@ export default function LibraryScreen() {
               : itemCount <= 1
               ? "titre"
               : "titres"}
-            {debouncedSearchQuery.trim() ? ` pour "${debouncedSearchQuery.trim()}"` : ""}
+            {debouncedSearchQuery.trim() ? ` pour « ${debouncedSearchQuery.trim()} »` : ""}
           </FinoraText>
         </View>
 
@@ -436,16 +421,15 @@ export default function LibraryScreen() {
           style={styles.sortButton}
           onPress={() => setSortModalVisible(true)}
           accessibilityRole="button"
-          accessibilityLabel="Open sort options"
+          accessibilityLabel="Ouvrir les options de tri"
         >
           <Ionicons name="swap-vertical" size={16} color={colors.textPrimary} />
-          <FinoraText variant="caption" style={styles.sortButtonText}>
+          <FinoraText variant="caption" style={styles.sortButtonText} numberOfLines={1}>
             {currentSort.label}
           </FinoraText>
         </Pressable>
       </View>
 
-      {/* Expandable Integrated Search Bar */}
       {isSearchOpen && (
         <View style={styles.searchBarWrapper}>
           <SearchBar
@@ -457,7 +441,7 @@ export default function LibraryScreen() {
             }}
             placeholder={
               isWatchlist
-                ? "Rechercher dans la Watchlist..."
+                ? "Rechercher dans Ma liste..."
                 : isCollectionTab
                 ? "Rechercher une collection..."
                 : `Rechercher dans ${activeLibrary?.name || "la bibliothèque"}...`
@@ -467,7 +451,6 @@ export default function LibraryScreen() {
         </View>
       )}
 
-      {/* Genre filter horizontal list */}
       {!isWatchlist && !isCollectionTab && (
         <LibraryFilterBar
           genres={genres}
@@ -476,7 +459,6 @@ export default function LibraryScreen() {
         />
       )}
 
-      {/* Network Failure State or 3-Column Virtualized Media Grid */}
       {items.length === 0 && (isAnyError || failureType !== null) ? (
         <NetworkFailureStateView
           failureType={failureType}
@@ -509,14 +491,14 @@ export default function LibraryScreen() {
           loadingMessage="Chargement de vos médias..."
           emptyTitle={
             isWatchlist
-              ? "Votre Watchlist est vide"
+              ? "Ma liste est vide"
               : isCollectionTab
               ? "Aucune collection trouvée"
               : "Aucun média trouvé"
           }
           emptyMessage={
             isWatchlist
-              ? "Ajoutez des films et séries depuis la page d'accueil ou la recherche pour les retrouver rapidement ici."
+              ? "Ajoutez des films et séries depuis l'accueil ou la recherche pour les retrouver rapidement ici."
               : isCollectionTab
               ? "Aucune saga ou collection n'a été trouvée sur votre serveur Jellyfin."
               : "Aucun film ou série ne correspond à vos filtres dans cette bibliothèque."
@@ -524,7 +506,6 @@ export default function LibraryScreen() {
         />
       )}
 
-      {/* Sort bottom sheet */}
       <SortOptionsModal
         visible={sortModalVisible}
         currentSort={currentSort}
@@ -561,11 +542,12 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   libraryTab: {
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 6,
+    justifyContent: "center",
     paddingHorizontal: 14,
-    borderRadius: 8
+    borderRadius: 12
   },
   tabIcon: {
     marginRight: 5
@@ -585,19 +567,20 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs
+    paddingVertical: spacing.xs,
+    gap: spacing.sm
   },
   actionBarLeft: {
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    flex: 1,
-    marginRight: spacing.sm
+    flex: 1
   },
   actionIconButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: "#161622",
     borderWidth: 1,
     borderColor: "#262638",
@@ -614,21 +597,26 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs
   },
   resultsCount: {
+    flex: 1,
+    minWidth: 0,
     color: colors.textSecondary
   },
   sortButton: {
+    minHeight: 44,
+    maxWidth: "42%",
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderRadius: 12,
     backgroundColor: "#161622",
     borderWidth: 1,
     borderColor: "#262638",
-    gap: 4
+    gap: 5
   },
   sortButtonText: {
     color: colors.textPrimary,
-    fontWeight: "600"
+    fontWeight: "600",
+    flexShrink: 1
   }
 });
