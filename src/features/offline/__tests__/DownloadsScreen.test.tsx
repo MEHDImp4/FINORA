@@ -1,5 +1,6 @@
 import React from "react";
 import ReactTestRenderer, { act } from "react-test-renderer";
+import { Alert } from "react-native";
 import {
   DownloadsScreen,
   formatBytes,
@@ -10,7 +11,6 @@ import { offlineStorageService } from "../offlineStorage";
 import { downloadManager } from "../downloadManager";
 import { OfflineMediaRecord } from "../types";
 
-// Mock router
 const mockPush = jest.fn();
 jest.mock("expo-router", () => ({
   useRouter: () => ({
@@ -19,7 +19,6 @@ jest.mock("expo-router", () => ({
   useFocusEffect: (cb: any) => cb()
 }));
 
-// Mock authStore
 jest.mock("../../../stores/authStore", () => ({
   useAuthStore: (selector: any) =>
     selector({
@@ -37,7 +36,7 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     type: "Movie",
     year: 1982,
     localPath: "finora_downloads/bladerunner.mp4",
-    fileSizeBytes: 1048576000, // ~1000 MB
+    fileSizeBytes: 1048576000,
     totalTicks: 7000000000,
     playbackPositionTicks: 0,
     savedAt: Date.now()
@@ -87,7 +86,7 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     });
 
     const playButton = tree.root.findByProps({
-      accessibilityLabel: "Play offline Blade Runner"
+      accessibilityLabel: "Lire hors-ligne Blade Runner"
     });
     expect(playButton).toBeTruthy();
 
@@ -98,7 +97,8 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     expect(mockOnPlay).toHaveBeenCalledWith(mockRecord);
   });
 
-  it("deletes a downloaded item upon button press", async () => {
+  it("asks for confirmation before deleting a downloaded item", async () => {
+    const alertSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});
     let tree: any;
 
     await act(async () => {
@@ -106,15 +106,25 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     });
 
     const deleteButton = tree.root.findByProps({
-      accessibilityLabel: "Delete Blade Runner"
+      accessibilityLabel: "Supprimer Blade Runner"
     });
     expect(deleteButton).toBeTruthy();
 
+    act(() => {
+      deleteButton.props.onPress();
+    });
+
+    expect(alertSpy).toHaveBeenCalled();
+    const buttons = alertSpy.mock.calls[0][2];
+    const confirmButton = buttons?.find((button: any) => button.style === "destructive");
+    expect(confirmButton).toBeDefined();
+
     await act(async () => {
-      await deleteButton.props.onPress();
+      await confirmButton?.onPress?.();
     });
 
     expect(offlineStorageService.deleteOfflineMedia).toHaveBeenCalledWith("movie-offline-1");
+    alertSpy.mockRestore();
   });
 
   it("automatically reloads catalog when a download completes", async () => {
@@ -133,21 +143,18 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
 
     const callCountBefore = getVerifiedSpy.mock.calls.length;
 
-    // Simulate download completing
     await act(async () => {
-      if (capturedListener) {
-        capturedListener([
-          {
-            itemId: "movie-new",
-            title: "New Movie",
-            type: "Movie",
-            status: "completed",
-            progress: 1.0,
-            bytesDownloaded: 500000,
-            totalBytes: 500000
-          }
-        ]);
-      }
+      capturedListener?.([
+        {
+          itemId: "movie-new",
+          title: "New Movie",
+          type: "Movie",
+          status: "completed",
+          progress: 1.0,
+          bytesDownloaded: 500000,
+          totalBytes: 500000
+        }
+      ]);
     });
 
     expect(getVerifiedSpy.mock.calls.length).toBeGreaterThan(callCountBefore);
@@ -199,44 +206,33 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
       tree = ReactTestRenderer.create(<DownloadsScreen onPlayItem={mockOnPlay} />);
     });
 
-    // Should find single series card for Breaking Bad with 2 episodes
     const seriesCard = tree.root.findByProps({
-      accessibilityLabel: "Browse series Breaking Bad, 2 episodes"
+      accessibilityLabel: "Parcourir Breaking Bad, 2 épisodes téléchargés"
     });
     expect(seriesCard).toBeTruthy();
 
-    // Click on the series card to open DownloadedSeriesView
     await act(async () => {
       seriesCard.props.onPress();
     });
 
-    // Should now display the series view
-    const seriesView = tree.root.findByProps({ testID: "downloaded-series-view" });
-    expect(seriesView).toBeTruthy();
+    expect(tree.root.findByProps({ testID: "downloaded-series-view" })).toBeTruthy();
+    expect(tree.root.findByProps({ testID: "series-episode-item-ep-1" })).toBeTruthy();
+    expect(tree.root.findByProps({ testID: "series-episode-item-ep-2" })).toBeTruthy();
 
-    // Should list both episodes
-    const ep1Item = tree.root.findByProps({ testID: "series-episode-item-ep-1" });
-    const ep2Item = tree.root.findByProps({ testID: "series-episode-item-ep-2" });
-    expect(ep1Item).toBeTruthy();
-    expect(ep2Item).toBeTruthy();
-
-    // Click play on episode 1
     const ep1PlayBtn = tree.root.findByProps({ accessibilityLabel: "Play offline Breaking Bad - Pilot" });
     act(() => {
       ep1PlayBtn.props.onPress();
     });
     expect(mockOnPlay).toHaveBeenCalledWith(expect.objectContaining({ itemId: "ep-1" }));
 
-    // Back button returns to main catalog
     const backBtn = tree.root.findByProps({ accessibilityLabel: "Retour aux téléchargements" });
     await act(async () => {
       backBtn.props.onPress();
     });
 
-    const seriesCardAgain = tree.root.findByProps({
-      accessibilityLabel: "Browse series Breaking Bad, 2 episodes"
-    });
-    expect(seriesCardAgain).toBeTruthy();
+    expect(tree.root.findByProps({
+      accessibilityLabel: "Parcourir Breaking Bad, 2 épisodes téléchargés"
+    })).toBeTruthy();
   });
 
   it("renders active downloads with poster and series info", async () => {
@@ -270,10 +266,7 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
       tree = ReactTestRenderer.create(<DownloadsScreen />);
     });
 
-    const activeCard = tree.root.findByProps({
-      testID: "download-progress-card-active-ep-1"
-    });
-    expect(activeCard).toBeTruthy();
+    expect(tree.root.findByProps({ testID: "download-progress-card-active-ep-1" })).toBeTruthy();
   });
 
   it("shows an estimated size and percentage for a transcoded download without Content-Length", async () => {
@@ -286,7 +279,6 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
       status: "downloading" as const,
       progress: 0.42,
       bytesDownloaded: 580000000,
-      // Jellyfin sends no Content-Length for transcodes
       totalBytes: 0,
       expectedBytes: 1400000000,
       isEstimatedTotal: true,
@@ -304,7 +296,6 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
       tree = ReactTestRenderer.create(<DownloadsScreen />);
     });
 
-    // Collect rendered text without JSON.stringify (React fibers are circular).
     const collectText = (node: any, out: string[] = []): string[] => {
       if (node == null) return out;
       if (typeof node === "string" || typeof node === "number") {
@@ -320,8 +311,6 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     };
     const rendered = collectText(tree.toJSON()).join(" • ");
 
-    // The duration-based estimate stands in for the missing Content-Length,
-    // marked with "~" so it is never mistaken for an exact figure.
     expect(rendered).toContain("553 MB / ~1.3 GB");
     expect(rendered).toContain("~42%");
   });
