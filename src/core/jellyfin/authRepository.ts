@@ -151,10 +151,21 @@ export class AuthRepository {
         return null;
       }
 
+      // Re-evaluate legacy saved sessions before placing the token on the wire.
+      // A session saved by an older FINORA version may point at a public HTTP URL.
+      let targetUrl: string;
+      try {
+        targetUrl = normalizeServerUrlForCredentials(descriptor.serverUrl).url;
+      } catch {
+        await this.prefStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+        this.client.setAuthToken(null);
+        return null;
+      }
+
       if (typeof this.client.initialize === "function") {
-        await this.client.initialize(descriptor.serverUrl);
+        await this.client.initialize(targetUrl);
       } else {
-        this.client.setServerUrl(descriptor.serverUrl);
+        this.client.setServerUrl(targetUrl);
       }
       this.client.setAuthToken(token);
       const clientHttp = httpClient || this.client.getHttpClient();
@@ -176,7 +187,7 @@ export class AuthRepository {
         userId: descriptor.userId,
         userName: descriptor.userName,
         serverId: descriptor.serverId,
-        serverUrl: descriptor.serverUrl
+        serverUrl: targetUrl
       };
     } catch (error) {
       return null;
