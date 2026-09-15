@@ -1,5 +1,7 @@
+import { Alert } from "react-native";
 import { HttpClient } from "../network/httpClient";
 import { jellyfinClient, JellyfinClient } from "./jellyfinClient";
+import { normalizeServerUrlForCredentials } from "./serverDiscovery";
 import {
   ISecureTokenStorage,
   IUserPreferencesStorage,
@@ -36,25 +38,71 @@ export interface ActiveSessionDescriptor {
   lastActiveAt: number;
 }
 
+export type InsecureHttpConfirmer = (serverUrl: string) => Promise<boolean>;
+
 export const ACTIVE_SESSION_STORAGE_KEY = "finora_active_session";
 
 export function getAuthTokenStorageKey(serverId: string, userId: string): string {
   return `finora_auth_token_${serverId}_${userId}`;
 }
 
+/**
+ * Native user-consent gate for LAN-only Jellyfin installations.
+ * Public HTTP is rejected earlier by the transport policy; this prompt only
+ * applies to private/local hosts that intentionally use cleartext HTTP.
+ */
+export function confirmLocalHttpConnection(serverUrl: string): Promise<boolean> {
+  if (!Alert || typeof Alert.alert !== "function") {
+    return Promise.resolve(false);
+  }
+
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    Alert.alert(
+      "Connexion HTTP non chiffrée",
+      `Le serveur ${serverUrl} utilise HTTP sur votre réseau local. Votre mot de passe, votre token Jellyfin et le trafic peuvent être visibles par d'autres appareils présents sur ce réseau. Continuez uniquement si vous faites confiance à ce réseau.`,
+      [
+        {
+          text: "Annuler",
+          style: "cancel",
+          onPress: () => finish(false)
+        },
+        {
+          text: "Continuer",
+          style: "destructive",
+          onPress: () => finish(true)
+        }
+      ],
+      {
+        cancelable: true,
+        onDismiss: () => finish(false)
+      }
+    );
+  });
+}
+
 export class AuthRepository {
   private client: JellyfinClient;
   private secureStorage: ISecureTokenStorage;
   private prefStorage: IUserPreferencesStorage;
+  private confirmInsecureHttp: InsecureHttpConfirmer;
 
   constructor(
     client: JellyfinClient = jellyfinClient,
     secureStorage: ISecureTokenStorage = secureTokenStorage,
-    prefStorage: IUserPreferencesStorage = userPreferencesStorage
+    prefStorage: IUserPreferencesStorage = userPreferencesStorage,
+    confirmInsecureHttp: InsecureHttpConfirmer = confirmLocalHttpConnection
   ) {
     this.client = client;
     this.secureStorage = secureStorage;
     this.prefStorage = prefStorage;
+    this.confirmInsecureHttp = confirmInsecureHttp;
   }
 
   public async authenticate(
@@ -62,7 +110,22 @@ export class AuthRepository {
     serverUrl: string,
     httpClient?: HttpClient
   ): Promise<AuthSession> {
-    const targetUrl = serverUrl.replace(/\/+$/, "");
+    // Central security boundary: no UI path can bypass URL normalization or send
+    // credentials over cleartext HTTP to a public Internet host.
+    const normalized = normalizeServerUrlForCredentials(serverUrl);
+    const targetUrl = normalized.url;
+
+    // Local/private HTTP is supported for LAN-only Jellyfin deployments, but it
+    // must be an explicit user decision before any password or token is sent.
+    if (normalized.hasWarning) {
+      const approved = await this.confirmInsecureHttp(targetUrl);
+      if (!approved) {
+        throw new AuthenticationError(
+          "Connexion HTTP non chiffrée annulée. Utilisez HTTPS ou confirmez explicitement la connexion locale."
+        );
+      }
+    }
+
     await this.client.initialize(targetUrl);
     this.client.setAuthToken(null);
     const clientHttp = httpClient || this.client.getHttpClient();
@@ -148,10 +211,21 @@ export class AuthRepository {
         return null;
       }
 
+      // Re-evaluate legacy saved sessions before placing the token on the wire.
+      // A session saved by an older FINORA version may point at a public HTTP URL.
+      let targetUrl: string;
+      try {
+        targetUrl = normalizeServerUrlForCredentials(descriptor.serverUrl).url;
+      } catch {
+        await this.prefStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+        this.client.setAuthToken(null);
+        return null;
+      }
+
       if (typeof this.client.initialize === "function") {
-        await this.client.initialize(descriptor.serverUrl);
+        await this.client.initialize(targetUrl);
       } else {
-        this.client.setServerUrl(descriptor.serverUrl);
+        this.client.setServerUrl(targetUrl);
       }
       this.client.setAuthToken(token);
       const clientHttp = httpClient || this.client.getHttpClient();
@@ -173,7 +247,7 @@ export class AuthRepository {
         userId: descriptor.userId,
         userName: descriptor.userName,
         serverId: descriptor.serverId,
-        serverUrl: descriptor.serverUrl
+        serverUrl: targetUrl
       };
     } catch (error) {
       return null;

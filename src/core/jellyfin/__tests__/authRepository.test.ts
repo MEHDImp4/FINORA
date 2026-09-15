@@ -17,6 +17,7 @@ describe("AuthRepository", () => {
   let mockSecureStorage: jest.Mocked<ISecureTokenStorage>;
   let mockPrefStorage: jest.Mocked<IUserPreferencesStorage>;
   let mockHttpClient: jest.Mocked<HttpClient>;
+  let confirmInsecureHttp: jest.Mock<Promise<boolean>, [string]>;
 
   beforeEach(() => {
     mockHttpClient = new HttpClient() as jest.Mocked<HttpClient>;
@@ -42,7 +43,13 @@ describe("AuthRepository", () => {
       clear: jest.fn()
     };
 
-    repository = new AuthRepository(mockClient, mockSecureStorage, mockPrefStorage);
+    confirmInsecureHttp = jest.fn().mockResolvedValue(true);
+    repository = new AuthRepository(
+      mockClient,
+      mockSecureStorage,
+      mockPrefStorage,
+      confirmInsecureHttp
+    );
   });
 
   describe("authenticate", () => {
@@ -67,15 +74,14 @@ describe("AuthRepository", () => {
       expect(session.userName).toBe("FinoraUser");
       expect(session.serverId).toBe("server-001");
       expect((session as any).password).toBeUndefined();
+      expect(confirmInsecureHttp).not.toHaveBeenCalled();
 
-      // Secure storage received token
       const expectedTokenKey = getAuthTokenStorageKey("server-001", "user-456");
       expect(mockSecureStorage.setToken).toHaveBeenCalledWith(
         expectedTokenKey,
         "test-access-token-123"
       );
 
-      // Preferences storage received metadata descriptor only (no token or password)
       expect(mockPrefStorage.setItem).toHaveBeenCalledWith(
         ACTIVE_SESSION_STORAGE_KEY,
         expect.objectContaining({
@@ -86,6 +92,59 @@ describe("AuthRepository", () => {
         })
       );
       expect(mockClient.setAuthToken).toHaveBeenCalledWith("test-access-token-123");
+    });
+
+    it("allows private/local HTTP only after explicit confirmation", async () => {
+      mockHttpClient.request.mockResolvedValue({
+        AccessToken: "lan-token",
+        ServerId: "server-lan",
+        User: { Id: "user-lan", Name: "LanUser" }
+      });
+
+      const session = await repository.authenticate(
+        { username: "LanUser", password: "LocalPassword" },
+        "http://192.168.1.50:8096/web/index.html",
+        mockHttpClient
+      );
+
+      expect(confirmInsecureHttp).toHaveBeenCalledWith("http://192.168.1.50:8096");
+      expect(session.serverUrl).toBe("http://192.168.1.50:8096");
+      expect(mockHttpClient.request).toHaveBeenCalledWith(
+        "http://192.168.1.50:8096/Users/AuthenticateByName",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    it("does not send local HTTP credentials when the user declines the warning", async () => {
+      confirmInsecureHttp.mockResolvedValue(false);
+
+      await expect(
+        repository.authenticate(
+          { username: "LanUser", password: "LocalPassword" },
+          "http://192.168.1.50:8096",
+          mockHttpClient
+        )
+      ).rejects.toThrow(AuthenticationError);
+
+      expect(confirmInsecureHttp).toHaveBeenCalledWith("http://192.168.1.50:8096");
+      expect(mockClient.initialize).not.toHaveBeenCalled();
+      expect(mockHttpClient.request).not.toHaveBeenCalled();
+      expect(mockSecureStorage.setToken).not.toHaveBeenCalled();
+    });
+
+    it("rejects public HTTP before confirmation, initialization or credential transmission", async () => {
+      await expect(
+        repository.authenticate(
+          { username: "FinoraUser", password: "SecretPassword" },
+          "http://jellyfin.example.com:8096",
+          mockHttpClient
+        )
+      ).rejects.toThrow("Unencrypted HTTP is only allowed for local/private Jellyfin servers");
+
+      expect(confirmInsecureHttp).not.toHaveBeenCalled();
+      expect(mockClient.initialize).not.toHaveBeenCalled();
+      expect(mockHttpClient.request).not.toHaveBeenCalled();
+      expect(mockSecureStorage.setToken).not.toHaveBeenCalled();
     });
 
     it("throws AuthenticationError on failure and does not store token", async () => {
@@ -113,7 +172,6 @@ describe("AuthRepository", () => {
         lastActiveAt: 123456
       });
 
-      const expectedTokenKey = getAuthTokenStorageKey("server-001", "user-456");
       mockSecureStorage.getToken.mockResolvedValue("stored-token-abc");
       mockHttpClient.request.mockResolvedValue({ ServerName: "Jellyfin" });
 

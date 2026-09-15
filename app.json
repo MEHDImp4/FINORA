@@ -29,10 +29,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/finora-icon-f.png",
         "backgroundColor": "#0A0A0C"
-      },
-      "permissions": [
-        "android.permission.WRITE_SETTINGS"
-      ]
+      }
     },
     "plugins": [
       "expo-router",

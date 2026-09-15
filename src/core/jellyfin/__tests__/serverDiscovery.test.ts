@@ -1,4 +1,9 @@
-import { normalizeServerUrl, validateAndDiscoverServer } from "../serverDiscovery";
+import {
+  isLocalNetworkHost,
+  normalizeServerUrl,
+  normalizeServerUrlForCredentials,
+  validateAndDiscoverServer
+} from "../serverDiscovery";
 import { HttpClient } from "../../network/httpClient";
 import { FinoraError } from "../../errors";
 
@@ -38,6 +43,33 @@ describe("serverDiscovery", () => {
     });
   });
 
+  describe("credential transport policy", () => {
+    it("allows private LAN, loopback, local DNS and Tailscale/CGNAT hosts", () => {
+      expect(isLocalNetworkHost("192.168.1.50")).toBe(true);
+      expect(isLocalNetworkHost("10.0.0.5")).toBe(true);
+      expect(isLocalNetworkHost("172.20.1.2")).toBe(true);
+      expect(isLocalNetworkHost("127.0.0.1")).toBe(true);
+      expect(isLocalNetworkHost("localhost")).toBe(true);
+      expect(isLocalNetworkHost("jellyfin.local")).toBe(true);
+      expect(isLocalNetworkHost("jellyfin")).toBe(true);
+      expect(isLocalNetworkHost("100.100.20.30")).toBe(true);
+      expect(isLocalNetworkHost("::1")).toBe(true);
+      expect(isLocalNetworkHost("fd7a:115c:a1e0::1")).toBe(true);
+    });
+
+    it("rejects public hosts over cleartext HTTP before credentials are sent", () => {
+      expect(() =>
+        normalizeServerUrlForCredentials("http://jellyfin.example.com:8096")
+      ).toThrow("Unencrypted HTTP is only allowed for local/private Jellyfin servers");
+    });
+
+    it("allows HTTPS for public hosts", () => {
+      const result = normalizeServerUrlForCredentials("https://jellyfin.example.com");
+      expect(result.url).toBe("https://jellyfin.example.com");
+      expect(result.isHttps).toBe(true);
+    });
+  });
+
   describe("validateAndDiscoverServer", () => {
     let mockHttpClient: jest.Mocked<HttpClient>;
 
@@ -61,6 +93,27 @@ describe("serverDiscovery", () => {
       expect(discovery.version).toBe("10.9.11");
       expect(discovery.isHttps).toBe(true);
       expect(discovery.hasWarning).toBe(false);
+    });
+
+    it("keeps local HTTP available but returns an explicit warning", async () => {
+      mockHttpClient.request.mockResolvedValue({
+        Id: "server-local",
+        ServerName: "LAN Jellyfin",
+        Version: "10.10.0"
+      });
+
+      const discovery = await validateAndDiscoverServer("http://192.168.1.20:8096", mockHttpClient);
+
+      expect(discovery.isHttps).toBe(false);
+      expect(discovery.hasWarning).toBe(true);
+      expect(discovery.warningMessage).toContain("not encrypted");
+    });
+
+    it("does not contact a public HTTP server", async () => {
+      await expect(
+        validateAndDiscoverServer("http://jellyfin.example.com:8096", mockHttpClient)
+      ).rejects.toThrow("Unencrypted HTTP is only allowed");
+      expect(mockHttpClient.request).not.toHaveBeenCalled();
     });
 
     it("throws FinoraError if server response lacks Id or ServerName", async () => {

@@ -35,7 +35,9 @@ describe("PlaybackPlanner", () => {
     });
 
     expect(plan.mode).toBe("direct-play");
-    expect(plan.url).toBe("https://demo.jellyfin.org/Videos/item-123/stream?static=true&api_key=secure-token-abc-999");
+    expect(plan.url).toBe("https://demo.jellyfin.org/Videos/item-123/stream?static=true");
+    expect(plan.url).not.toContain(token);
+    expect(plan.url).not.toContain("api_key=");
     expect(plan.videoCodec).toBe("h264");
     expect(plan.audioCodec).toBe("aac");
   });
@@ -60,8 +62,10 @@ describe("PlaybackPlanner", () => {
 
     expect(plan.mode).toBe("direct-stream");
     expect(plan.url).toBe(
-      "https://demo.jellyfin.org/Videos/item-123/stream?videoCodec=copy&audioCodec=copy&api_key=secure-token-abc-999"
+      "https://demo.jellyfin.org/Videos/item-123/stream?videoCodec=copy&audioCodec=copy"
     );
+    expect(plan.url).not.toContain(token);
+    expect(plan.url).not.toContain("api_key=");
     expect(plan.reason).toContain("unsupported; remuxing codecs directly");
   });
 
@@ -124,6 +128,8 @@ describe("PlaybackPlanner", () => {
 
     expect(plan.mode).toBe("transcode");
     expect(plan.url).toContain("master.m3u8?videoCodec=h264&audioCodec=aac");
+    expect(plan.url).not.toContain(token);
+    expect(plan.url).not.toContain("api_key=");
     expect(plan.reason).toContain("video codec 'vc1'");
   });
 
@@ -145,6 +151,7 @@ describe("PlaybackPlanner", () => {
 
     expect(plan.mode).toBe("transcode");
     expect(plan.url).toContain("master.m3u8");
+    expect(plan.url).not.toContain(token);
     expect(plan.reason).toContain("audio codec 'dts-hd'");
   });
 
@@ -180,6 +187,7 @@ describe("PlaybackPlanner", () => {
     expect(plan.mode).toBe("direct-stream");
     expect(plan.url).toContain("AudioStreamIndex=2");
     expect(plan.url).toContain("videoCodec=copy&audioCodec=copy");
+    expect(plan.url).not.toContain(token);
     expect(plan.audioCodec).toBe("copy");
   });
 
@@ -204,10 +212,39 @@ describe("PlaybackPlanner", () => {
     expect(plan.mode).toBe("direct-stream");
     expect(plan.url).toContain("AudioStreamIndex=2");
     expect(plan.url).toContain("videoCodec=copy&audioCodec=aac&audioChannels=2");
+    expect(plan.url).not.toContain(token);
     expect(plan.audioCodec).toBe("aac");
   });
 
-  it("sanitizes token and api_key from URLs", () => {
+  it("does not embed authentication tokens in generated network playback URLs", () => {
+    const directItem: MediaItem = {
+      ...baseItem,
+      mediaStreams: [
+        { type: "Video", codec: "h264", width: 1920, height: 1080 },
+        { type: "Audio", codec: "aac", channels: 2 }
+      ]
+    };
+    const transcodeItem: MediaItem = {
+      ...baseItem,
+      mediaStreams: [
+        { type: "Video", codec: "vc1", width: 1920, height: 1080 },
+        { type: "Audio", codec: "aac", channels: 2 }
+      ]
+    };
+
+    const plans = [
+      createPlaybackPlan({ item: directItem, serverUrl, token, container: "mp4" }),
+      createPlaybackPlan({ item: transcodeItem, serverUrl, token, container: "mp4" }),
+      createPlaybackPlan({ item: directItem, serverUrl, token, container: "mp4", quality: "720p" })
+    ];
+
+    for (const plan of plans) {
+      expect(plan.url).not.toContain(token);
+      expect(plan.url).not.toMatch(/[?&](?:api_key|token)=/i);
+    }
+  });
+
+  it("sanitizes token and api_key from legacy URLs", () => {
     const rawUrl = "https://demo.jellyfin.org/Videos/123/stream?static=true&api_key=super_secret_token";
     const sanitized = getSanitizedPlaybackUrl(rawUrl);
 
@@ -240,6 +277,7 @@ describe("PlaybackPlanner", () => {
       expect(plan.bitrate).toBe(4000000);
       expect(plan.url).toContain("maxWidth=1280&maxHeight=720&videoBitRate=4000000&maxVideoBitRate=4000000");
       expect(plan.url).toContain("videoCodec=h264");
+      expect(plan.url).not.toContain(token);
       expect(plan.reason).toContain("Transcoding to requested quality: 720p HD - 4 Mbps");
     });
 
@@ -258,6 +296,7 @@ describe("PlaybackPlanner", () => {
       expect(plan.maxHeight).toBe(480);
       expect(plan.bitrate).toBe(1500000);
       expect(plan.url).toContain("maxWidth=854&maxHeight=480&videoBitRate=1500000&maxVideoBitRate=1500000");
+      expect(plan.url).not.toContain(token);
     });
 
     it("injects 1080p quality constraints for 4K media", () => {
@@ -284,6 +323,7 @@ describe("PlaybackPlanner", () => {
       expect(plan.bitrate).toBe(10000000);
       expect(plan.url).toContain("maxWidth=1920&maxHeight=1080&videoBitRate=10000000");
       expect(plan.url).toContain("videoCodec=h264");
+      expect(plan.url).not.toContain(token);
     });
 
     it("direct plays when quality is 'original' on supported media", () => {
@@ -298,6 +338,7 @@ describe("PlaybackPlanner", () => {
       expect(plan.mode).toBe("direct-play");
       expect(plan.quality).toBe("original");
       expect(plan.url).not.toContain("videoBitRate=");
+      expect(plan.url).not.toContain(token);
     });
 
     it("always uses direct play for offline local files regardless of quality setting", () => {

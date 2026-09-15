@@ -1,8 +1,7 @@
 import {
   DOWNLOAD_QUALITIES,
   buildDownloadUrl,
-  estimateTranscodedBytes,
-  DownloadQuality
+  estimateTranscodedBytes
 } from "../downloadQuality";
 
 describe("Download Quality & Transcoding URL Builder", () => {
@@ -10,20 +9,23 @@ describe("Download Quality & Transcoding URL Builder", () => {
   const itemId = "movie-123";
   const token = "secret-token-xyz";
 
-  it("builds raw download URL for original quality without transcoding", () => {
+  it("builds raw download URL for original quality without credentials", () => {
     const url = buildDownloadUrl(serverUrl, itemId, token, "original");
-    expect(url).toBe("https://jellyfin.example.com/Items/movie-123/Download?api_key=secret-token-xyz");
+    expect(url).toBe("https://jellyfin.example.com/Items/movie-123/Download");
     expect(url).not.toContain("stream.mp4");
+    expect(url).not.toContain(token);
+    expect(url).not.toContain("api_key=");
   });
 
-  it("builds progressive MP4 transcode URL for 720p HD", () => {
+  it("builds progressive MP4 transcode URL for 720p HD without credentials", () => {
     const url = buildDownloadUrl(serverUrl, itemId, token, "720p");
     expect(url).toContain("/Videos/movie-123/stream.mp4?");
     expect(url).toContain("videoCodec=h264");
     expect(url).toContain("audioCodec=aac");
     expect(url).toContain("maxHeight=720");
     expect(url).toContain("videoBitRate=3500000");
-    expect(url).toContain("api_key=secret-token-xyz");
+    expect(url).not.toContain(token);
+    expect(url).not.toContain("api_key=");
   });
 
   it("builds progressive MP4 transcode URL for 1080p Full HD", () => {
@@ -31,6 +33,7 @@ describe("Download Quality & Transcoding URL Builder", () => {
     expect(url).toContain("/Videos/movie-123/stream.mp4?");
     expect(url).toContain("maxHeight=1080");
     expect(url).toContain("videoBitRate=7500000");
+    expect(url).not.toContain(token);
   });
 
   it("builds progressive MP4 transcode URL for 480p SD", () => {
@@ -38,6 +41,7 @@ describe("Download Quality & Transcoding URL Builder", () => {
     expect(url).toContain("/Videos/movie-123/stream.mp4?");
     expect(url).toContain("maxHeight=480");
     expect(url).toContain("videoBitRate=1500000");
+    expect(url).not.toContain(token);
   });
 
   it("contains 4 quality profiles with original recommended", () => {
@@ -48,7 +52,8 @@ describe("Download Quality & Transcoding URL Builder", () => {
 
   it("defaults to original quality when no quality is specified", () => {
     const url = buildDownloadUrl(serverUrl, itemId, token);
-    expect(url).toBe("https://jellyfin.example.com/Items/movie-123/Download?api_key=secret-token-xyz");
+    expect(url).toBe("https://jellyfin.example.com/Items/movie-123/Download");
+    expect(url).not.toContain(token);
   });
 
   it("builds correct authentication headers for Jellyfin downloads", () => {

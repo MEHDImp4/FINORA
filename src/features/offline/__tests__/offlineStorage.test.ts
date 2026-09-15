@@ -1,13 +1,19 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { OfflineStorageService } from "../offlineStorage";
+import {
+  OfflineStorageService,
+  getScopedOfflineCatalogKey,
+  getScopedOfflineSyncQueueKey
+} from "../offlineStorage";
 import { OfflineMediaRecord } from "../types";
+
+const TEST_SCOPE = { serverId: "server-test", userId: "user-test" };
 
 describe("OfflineStorageService", () => {
   let service: OfflineStorageService;
 
   beforeEach(async () => {
     await AsyncStorage.clear();
-    service = new OfflineStorageService();
+    service = new OfflineStorageService(TEST_SCOPE);
   });
 
   it("saves and retrieves offline media records", async () => {
@@ -32,6 +38,55 @@ describe("OfflineStorageService", () => {
     const all = await service.getAllOfflineMedia();
     expect(all).toHaveLength(1);
     expect(all[0].title).toBe("Spider-Man: Across the Spider-Verse");
+    expect(await AsyncStorage.getItem(getScopedOfflineCatalogKey(TEST_SCOPE))).not.toBeNull();
+    expect(await AsyncStorage.getItem("@finora_offline_catalog")).toBeNull();
+  });
+
+  it("strictly isolates catalog and sync queue by server and user", async () => {
+    const scopeA = { serverId: "server-a", userId: "user-a" };
+    const scopeB = { serverId: "server-b", userId: "user-b" };
+    const serviceA = new OfflineStorageService(scopeA);
+    const serviceB = new OfflineStorageService(scopeB);
+
+    const baseRecord: OfflineMediaRecord = {
+      itemId: "same-item-id",
+      title: "Account A Movie",
+      type: "Movie",
+      localPath: "file:///a/movie.mp4",
+      fileSizeBytes: 100,
+      totalTicks: 1000,
+      playbackPositionTicks: 0,
+      savedAt: Date.now()
+    };
+
+    await serviceA.saveOfflineMedia(baseRecord);
+    await serviceB.saveOfflineMedia({
+      ...baseRecord,
+      title: "Account B Movie",
+      localPath: "file:///b/movie.mp4"
+    });
+
+    expect((await serviceA.getAllOfflineMedia()).map((item) => item.title)).toEqual([
+      "Account A Movie"
+    ]);
+    expect((await serviceB.getAllOfflineMedia()).map((item) => item.title)).toEqual([
+      "Account B Movie"
+    ]);
+
+    await serviceA.enqueueProgressSync("same-item-id", 100, false);
+    await serviceB.enqueueProgressSync("same-item-id", 900, true);
+
+    expect((await serviceA.getPendingSyncEntries())[0].positionTicks).toBe(100);
+    expect((await serviceB.getPendingSyncEntries())[0].positionTicks).toBe(900);
+    expect(await AsyncStorage.getItem(getScopedOfflineSyncQueueKey(scopeA))).not.toEqual(
+      await AsyncStorage.getItem(getScopedOfflineSyncQueueKey(scopeB))
+    );
+
+    await serviceA.clearAll();
+    expect(await serviceA.getAllOfflineMedia()).toEqual([]);
+    expect(await serviceA.getPendingSyncEntries()).toEqual([]);
+    expect(await serviceB.getAllOfflineMedia()).toHaveLength(1);
+    expect(await serviceB.getPendingSyncEntries()).toHaveLength(1);
   });
 
   it("updates local playback position for an offline item", async () => {
@@ -74,8 +129,8 @@ describe("OfflineStorageService", () => {
   });
 
   it("enqueues progress sync and clears synced entries", async () => {
-    const entry1 = await service.enqueueProgressSync("item-sync-1", 500000, false);
-    const entry2 = await service.enqueueProgressSync("item-sync-2", 1000000, true);
+    await service.enqueueProgressSync("item-sync-1", 500000, false);
+    await service.enqueueProgressSync("item-sync-2", 1000000, true);
 
     let pending = await service.getPendingSyncEntries();
     expect(pending).toHaveLength(2);
@@ -87,7 +142,6 @@ describe("OfflineStorageService", () => {
     const item1 = pending.find((e) => e.itemId === "item-sync-1");
     expect(item1?.positionTicks).toBe(750000);
 
-    // Clear entry1
     await service.clearSyncEntries([item1!.id]);
     pending = await service.getPendingSyncEntries();
     expect(pending).toHaveLength(1);
@@ -108,13 +162,11 @@ describe("OfflineStorageService", () => {
 
     await service.saveOfflineMedia(record);
 
-    // Explicit mark as watched
     await service.markAsWatched("movie-watch-1");
     let updated = await service.getOfflineMedia("movie-watch-1");
     expect(updated?.isPlayed).toBe(true);
     expect(updated?.completedWatchedAt).toBeDefined();
 
-    // Auto mark when position is >= 90%
     const record2: OfflineMediaRecord = {
       itemId: "movie-watch-2",
       title: "Dune Part Two",
@@ -195,7 +247,6 @@ describe("OfflineStorageService", () => {
 
   it("verifies physical files and detects orphans", async () => {
     const FileSystem = require("expo-file-system/legacy");
-    // Mock getInfoAsync to return exists=false for missing item
     (FileSystem.getInfoAsync as jest.Mock).mockImplementation(async (path: string) => {
       if (path.includes("missing")) {
         return { exists: false, isDirectory: false };
@@ -219,7 +270,7 @@ describe("OfflineStorageService", () => {
       title: "Phantom File",
       type: "Movie",
       localPath: "file:///mock-documents/finora_downloads/missing.mp4",
-      fileSizeBytes: 7500000000, // 7.5 GB fake size!
+      fileSizeBytes: 7500000000,
       totalTicks: 1000,
       playbackPositionTicks: 0,
       savedAt: Date.now()
@@ -230,7 +281,7 @@ describe("OfflineStorageService", () => {
 
     const verified = await service.getVerifiedOfflineMedia();
     expect(verified.hasOrphans).toBe(true);
-    expect(verified.totalPhysicalBytes).toBe(450000000); // Only counts the real file!
+    expect(verified.totalPhysicalBytes).toBe(450000000);
 
     const orphanCount = await service.cleanupOrphanMedia();
     expect(orphanCount).toBe(1);
@@ -240,7 +291,7 @@ describe("OfflineStorageService", () => {
     expect(afterCleanup[0].itemId).toBe("real-1");
   });
 
-  it("cleans up unregistered/orphaned disk files that are not in the catalog", async () => {
+  it("cleans up unregistered disk files without deleting another account's media", async () => {
     const FileSystem = require("expo-file-system/legacy");
     (FileSystem.getInfoAsync as jest.Mock).mockResolvedValueOnce({ exists: true, isDirectory: true });
     (FileSystem.readDirectoryAsync as jest.Mock).mockResolvedValueOnce([

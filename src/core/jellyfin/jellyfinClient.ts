@@ -1,6 +1,7 @@
 import { HttpClient } from "../network/httpClient";
 import { formatAuthorizationHeader, getOrCreateDeviceId } from "./clientInfo";
 import { ISecureTokenStorage, secureTokenStorage } from "../security/storage";
+import { normalizeServerUrlForCredentials } from "./serverDiscovery";
 
 export class JellyfinClient {
   private httpClient: HttpClient;
@@ -25,7 +26,10 @@ export class JellyfinClient {
   }
 
   public setServerUrl(url: string): void {
-    this.serverUrl = url.replace(/\/+$/, "");
+    // Last-line network boundary: every repository shares this client, so reject
+    // a public cleartext target even when a saved legacy session or future call
+    // path bypasses onboarding/server discovery.
+    this.serverUrl = normalizeServerUrlForCredentials(url).url;
     this.httpClient.setBaseUrl(this.serverUrl);
   }
 

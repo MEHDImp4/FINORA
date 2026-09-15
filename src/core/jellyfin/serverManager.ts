@@ -6,6 +6,7 @@ import {
 } from "../security/storage";
 import { jellyfinClient, JellyfinClient } from "./jellyfinClient";
 import { getAuthTokenStorageKey, AuthSession, ACTIVE_SESSION_STORAGE_KEY } from "./authRepository";
+import { normalizeServerUrlForCredentials } from "./serverDiscovery";
 import { FinoraError } from "../errors";
 
 export interface SavedAccount {
@@ -62,6 +63,11 @@ export class ServerManager {
       throw new FinoraError("Account not found in registered accounts list", "ACCOUNT_NOT_FOUND");
     }
 
+    // Validate the saved URL before touching the active-session descriptor. This
+    // prevents an account created by an older FINORA version from reactivating a
+    // public cleartext endpoint or corrupting the current session on failure.
+    const safeServerUrl = normalizeServerUrlForCredentials(account.serverUrl).url;
+
     const tokenKey = getAuthTokenStorageKey(serverId, userId);
     const token = await this.secureStorage.getToken(tokenKey);
 
@@ -75,14 +81,14 @@ export class ServerManager {
       userId: account.userId,
       userName: account.userName,
       serverId: account.serverId,
-      serverUrl: account.serverUrl,
+      serverUrl: safeServerUrl,
       lastActiveAt: Date.now()
     });
 
-    await this.saveAccount(account);
+    await this.saveAccount({ ...account, serverUrl: safeServerUrl });
 
     // Commit the runtime switch only after persistence succeeded.
-    this.client.setServerUrl(account.serverUrl);
+    this.client.setServerUrl(safeServerUrl);
     this.client.setAuthToken(token);
 
     return {
@@ -90,7 +96,7 @@ export class ServerManager {
       userId: account.userId,
       userName: account.userName,
       serverId: account.serverId,
-      serverUrl: account.serverUrl
+      serverUrl: safeServerUrl
     };
   }
 

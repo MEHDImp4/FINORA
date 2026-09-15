@@ -121,6 +121,53 @@ Bonjour le monde
     });
   });
 
+  it("never forwards Jellyfin credentials to a cross-origin deliveryUrl", async () => {
+    const externalStreams: MediaStreamInfo[] = [
+      {
+        type: "Subtitle",
+        index: 7,
+        codec: "subrip",
+        language: "eng",
+        displayTitle: "External",
+        deliveryUrl: "https://cdn.example.net/subtitle.vtt?api_key=must-not-leak"
+      }
+    ];
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => "WEBVTT\n\n1\n00:00:01.000 --> 00:00:02.000\nExternal cue\n"
+    });
+    global.fetch = mockFetch;
+
+    let root: any;
+    await act(async () => {
+      root = renderer.create(
+        <TestComponent
+          itemId="item-external-origin"
+          mediaSourceId="source-external"
+          subtitleStreamIndex={7}
+          serverUrl="https://jellyfin.example.com"
+          token="jellyfin-secret-token"
+          streams={externalStreams}
+        />
+      );
+    });
+
+    const [firstCallUrl, firstCallOptions] = mockFetch.mock.calls[0];
+    expect(firstCallUrl).toBe("https://cdn.example.net/subtitle.vtt");
+    expect(firstCallOptions.headers["Authorization"]).toBeUndefined();
+    expect(firstCallOptions.headers["X-Emby-Token"]).toBeUndefined();
+    expect(firstCallOptions.headers["X-MediaBrowser-Token"]).toBeUndefined();
+    expect(JSON.stringify(mockFetch.mock.calls[0])).not.toContain("jellyfin-secret-token");
+    expect(JSON.stringify(mockFetch.mock.calls[0])).not.toContain("must-not-leak");
+    expect(capturedResult.cues[0].text).toBe("External cue");
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
   it("falls back to candidate endpoints if deliveryUrl or initial candidate returns 404", async () => {
     const mockFetch = jest.fn()
       .mockResolvedValueOnce({ ok: false, status: 404 })
