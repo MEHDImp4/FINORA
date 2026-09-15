@@ -8,8 +8,6 @@ import { Image } from "expo-image";
 import { useAuthStore } from "../stores/authStore";
 import { useNotificationStore } from "../stores/notificationStore";
 import { notificationService } from "../core/notifications/notificationService";
-// Side-effect import: registers the background task with TaskManager at module load time.
-// Must be imported before Expo Router renders any screens.
 import "../core/notifications/backgroundFetchTask";
 import {
   registerBackgroundFetch,
@@ -26,6 +24,10 @@ export default function RootLayout() {
   const status = useAuthStore((state) => state.status);
   const session = useAuthStore((state) => state.session);
   const restoreSession = useAuthStore((state) => state.restoreSession);
+  const notificationPreferencesEnabled = useNotificationStore(
+    (state) => state.preferences.enabled
+  );
+  const notificationsLoaded = useNotificationStore((state) => state.isLoaded);
   const isOnboardingCompleted = useOnboardingStore((state) => state.isCompleted);
   const isOnboardingLoaded = useOnboardingStore((state) => state.isLoaded);
   const loadOnboardingStatus = useOnboardingStore((state) => state.loadOnboardingStatus);
@@ -33,35 +35,81 @@ export default function RootLayout() {
   const [minSplashDone, setMinSplashDone] = React.useState(false);
 
   useEffect(() => {
-    // Boot sequence — no artificial delay, splash disappears when real data is ready
-    Promise.all([
-      restoreSession(),
-      loadOnboardingStatus()
-    ]).finally(() => {
+    Promise.all([restoreSession(), loadOnboardingStatus()]).finally(() => {
       setMinSplashDone(true);
     });
 
-    // Initialize download manager FIRST: restores persisted downloads and
-    // registers their file paths so that orphan cleanup does NOT delete
-    // partial files that belong to active or queued downloads.
-    downloadManager.initialize().then(() => {
-      const trackedPaths = downloadManager.getTrackedLocalPaths();
-      // Auto-cleanup watched downloads older than 48h and any orphaned disk files,
-      // but protect partial files still tracked by the download manager.
-      offlineStorageService.cleanupExpiredWatchedMedia(48).then(() => {
-        offlineStorageService.cleanupOrphanDiskFiles(trackedPaths).catch(() => {});
-      }).catch(() => {});
-    }).catch(() => {});
-
-    // Initialize notification engine, request permissions, and register background task
-    notificationService.init()
-      .then(() => notificationService.requestPermissions())
-      .then(() => registerBackgroundFetch())
+    downloadManager
+      .initialize()
+      .then(() => {
+        const trackedPaths = downloadManager.getTrackedLocalPaths();
+        offlineStorageService
+          .cleanupExpiredWatchedMedia(48)
+          .then(() => {
+            offlineStorageService.cleanupOrphanDiskFiles(trackedPaths).catch(() => {});
+          })
+          .catch(() => {});
+      })
       .catch(() => {});
-    useNotificationStore.getState().loadPersisted().catch(() => {});
+
+    // Only initialize handlers here. Permission requests and OS task registration
+    // happen after the persisted user preference has been loaded for the session.
+    notificationService.init().catch(() => {});
   }, [restoreSession, loadOnboardingStatus]);
 
-  // Deep linking: when user taps a notification on their device
+  // Load account-scoped notification state whenever the authenticated identity changes.
+  useEffect(() => {
+    if (status === "authenticated" && session?.serverId && session?.userId) {
+      useNotificationStore
+        .getState()
+        .loadPersisted(session.serverId, session.userId)
+        .catch(() => {});
+
+      offlineSyncManager.syncPendingProgress(session.userId).catch(() => {});
+      offlineStorageService.cleanupExpiredWatchedMedia(48).catch(() => {});
+      return;
+    }
+
+    if (status === "unauthenticated") {
+      useNotificationStore.getState().resetActiveScope();
+      unregisterBackgroundFetch().catch(() => {});
+    }
+  }, [status, session?.serverId, session?.userId]);
+
+  // Keep the OS background task in lockstep with the persisted global setting.
+  // Disabling notifications now really unregisters the worker; enabling them only
+  // registers after native permission is granted.
+  useEffect(() => {
+    if (
+      status !== "authenticated" ||
+      !session?.userId ||
+      !notificationsLoaded
+    ) {
+      return;
+    }
+
+    if (!notificationPreferencesEnabled) {
+      unregisterBackgroundFetch().catch(() => {});
+      return;
+    }
+
+    notificationService
+      .requestPermissions()
+      .then((granted) => {
+        if (granted) {
+          return registerBackgroundFetch();
+        }
+        return unregisterBackgroundFetch();
+      })
+      .catch(() => {});
+  }, [
+    status,
+    session?.serverId,
+    session?.userId,
+    notificationsLoaded,
+    notificationPreferencesEnabled
+  ]);
+
   useEffect(() => {
     const unsubscribe = notificationService.addNotificationResponseListener((mediaId) => {
       router.push({ pathname: "/details/[id]", params: { id: mediaId } });
@@ -72,8 +120,6 @@ export default function RootLayout() {
     };
   }, [router]);
 
-  // Tapping the ongoing download notification opens the Downloads tab so the
-  // user lands on the active transfers instead of Home.
   useEffect(() => {
     const handleUrl = ({ url }: { url: string }) => {
       if (url.includes("downloads")) {
@@ -86,17 +132,11 @@ export default function RootLayout() {
     };
   }, [router]);
 
-  useEffect(() => {
-    if (status === "authenticated" && session?.userId) {
-      offlineSyncManager.syncPendingProgress(session.userId).catch(() => {});
-      offlineStorageService.cleanupExpiredWatchedMedia(48).catch(() => {});
-    } else if (status === "unauthenticated") {
-      // Unregister background task on logout so we don't fire stale notifications
-      unregisterBackgroundFetch().catch(() => {});
-    }
-  }, [status, session?.userId]);
-
-  const showSplash = !minSplashDone || status === "idle" || status === "restoring" || !isOnboardingLoaded;
+  const showSplash =
+    !minSplashDone ||
+    status === "idle" ||
+    status === "restoring" ||
+    !isOnboardingLoaded;
   const showOnboarding = !showSplash && !isOnboardingCompleted;
 
   return (
