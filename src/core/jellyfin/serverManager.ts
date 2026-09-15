@@ -69,11 +69,8 @@ export class ServerManager {
       throw new FinoraError("No authentication token found for target account", "AUTH_TOKEN_MISSING");
     }
 
-    // Point client to the new server and set the isolated token
-    this.client.setServerUrl(account.serverUrl);
-    this.client.setAuthToken(token);
-
-    // Update active session descriptor
+    // Persist the target identity first. If storage fails, the singleton client
+    // remains untouched and the caller can safely restore the previous UI session.
     await this.prefStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, {
       userId: account.userId,
       userName: account.userName,
@@ -82,8 +79,11 @@ export class ServerManager {
       lastActiveAt: Date.now()
     });
 
-    // Update lastUsedAt in accounts registry
     await this.saveAccount(account);
+
+    // Commit the runtime switch only after persistence succeeded.
+    this.client.setServerUrl(account.serverUrl);
+    this.client.setAuthToken(token);
 
     return {
       token,
@@ -95,18 +95,15 @@ export class ServerManager {
   }
 
   public async removeAccount(serverId: string, userId: string): Promise<void> {
-    // Evict token
     const tokenKey = getAuthTokenStorageKey(serverId, userId);
     await this.secureStorage.deleteToken(tokenKey);
 
-    // Remove from saved accounts list
     const accounts = await this.getSavedAccounts();
     const filtered = accounts.filter(
       (a) => !(a.serverId === serverId && a.userId === userId)
     );
     await this.prefStorage.setItem(SAVED_ACCOUNTS_STORAGE_KEY, filtered);
 
-    // If active session was this account, clear it
     const active = await this.prefStorage.getItem<{ serverId: string; userId: string }>(
       ACTIVE_SESSION_STORAGE_KEY
     );
