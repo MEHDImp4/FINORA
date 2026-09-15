@@ -25,16 +25,16 @@ export function SearchHistoryList({
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <FinoraText variant="body" style={styles.headerTitle}>
-          Recent Searches
+          Recherches récentes
         </FinoraText>
         <Pressable
           onPress={onClearAll}
+          style={styles.clearAllButton}
           accessibilityRole="button"
-          accessibilityLabel="Clear all search history"
-          hitSlop={8}
+          accessibilityLabel="Effacer tout l'historique de recherche"
         >
           <FinoraText variant="caption" style={styles.clearAllText}>
-            Clear All
+            Tout effacer
           </FinoraText>
         </Pressable>
       </View>
@@ -46,7 +46,7 @@ export function SearchHistoryList({
               style={styles.termButton}
               onPress={() => onSelectTerm(term)}
               accessibilityRole="button"
-              accessibilityLabel={`Search for ${term}`}
+              accessibilityLabel={`Rechercher ${term}`}
             >
               <Ionicons
                 name="time-outline"
@@ -62,8 +62,7 @@ export function SearchHistoryList({
               onPress={() => onRemoveTerm(term)}
               style={styles.removeButton}
               accessibilityRole="button"
-              accessibilityLabel={`Remove ${term} from history`}
-              hitSlop={8}
+              accessibilityLabel={`Retirer ${term} de l'historique`}
             >
               <Ionicons name="close" size={18} color={colors.textSecondary} />
             </Pressable>
@@ -89,6 +88,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.textPrimary
   },
+  clearAllButton: {
+    minHeight: 44,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   clearAllText: {
     color: colors.primary,
     fontWeight: "600"
@@ -97,14 +102,15 @@ const styles = StyleSheet.create({
     gap: spacing.xs
   },
   historyRow: {
+    minHeight: 52,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#1F1F2E"
   },
   termButton: {
+    minHeight: 48,
     flex: 1,
     flexDirection: "row",
     alignItems: "center"
@@ -117,7 +123,10 @@ const styles = StyleSheet.create({
     color: colors.textSecondary
   },
   removeButton: {
-    padding: 4,
-    marginLeft: spacing.sm
+    width: 44,
+    height: 44,
+    marginLeft: spacing.sm,
+    alignItems: "center",
+    justifyContent: "center"
   }
 });
