@@ -24,6 +24,29 @@ interface UseSubtitleCuesResult {
 // In-memory cache for parsed subtitle cues by key: `${itemId}_${streamIndex}`
 const subtitleCuesCache = new Map<string, SubtitleCue[]>();
 
+function getOrigin(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+function stripJellyfinCredentialParams(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.delete("api_key");
+    parsed.searchParams.delete("ApiKey");
+    parsed.searchParams.delete("Token");
+    parsed.searchParams.delete("token");
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function useSubtitleCues({
   itemId,
   mediaSourceId,
@@ -71,6 +94,7 @@ export function useSubtitleCues({
 
       try {
         const cleanServerUrl = (serverUrl || "").replace(/\/+$/, "");
+        const jellyfinOrigin = getOrigin(cleanServerUrl);
         const sid = mediaSourceId || itemId;
         const targetStream = streams?.find((s) => s.index === subtitleStreamIndex);
 
@@ -91,7 +115,8 @@ export function useSubtitleCues({
           return;
         }
 
-        // Build candidate URLs to try in order of priority
+        // Build candidate URLs to try in order of priority. DeliveryUrl is server-provided
+        // and may be absolute, so credentials are decided per candidate below.
         const rawCandidates: string[] = [];
 
         // Candidate 1: Exact DeliveryUrl from Jellyfin if provided
@@ -163,32 +188,32 @@ export function useSubtitleCues({
           `${cleanServerUrl}/Videos/${itemId}/${sid}/${subtitleStreamIndex}/Stream.vtt`
         );
 
-        // Deduplicate candidates and attach api_key query param if not already present
-        const candidates = Array.from(new Set(rawCandidates)).map((url) => {
-          if (!token) return url;
-          if (url.includes("api_key=") || url.includes("Token=")) return url;
-          const separator = url.includes("?") ? "&" : "?";
-          return `${url}${separator}api_key=${encodeURIComponent(token)}`;
-        });
-
-        // Prepare Jellyfin authentication headers
-        const requestHeaders: Record<string, string> = {
-          Accept: "text/vtt, text/plain, application/x-subrip, text/x-ssa, text/x-ass, */*"
-        };
-        if (token) {
-          requestHeaders["Authorization"] = formatAuthorizationHeader("finora-mobile", token);
-          requestHeaders["X-Emby-Token"] = token;
-          requestHeaders["X-MediaBrowser-Token"] = token;
-        }
+        const candidates = Array.from(new Set(rawCandidates));
+        const acceptHeader = "text/vtt, text/plain, application/x-subrip, text/x-ssa, text/x-ass, */*";
 
         let parsedCues: SubtitleCue[] | null = null;
 
-        for (const url of candidates) {
+        for (const rawUrl of candidates) {
           if (abortController.signal.aborted) return;
 
           try {
+            const candidateOrigin = getOrigin(rawUrl);
+            const isJellyfinOrigin = Boolean(
+              jellyfinOrigin && candidateOrigin && candidateOrigin === jellyfinOrigin
+            );
+
+            // Never forward a Jellyfin token, Authorization header, or token-bearing
+            // query string to a server-provided cross-origin DeliveryUrl.
+            const url = isJellyfinOrigin ? rawUrl : stripJellyfinCredentialParams(rawUrl);
+            const requestHeaders: Record<string, string> = { Accept: acceptHeader };
+            if (isJellyfinOrigin && token) {
+              requestHeaders["Authorization"] = formatAuthorizationHeader("finora-mobile", token);
+              requestHeaders["X-Emby-Token"] = token;
+              requestHeaders["X-MediaBrowser-Token"] = token;
+            }
+
             logger.debug(
-              `[useSubtitleCues] Trying subtitle candidate: ${url.replace(/api_key=[^&]+/, "api_key=[REDACTED]")}`
+              `[useSubtitleCues] Trying subtitle candidate: ${stripJellyfinCredentialParams(url)}`
             );
             const res = await fetch(url, {
               signal: abortController.signal,
