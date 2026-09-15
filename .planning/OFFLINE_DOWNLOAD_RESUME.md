@@ -96,6 +96,87 @@ size (when the server reported one).
 
 ---
 
+## Background downloads (Android Foreground Service)
+
+Leaving the app must not stop a transfer. A Foreground Service keeps the process
+alive and gives the user a live notification.
+
+```
+download starts
+  └─ syncForegroundService()
+       ├─ notification permission requested (Android 13+ POST_NOTIFICATIONS)
+       └─ BackgroundService.start(keepAliveTask, { foregroundServiceType: ["dataSync"] })
+            ↓
+       Android keeps the process alive → expo-file-system keeps transferring
+            ↓
+       progress ticks refresh the notification (same 3 s / 1 % throttle as persistence)
+            ↓
+       no download left → BackgroundService.stop()
+```
+
+| File | Role |
+|---|---|
+| `src/core/notifications/foregroundDownloadService.ts` | Service start/stop/update, permission request, notification content |
+| `plugins/withBackgroundService.js` | Expo config plugin: manifest permissions + `foregroundServiceType="dataSync"`, Gradle include/dependency, package registration in `MainApplication.kt` |
+| `react-native.config.js` | Manual linking entry for the library |
+
+**The library has no `react-native.config.js`, so autolinking does not pick it up.**
+The config plugin therefore does all of it: `settings.gradle` include, `app/build.gradle`
+dependency, `AndroidManifest.xml` permissions + service, and the
+`BackgroundActionsPackage` registration in `MainApplication.kt`. The class is
+`BackgroundActionsPackage` — **not** `RNBackgroundActionsPackage` (the service class
+is `RNBackgroundActionsTask`; the two names differ).
+
+### Why the notification permission matters
+
+`POST_NOTIFICATIONS` was only ever requested from `settings.tsx`, so a fresh install
+never asked for it. Without the permission Android drops the service notification
+entirely, and OEMs (MIUI especially) are far more likely to kill a foreground service
+that shows no notification — which is what silently stopped background downloads.
+It is now requested once per session, at the moment the first download starts.
+
+### Notification content
+
+```
+Obsession (1080P)
+~42 % · 3,4 MB/s · 580 MB / ~1,4 GB · ~2 min
+```
+
+Tapping it opens the **Downloads** tab (`linkingURI: "finora://downloads"`, plus an
+explicit `Linking` listener in `_layout.tsx` as a fallback).
+
+---
+
+## Sizes for transcoded downloads
+
+Jellyfin sends **no `Content-Length`** for transcode responses — the final size is only
+known once encoding finishes. Without a denominator the progress bar stayed at 0 % (and
+the in-app card wrongly rendered a full bar).
+
+`estimateTranscodedBytes(quality, totalTicks)` approximates it from the media duration
+and the profile's target bitrate:
+
+```
+bytes ≈ (videoBitRate + 128 000 audio) / 8 × totalTicks / 10 000 000
+```
+
+| Case | Progress bar | Size line | Percentage |
+|---|---|---|---|
+| Real total known (`original`) | exact | `580 MB / 1.4 GB` | `42%` |
+| Transcode, estimate available | approximate | `580 MB / ~1.4 GB` | `~42%` |
+| Nothing knowable (no duration) | muted, no fill claim | `580 MB reçus` | `...` |
+
+Guardrails:
+
+- The estimate is **display only**. `totalBytes` stays the real value, and the
+  completion integrity check uses it — an off estimate can never mark a download failed.
+- Estimated values are always prefixed `~`.
+- With neither a real nor an estimated total, the bar is indeterminate — never a fake 0 %
+  or a fake 100 %.
+- The estimate is persisted (`expectedBytes`) so a restored download keeps it.
+
+---
+
 ## Manual validation on a real Android device
 
 1. Install a FINORA preview/release build.
@@ -151,6 +232,34 @@ FINORA will then discard the partial file and restart cleanly rather than keep a
   stay queued rather than failing; they start once Wi-Fi returns and the queue is processed.
 - **Total transfer duration is not resumed "mid-flight" for transcoded streams**, because the server
   regenerates the output; the offset is only meaningful for stable, range-capable sources.
+- **Transcode sizes are estimates.** The percentage, transferred-total and ETA for a transcoded
+  download are derived from duration × target bitrate. Real output varies with the encoder (VBR, scene
+  complexity), so treat `~` values as indicative. Exact figures appear when the server does send a
+  `Content-Length` (i.e. `original` quality).
+- **A Foreground Service is not immortality.** It survives leaving the app and screen-off, but not a
+  **force-stop** — Android kills everything, by design. On aggressive OEMs (MIUI/Xiaomi) the app should
+  also be exempted from battery optimisation and have Autostart enabled, otherwise the service may still
+  be reaped during a long transfer.
+
+### OEM battery settings (Xiaomi/MIUI)
+
+Verified on a Xiaomi device (`chagall`, Android 16): with the notification permission missing **and**
+the app not battery-whitelisted, a background download stopped. After granting
+`POST_NOTIFICATIONS` and adding the app to the device-idle whitelist, it kept running while
+backgrounded and screen-off.
+
+The permission is now requested by the app itself. The battery exemption still requires the user:
+
+```
+Paramètres → Applications → FINORA → Économiseur de batterie → Aucune restriction
+Paramètres → Applications → FINORA → Démarrage automatique → activé
+```
+
+Check the current state with:
+
+```bash
+adb shell dumpsys deviceidle whitelist | grep finora   # empty = not whitelisted
+```
 
 ## Tests
 
@@ -159,6 +268,14 @@ normal restore+resume, token never persisted, missing session, missing partial f
 paused, concurrency cap with restored queue order, account change, server change, 401 bounded retry,
 Range-ignored corruption, already-complete file, and a genuine two-manager restart.
 
+`downloadQuality.test.ts` covers `estimateTranscodedBytes` (magnitude, duration scaling, and the
+`original`/unknown-duration cases that must return `undefined`).
+
+`DownloadsScreen.test.tsx` asserts the progress card renders `553 MB / ~1.3 GB` and `~42%` for a
+transcoded download whose `totalBytes` is 0.
+
 The shared `expo-file-system` mock (`__mocks__/expo-file-system.js`) exposes `__setFileSize`,
 `__removeFile`, `__getDownloadTasks`, `__clearDownloadTasks` and `__completeTask(fileUri, { status })`
 so tests can drive real resume behaviour rather than assert on internals.
+`react-native-background-actions` is mocked (`__mocks__/react-native-background-actions.js`) because
+the library ships ESM that Jest cannot parse.
