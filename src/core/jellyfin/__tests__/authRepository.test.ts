@@ -88,6 +88,40 @@ describe("AuthRepository", () => {
       expect(mockClient.setAuthToken).toHaveBeenCalledWith("test-access-token-123");
     });
 
+    it("allows cleartext authentication only for a private/local server", async () => {
+      mockHttpClient.request.mockResolvedValue({
+        AccessToken: "lan-token",
+        ServerId: "server-lan",
+        User: { Id: "user-lan", Name: "LanUser" }
+      });
+
+      const session = await repository.authenticate(
+        { username: "LanUser", password: "LocalPassword" },
+        "http://192.168.1.50:8096/web/index.html",
+        mockHttpClient
+      );
+
+      expect(session.serverUrl).toBe("http://192.168.1.50:8096");
+      expect(mockHttpClient.request).toHaveBeenCalledWith(
+        "http://192.168.1.50:8096/Users/AuthenticateByName",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    it("rejects public HTTP before initializing the client or sending credentials", async () => {
+      await expect(
+        repository.authenticate(
+          { username: "FinoraUser", password: "SecretPassword" },
+          "http://jellyfin.example.com:8096",
+          mockHttpClient
+        )
+      ).rejects.toThrow("Unencrypted HTTP is only allowed for local/private Jellyfin servers");
+
+      expect(mockClient.initialize).not.toHaveBeenCalled();
+      expect(mockHttpClient.request).not.toHaveBeenCalled();
+      expect(mockSecureStorage.setToken).not.toHaveBeenCalled();
+    });
+
     it("throws AuthenticationError on failure and does not store token", async () => {
       mockHttpClient.request.mockRejectedValue(new Error("Invalid username or password"));
 
