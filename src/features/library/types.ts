@@ -11,37 +11,37 @@ export interface SortOption {
 export const AVAILABLE_SORT_OPTIONS: SortOption[] = [
   {
     id: "title-asc",
-    label: "Title (A to Z)",
+    label: "Titre (A à Z)",
     sortBy: "SortName",
     sortOrder: "Ascending"
   },
   {
     id: "title-desc",
-    label: "Title (Z to A)",
+    label: "Titre (Z à A)",
     sortBy: "SortName",
     sortOrder: "Descending"
   },
   {
     id: "date-desc",
-    label: "Release Date (Newest first)",
+    label: "Date de sortie (plus récent)",
     sortBy: "PremiereDate",
     sortOrder: "Descending"
   },
   {
     id: "date-asc",
-    label: "Release Date (Oldest first)",
+    label: "Date de sortie (plus ancien)",
     sortBy: "PremiereDate",
     sortOrder: "Ascending"
   },
   {
     id: "rating-desc",
-    label: "Rating (Highest first)",
+    label: "Note (la plus élevée)",
     sortBy: "CommunityRating",
     sortOrder: "Descending"
   },
   {
     id: "added-desc",
-    label: "Date Added (Recently added)",
+    label: "Ajout récent",
     sortBy: "DateCreated",
     sortOrder: "Descending"
   }
