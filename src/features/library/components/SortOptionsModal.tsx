@@ -37,13 +37,13 @@ export function SortOptionsModal({
         >
           <View style={styles.header}>
             <FinoraText variant="title" style={styles.title}>
-              Sort By
+              Trier par
             </FinoraText>
             <Pressable
               onPress={onClose}
               style={styles.closeButton}
               accessibilityRole="button"
-              accessibilityLabel="Close sort options"
+              accessibilityLabel="Fermer les options de tri"
             >
               <Ionicons name="close" size={24} color={colors.textSecondary} />
             </Pressable>
@@ -67,7 +67,7 @@ export function SortOptionsModal({
                     onClose();
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel={`Sort by ${option.label}`}
+                  accessibilityLabel={`Trier par ${option.label}`}
                   accessibilityState={{ selected: isSelected }}
                 >
                   <FinoraText
@@ -122,16 +122,21 @@ const styles = StyleSheet.create({
     color: colors.textPrimary
   },
   closeButton: {
-    padding: 4
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center"
   },
   optionsList: {
     gap: spacing.xs
   },
   optionRow: {
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: spacing.md,
     borderRadius: 12
   },
@@ -139,7 +144,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#202030"
   },
   optionLabel: {
-    color: colors.textSecondary
+    color: colors.textSecondary,
+    flex: 1,
+    marginRight: spacing.sm
   },
   optionLabelSelected: {
     color: colors.textPrimary,
