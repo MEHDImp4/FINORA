@@ -51,8 +51,8 @@ describe("NotificationsModal", () => {
     });
 
     const root = component!.root;
-    expect(root.findByProps({ children: "Activité" })).toBeDefined();
-    expect(root.findByProps({ children: 2 })).toBeDefined(); // unread count badge
+    expect(root.findByProps({ children: "Notifications" })).toBeDefined();
+    expect(root.findByProps({ children: 2 })).toBeDefined();
     expect(root.findByProps({ children: "Nouvel épisode disponible" })).toBeDefined();
     expect(root.findByProps({ children: "Nouveau film ajouté" })).toBeDefined();
   });
@@ -74,7 +74,6 @@ describe("NotificationsModal", () => {
       seriesPressable!.props.onPress();
     });
 
-    // In series tab, movie notif shouldn't appear
     expect(root.findByProps({ children: "Nouvel épisode disponible" })).toBeDefined();
     expect(root.findAllByProps({ children: "Nouveau film ajouté" })).toHaveLength(0);
   });
@@ -95,8 +94,7 @@ describe("NotificationsModal", () => {
     });
 
     const root = component!.root;
-    const pressables = root.findAllByType("Pressable" as any);
-    const itemPressable = pressables.find(
+    const itemPressable = root.findAllByType("Pressable" as any).find(
       (p) =>
         p.props.accessibilityLabel &&
         p.props.accessibilityLabel.includes("Nouvel épisode disponible")
@@ -110,8 +108,7 @@ describe("NotificationsModal", () => {
     expect(onSelectMediaMock).toHaveBeenCalledWith("ep-105");
     expect(onCloseMock).toHaveBeenCalled();
 
-    const state = useNotificationStore.getState();
-    const updated = state.notifications.find((n) => n.id === "notif-1");
+    const updated = useNotificationStore.getState().notifications.find((n) => n.id === "notif-1");
     expect(updated?.read).toBe(true);
   });
 
@@ -124,8 +121,7 @@ describe("NotificationsModal", () => {
     });
 
     const root = component!.root;
-    const pressables = root.findAllByType("Pressable" as any);
-    const markAllPressable = pressables.find(
+    const markAllPressable = root.findAllByType("Pressable" as any).find(
       (p) => p.props.accessibilityLabel === "Tout marquer comme lu"
     );
 
@@ -149,7 +145,6 @@ describe("NotificationsModal", () => {
       );
     });
 
-    const root = component!.root;
-    expect(root.findByProps({ children: "Tout est à jour" })).toBeDefined();
+    expect(component!.root.findByProps({ children: "Tout est à jour" })).toBeDefined();
   });
 });
