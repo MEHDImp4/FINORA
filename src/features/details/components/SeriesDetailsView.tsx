@@ -99,7 +99,6 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
       userId
     );
 
-    // Default to the first season when loaded if not yet set
     useEffect(() => {
       if (seasons.length > 0 && !selectedSeasonId) {
         setSelectedSeasonId(seasons[0].id);
@@ -112,9 +111,6 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
       userId
     );
 
-    // Long seasons (100+ episodes) must not mount every card on first paint, so the
-    // list is revealed in pages as the user scrolls. The full array stays in memory
-    // for "next unplayed" and the download flow.
     const [visibleEpisodeCount, setVisibleEpisodeCount] = useState(EPISODES_PAGE_SIZE);
     const isLoadingMoreRef = useRef(false);
 
@@ -146,7 +142,6 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
       );
     };
 
-    // Compute next episode to play: first unplayed episode or episode 1
     const nextEpisodeToPlay = useMemo(() => {
       if (episodes.length === 0) return null;
       const unplayed = episodes.find((ep) => !ep.isPlayed);
@@ -169,7 +164,6 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
-        {/* Backdrop Header */}
         <View style={styles.headerContainer}>
           {backdropUri ? (
             <Image
@@ -195,10 +189,9 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
             style={styles.gradientOverlay}
           />
 
-          {/* Top Back Button */}
           <View style={[styles.topBar, { top: Math.max(insets.top, 16) + 8 }]}>
             <FinoraIconButton
-              accessibilityLabel="Go back"
+              accessibilityLabel="Retour"
               onPress={onBack}
               size={40}
               backgroundColor="rgba(10, 10, 12, 0.6)"
@@ -207,7 +200,6 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
             </FinoraIconButton>
           </View>
 
-          {/* Logo or Title */}
           <View style={styles.headerContent}>
             {logoUri ? (
               <Image
@@ -216,6 +208,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
                 contentFit="contain"
                 transition={200}
                 cachePolicy="memory-disk"
+                accessibilityLabel={series.name}
               />
             ) : (
               <FinoraText variant="title" style={styles.titleText}>
@@ -225,17 +218,16 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
           </View>
         </View>
 
-        {/* Metadata Badges */}
         <View style={styles.metadataRow}>
           {series.year ? (
-            <FinoraText variant="caption" color="#8E8E9F" style={styles.badgeText}>
+            <FinoraText variant="caption" color="textSecondary" style={styles.badgeText}>
               {series.year}
             </FinoraText>
           ) : null}
 
           {seasons.length > 0 ? (
-            <FinoraText variant="caption" color="#8E8E9F" style={styles.badgeText}>
-              {`${seasons.length} Season${seasons.length > 1 ? "s" : ""}`}
+            <FinoraText variant="caption" color="textSecondary" style={styles.badgeText}>
+              {`${seasons.length} saison${seasons.length > 1 ? "s" : ""}`}
             </FinoraText>
           ) : null}
 
@@ -250,22 +242,21 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
 
           {series.officialRating ? (
             <View style={styles.specPill}>
-              <FinoraText variant="caption" color="#8E8E9F" style={styles.specText}>
+              <FinoraText variant="caption" color="textSecondary" style={styles.specText}>
                 {series.officialRating}
               </FinoraText>
             </View>
           ) : null}
         </View>
 
-        {/* Action Buttons Row */}
         <View style={styles.actionRow}>
           <FinoraButton
             label={
               nextEpisodeToPlay
                 ? typeof nextEpisodeToPlay.episodeIndex === "number"
-                  ? `Play S${nextEpisodeToPlay.seasonIndex ?? 1}:E${nextEpisodeToPlay.episodeIndex}`
-                  : "Play Next Episode"
-                : "Play"
+                  ? `Lire S${nextEpisodeToPlay.seasonIndex ?? 1}:E${nextEpisodeToPlay.episodeIndex}`
+                  : "Lire l'épisode suivant"
+                : "Lire"
             }
             variant="primary"
             size="lg"
@@ -281,12 +272,10 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
 
           {onToggleFavorite ? (
             <FinoraIconButton
-              accessibilityLabel={series.isFavorite ? "Remove from watchlist" : "Add to watchlist"}
+              accessibilityLabel={series.isFavorite ? "Retirer de ma liste" : "Ajouter à ma liste"}
               onPress={() => onToggleFavorite(series)}
               size={48}
-              backgroundColor={
-                series.isFavorite ? colors.primary : colors.surface
-              }
+              backgroundColor={series.isFavorite ? colors.primary : colors.surface}
             >
               <Ionicons
                 name={series.isFavorite ? "bookmark" : "bookmark-outline"}
@@ -309,11 +298,12 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
           </FinoraIconButton>
         </View>
 
-        {/* Overview Synopsis */}
         {series.overview ? (
           <Pressable
             onPress={() => setIsOverviewExpanded(!isOverviewExpanded)}
             style={styles.overviewContainer}
+            accessibilityRole="button"
+            accessibilityLabel={isOverviewExpanded ? "Réduire le synopsis" : "Développer le synopsis"}
           >
             <FinoraText
               variant="body"
@@ -324,13 +314,12 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
             </FinoraText>
             {series.overview.length > 150 ? (
               <FinoraText variant="caption" color={colors.primary} style={styles.expandText}>
-                {isOverviewExpanded ? "Show Less" : "Read More"}
+                {isOverviewExpanded ? "Voir moins" : "Voir plus"}
               </FinoraText>
             ) : null}
           </Pressable>
         ) : null}
 
-        {/* Season Picker Tabs */}
         {isLoadingSeasons ? (
           <View style={styles.seasonSkeletonRow}>
             {[0, 1, 2].map((index) => (
@@ -345,10 +334,9 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
           />
         )}
 
-        {/* Episode Cards List */}
         <View style={styles.episodesSection}>
           <FinoraText variant="title" style={styles.sectionTitle}>
-            Episodes
+            Épisodes
           </FinoraText>
           {isLoadingEpisodes ? (
             <EpisodeListSkeleton count={6} />
@@ -370,18 +358,16 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
               />
             ))
           ) : (
-            <FinoraText variant="caption" color={colors.textMuted} style={styles.emptyText}>
-              No episodes found for this season.
+            <FinoraText variant="caption" color="textMuted" style={styles.emptyText}>
+              Aucun épisode pour cette saison.
             </FinoraText>
           )}
         </View>
 
-        {/* Cast List */}
         {series.people && series.people.length > 0 ? (
           <CastList people={series.people} serverUrl={serverUrl} />
         ) : null}
 
-        {/* Netflix: Similar Titles Carousel */}
         {similarItems && similarItems.length > 0 ? (
           <View style={{ marginTop: spacing.md }}>
             <MediaCarousel
@@ -481,12 +467,6 @@ const styles = StyleSheet.create({
     left: spacing.md,
     zIndex: 10
   },
-  backIcon: {
-    fontSize: 26,
-    lineHeight: 28,
-    color: "#FFFFFF",
-    marginTop: -2
-  },
   headerContent: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.md
@@ -543,11 +523,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md
   },
   playButton: {
-    flex: 1
-  },
-  playIcon: {
-    fontSize: 14,
-    marginRight: 6
+    flex: 1,
+    minWidth: 0
   },
   overviewContainer: {
     paddingHorizontal: spacing.md,

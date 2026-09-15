@@ -61,7 +61,7 @@ export function FinoraButton({
     }
 
     const sizePadding = {
-      sm: { paddingVertical: 6, paddingHorizontal: 12, minHeight: 32 },
+      sm: { paddingVertical: 8, paddingHorizontal: 12, minHeight: 44 },
       md: { paddingVertical: 12, paddingHorizontal: 20, minHeight: 44 },
       lg: { paddingVertical: 16, paddingHorizontal: 28, minHeight: 52 }
     }[size];

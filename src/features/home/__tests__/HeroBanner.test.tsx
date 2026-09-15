@@ -28,23 +28,15 @@ describe("HeroBanner", () => {
     const tree = ReactTestRenderer.create(
       <HeroBanner item={sampleItem} serverUrl={serverUrl} />
     ).toJSON();
-
     expect(tree).toBeDefined();
   });
 
   it("renders typographic fallback title when logoImageTag is absent", () => {
-    const itemNoLogo: MediaItem = {
-      ...sampleItem,
-      logoImageTag: undefined
-    };
-
+    const itemNoLogo: MediaItem = { ...sampleItem, logoImageTag: undefined };
     const component = ReactTestRenderer.create(
       <HeroBanner item={itemNoLogo} serverUrl={serverUrl} />
     );
-
-    const root = component.root;
-    // Check that title text is rendered
-    expect(root.findByProps({ children: "Dune: Part Two" })).toBeDefined();
+    expect(component.root.findByProps({ children: "Dune: Part Two" })).toBeDefined();
   });
 
   it("cycles to next candidate URL when image error occurs", () => {
@@ -53,26 +45,19 @@ describe("HeroBanner", () => {
       primaryImageTag: "primary-poster-tag",
       backdropImageTag: "primary-backdrop-tag"
     };
-
     const component = ReactTestRenderer.create(
       <HeroBanner item={itemWithFallbacks} serverUrl={serverUrl} />
     );
-
     const images = component.root.findAllByType("Image" as any);
     expect(images.length).toBeGreaterThan(0);
     const backdropImg = images[0];
     const initialSource = backdropImg.props.source.uri;
     expect(initialSource).toContain("tag=primary-poster-tag");
     expect(backdropImg.props.contentPosition).toBe("center");
-
-    // Trigger onError on backdrop image
     ReactTestRenderer.act(() => {
       backdropImg.props.onError();
     });
-
-    const updatedImages = component.root.findAllByType("Image" as any);
-    const updatedBackdrop = updatedImages[0];
-    // Candidate should now have moved forward to the next candidate
+    const updatedBackdrop = component.root.findAllByType("Image" as any)[0];
     expect(updatedBackdrop.props.source.uri).not.toBe(initialSource);
   });
 
@@ -80,6 +65,6 @@ describe("HeroBanner", () => {
     const component = ReactTestRenderer.create(
       <HeroBanner item={null} serverUrl={serverUrl} />
     );
-    expect(component.root.findByProps({ children: "No featured media available" })).toBeDefined();
+    expect(component.root.findByProps({ children: "Aucun média à mettre en avant" })).toBeDefined();
   });
 });

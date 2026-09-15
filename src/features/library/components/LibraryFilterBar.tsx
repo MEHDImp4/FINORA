@@ -25,7 +25,6 @@ export function LibraryFilterBar({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* All Genres chip */}
         <Pressable
           style={[
             styles.chip,
@@ -33,7 +32,7 @@ export function LibraryFilterBar({
           ]}
           onPress={() => onSelectGenre(null)}
           accessibilityRole="button"
-          accessibilityLabel="Filter by all genres"
+          accessibilityLabel="Afficher tous les genres"
           accessibilityState={{ selected: selectedGenre === null }}
         >
           <FinoraText
@@ -45,11 +44,10 @@ export function LibraryFilterBar({
                 : styles.chipTextUnselected
             ]}
           >
-            All Genres
+            Tous les genres
           </FinoraText>
         </Pressable>
 
-        {/* Dynamic Genre chips */}
         {genres.map((genre) => {
           const isSelected = selectedGenre === genre;
           return (
@@ -61,7 +59,7 @@ export function LibraryFilterBar({
               ]}
               onPress={() => onSelectGenre(isSelected ? null : genre)}
               accessibilityRole="button"
-              accessibilityLabel={`Filter by genre ${genre}`}
+              accessibilityLabel={`Filtrer par genre ${genre}`}
               accessibilityState={{ selected: isSelected }}
             >
               <FinoraText
@@ -92,10 +90,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   chip: {
+    minHeight: 44,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    borderWidth: 1
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center"
   },
   chipSelected: {
     backgroundColor: colors.primary,

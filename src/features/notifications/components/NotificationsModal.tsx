@@ -5,7 +5,8 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  FlatList
+  FlatList,
+  Alert
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -131,6 +132,22 @@ export function NotificationsModal({
     }
   };
 
+  const handleClearAll = () => {
+    hapticService.impactLight();
+    Alert.alert(
+      "Effacer les notifications ?",
+      "L'historique des notifications de ce compte sera supprimé.",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Effacer",
+          style: "destructive",
+          onPress: () => clearAll()
+        }
+      ]
+    );
+  };
+
   const renderItem = ({ item }: { item: FinoraNotification }) => {
     const visuals = getNotificationVisuals(item.type);
 
@@ -145,7 +162,6 @@ export function NotificationsModal({
         accessibilityRole="button"
         accessibilityLabel={`${item.title}, ${item.body}`}
       >
-        {/* Poster thumbnail or stylized liquid icon */}
         <View style={styles.thumbnailWrapper}>
           {item.posterUrl ? (
             <Image
@@ -171,7 +187,6 @@ export function NotificationsModal({
           {!item.read && <View style={styles.unreadGlowingDot} />}
         </View>
 
-        {/* Content */}
         <View style={styles.cardContent}>
           <View style={styles.cardHeader}>
             <View style={styles.typeBadge}>
@@ -205,7 +220,7 @@ export function NotificationsModal({
         </View>
 
         <View style={styles.chevronCol}>
-          <Ionicons name="chevron-forward" size={16} color="rgba(255, 255, 255, 0.3)" />
+          <Ionicons name="chevron-forward" size={16} color="rgba(255, 255, 255, 0.38)" />
         </View>
       </Pressable>
     );
@@ -219,7 +234,7 @@ export function NotificationsModal({
       onRequestClose={onClose}
     >
       <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Fermer les notifications" />
 
         <View
           style={[
@@ -230,29 +245,25 @@ export function NotificationsModal({
             }
           ]}
         >
-          {/* Top Apple Handle */}
           <View style={styles.handle} />
 
-          {/* Dynamic Island Header */}
           <View style={styles.headerRow}>
             <View style={styles.headerLeft}>
-              <View style={styles.titleGlassPill}>
-                <Ionicons name="notifications" size={16} color="#E50914" />
-                <FinoraText variant="title" weight="800" color="textPrimary" style={styles.titleText}>
-                  Activité
-                </FinoraText>
-                {unreadCount > 0 && (
-                  <View style={styles.countBadge}>
-                    <Text style={styles.countText}>{unreadCount}</Text>
-                  </View>
-                )}
-              </View>
+              <FinoraText variant="title" weight="800" color="textPrimary" style={styles.titleText}>
+                Notifications
+              </FinoraText>
+              {unreadCount > 0 && (
+                <View style={styles.countBadge}>
+                  <Text style={styles.countText}>{unreadCount}</Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.headerActions}>
               {unreadCount > 0 && (
                 <Pressable
-                  style={styles.glassActionButton}
+                  style={styles.headerIconButton}
+                  hitSlop={4}
                   onPress={() => {
                     hapticService.impactLight();
                     markAllAsRead();
@@ -260,42 +271,34 @@ export function NotificationsModal({
                   accessibilityRole="button"
                   accessibilityLabel="Tout marquer comme lu"
                 >
-                  <Ionicons name="checkmark-done" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <FinoraText variant="caption" color="textPrimary" weight="600">
-                    Lu
-                  </FinoraText>
+                  <Ionicons name="checkmark-done" size={19} color="#FFFFFF" />
                 </Pressable>
               )}
 
               {notifications.length > 0 && (
                 <Pressable
-                  style={styles.glassActionButton}
-                  onPress={() => {
-                    hapticService.impactLight();
-                    clearAll();
-                  }}
+                  style={styles.headerIconButton}
+                  hitSlop={4}
+                  onPress={handleClearAll}
                   accessibilityRole="button"
-                  accessibilityLabel="Vider l'historique"
+                  accessibilityLabel="Effacer l'historique"
                 >
-                  <Ionicons name="trash-outline" size={13} color="rgba(255, 255, 255, 0.7)" style={{ marginRight: 3 }} />
-                  <FinoraText variant="caption" color="textSecondary" weight="500">
-                    Effacer
-                  </FinoraText>
+                  <Ionicons name="trash-outline" size={18} color="#A0A0B2" />
                 </Pressable>
               )}
 
               <Pressable
-                style={styles.closeGlassButton}
+                style={styles.headerIconButton}
+                hitSlop={4}
                 onPress={onClose}
                 accessibilityRole="button"
                 accessibilityLabel="Fermer"
               >
-                <Ionicons name="close" size={18} color="#FFFFFF" />
+                <Ionicons name="close" size={20} color="#FFFFFF" />
               </Pressable>
             </View>
           </View>
 
-          {/* Liquid Glass Filter Tabs */}
           {notifications.length > 0 && (
             <View style={styles.tabsRow}>
               <Pressable
@@ -304,6 +307,8 @@ export function NotificationsModal({
                   hapticService.selection();
                   setActiveTab("all");
                 }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: activeTab === "all" }}
               >
                 <Text style={[styles.filterPillText, activeTab === "all" && styles.filterPillTextActive]}>
                   Tous ({notifications.length})
@@ -316,6 +321,8 @@ export function NotificationsModal({
                   hapticService.selection();
                   setActiveTab("series");
                 }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: activeTab === "series" }}
               >
                 <Text style={[styles.filterPillText, activeTab === "series" && styles.filterPillTextActive]}>
                   Séries
@@ -328,6 +335,8 @@ export function NotificationsModal({
                   hapticService.selection();
                   setActiveTab("movies");
                 }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: activeTab === "movies" }}
               >
                 <Text style={[styles.filterPillText, activeTab === "movies" && styles.filterPillTextActive]}>
                   Films
@@ -336,17 +345,16 @@ export function NotificationsModal({
             </View>
           )}
 
-          {/* List or Empty State */}
           {notifications.length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconCircle}>
-                <Ionicons name="notifications-outline" size={32} color="rgba(255, 255, 255, 0.35)" />
+                <Ionicons name="notifications-outline" size={32} color="rgba(255, 255, 255, 0.42)" />
               </View>
               <FinoraText variant="title" weight="700" color="textPrimary" style={styles.emptyTitle}>
                 Tout est à jour
               </FinoraText>
               <FinoraText variant="body" color="textSecondary" style={styles.emptySubtitle}>
-                Vous serez notifié des nouveaux épisodes de vos séries en cours et des ajouts récents.
+                Les nouveaux épisodes, films et séries apparaîtront ici.
               </FinoraText>
             </View>
           ) : filteredNotifications.length === 0 ? (
@@ -381,60 +389,51 @@ const styles = StyleSheet.create({
     width: "92%",
     maxWidth: 440,
     maxHeight: "82%",
-    backgroundColor: "rgba(16, 16, 24, 0.94)",
-    borderRadius: 28,
+    backgroundColor: "rgba(16, 16, 24, 0.97)",
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.16)",
-    borderTopColor: "rgba(255, 255, 255, 0.32)",
-    paddingTop: 12,
+    borderColor: "rgba(255, 255, 255, 0.14)",
+    paddingTop: 10,
     paddingBottom: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.55,
-    shadowRadius: 20,
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
     elevation: 20,
     overflow: "hidden"
   },
   handle: {
     width: 36,
-    height: 4.5,
-    borderRadius: 3,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: "rgba(255, 255, 255, 0.28)",
     alignSelf: "center",
-    marginBottom: 14
+    marginBottom: 10
   },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 14
+    paddingHorizontal: 18,
+    paddingBottom: 12
   },
   headerLeft: {
-    flexDirection: "row",
-    alignItems: "center"
-  },
-  titleGlassPill: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)"
+    marginRight: 8
   },
   titleText: {
-    fontSize: 18,
+    fontSize: 20,
     letterSpacing: -0.3
   },
   countBadge: {
     backgroundColor: "#E50914",
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 10,
-    minWidth: 18,
+    minWidth: 20,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -446,48 +445,42 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8
+    gap: 6
   },
-  glassActionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+  headerIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255, 255, 255, 0.07)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)"
-  },
-  closeGlassButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(255, 255, 255, 0.10)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.20)",
+    borderColor: "rgba(255, 255, 255, 0.12)",
     alignItems: "center",
     justifyContent: "center"
   },
   tabsRow: {
     flexDirection: "row",
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingBottom: 12,
     gap: 8
   },
   filterPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
+    flex: 1,
+    minHeight: 44,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 14,
     backgroundColor: "rgba(255, 255, 255, 0.05)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.10)"
+    borderColor: "rgba(255, 255, 255, 0.10)",
+    alignItems: "center",
+    justifyContent: "center"
   },
   filterPillActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.18)",
-    borderColor: "rgba(255, 255, 255, 0.35)"
+    backgroundColor: "rgba(255, 255, 255, 0.14)",
+    borderColor: "rgba(255, 255, 255, 0.28)"
   },
   filterPillText: {
-    color: "rgba(255, 255, 255, 0.6)",
+    color: "#A0A0B2",
     fontSize: 12,
     fontWeight: "600"
   },
@@ -496,28 +489,23 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   listContent: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 6,
     gap: 10
   },
   glassCard: {
     flexDirection: "row",
     alignItems: "center",
+    minHeight: 84,
     padding: 12,
-    borderRadius: 20,
-    backgroundColor: "rgba(26, 26, 38, 0.72)",
+    borderRadius: 14,
+    backgroundColor: "#1A1A26",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
-    borderTopColor: "rgba(255, 255, 255, 0.24)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8
+    borderColor: "rgba(255, 255, 255, 0.10)"
   },
   glassCardUnread: {
-    backgroundColor: "rgba(34, 34, 52, 0.88)",
-    borderColor: "rgba(229, 9, 20, 0.35)",
-    borderTopColor: "rgba(255, 255, 255, 0.38)"
+    backgroundColor: "#20202E",
+    borderColor: "rgba(229, 9, 20, 0.32)"
   },
   glassCardPressed: {
     opacity: 0.82,
@@ -530,13 +518,13 @@ const styles = StyleSheet.create({
   posterImage: {
     width: 48,
     height: 68,
-    borderRadius: 10,
+    borderRadius: 8,
     backgroundColor: "rgba(255, 255, 255, 0.08)"
   },
   iconBadge: {
     width: 48,
     height: 48,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center"

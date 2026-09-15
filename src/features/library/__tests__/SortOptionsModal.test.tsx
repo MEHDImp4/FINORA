@@ -23,15 +23,13 @@ describe("SortOptionsModal", () => {
       />
     );
 
-    const titleAscOption = tree.root.findByProps({
-      accessibilityLabel: "Sort by Title (A to Z)"
-    });
-    expect(titleAscOption).toBeTruthy();
+    expect(tree.root.findByProps({
+      accessibilityLabel: "Trier par Titre (A à Z)"
+    })).toBeTruthy();
 
-    const dateDescOption = tree.root.findByProps({
-      accessibilityLabel: "Sort by Release Date (Newest first)"
-    });
-    expect(dateDescOption).toBeTruthy();
+    expect(tree.root.findByProps({
+      accessibilityLabel: "Trier par Date de sortie (plus récent)"
+    })).toBeTruthy();
   });
 
   it("calls onSelectSort and onClose when an option is tapped", () => {
@@ -46,9 +44,9 @@ describe("SortOptionsModal", () => {
       />
     );
 
-    const targetOption = AVAILABLE_SORT_OPTIONS[2]; // Release Date (Newest first)
+    const targetOption = AVAILABLE_SORT_OPTIONS[2];
     const button = tree.root.findByProps({
-      accessibilityLabel: `Sort by ${targetOption.label}`
+      accessibilityLabel: `Trier par ${targetOption.label}`
     });
 
     act(() => {

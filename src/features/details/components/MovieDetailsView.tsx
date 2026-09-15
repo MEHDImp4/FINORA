@@ -70,7 +70,6 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
       ? getLogoUrl(serverUrl, item.id, item.logoImageTag, 400)
       : null;
 
-    // Formatting runtime
     const formatRuntime = (mins?: number): string | null => {
       if (!mins || mins <= 0) return null;
       const h = Math.floor(mins / 60);
@@ -79,7 +78,6 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
       return `${m}m`;
     };
 
-    // Extracting video/audio spec badges
     const videoStream = item.mediaStreams?.find((s) => s.type === "Video");
     const audioStream = item.mediaStreams?.find((s) => s.type === "Audio");
 
@@ -94,11 +92,11 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
     if (audioStream?.channels) {
       if (audioStream.channels >= 8) audioBadge = "7.1";
       else if (audioStream.channels >= 6) audioBadge = "5.1";
-      else if (audioStream.channels >= 2) audioBadge = "Stereo";
+      else if (audioStream.channels >= 2) audioBadge = "Stéréo";
     }
 
     const isResume = item.playedPercentage > 0 && !item.isPlayed;
-    const playLabel = isResume ? `Resume (${item.playedPercentage}%)` : "Play";
+    const playLabel = isResume ? `Reprendre (${Math.round(item.playedPercentage)} %)` : "Lire";
 
     return (
       <ScrollView
@@ -106,7 +104,6 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Backdrop Header */}
         <View style={styles.headerContainer}>
           {backdropUri ? (
             <Image
@@ -132,10 +129,9 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
             style={styles.gradientOverlay}
           />
 
-          {/* Top Back Button */}
           <View style={[styles.topBar, { top: Math.max(insets.top, 16) + 8 }]}>
             <FinoraIconButton
-              accessibilityLabel="Go back"
+              accessibilityLabel="Retour"
               onPress={onBack}
               size={40}
               backgroundColor="rgba(10, 10, 12, 0.6)"
@@ -144,7 +140,6 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
             </FinoraIconButton>
           </View>
 
-          {/* Logo or Title */}
           <View style={styles.headerContent}>
             {logoUri ? (
               <Image
@@ -153,6 +148,7 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
                 contentFit="contain"
                 transition={200}
                 cachePolicy="memory-disk"
+                accessibilityLabel={item.name}
               />
             ) : (
               <FinoraText variant="title" style={styles.titleText}>
@@ -162,16 +158,15 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
           </View>
         </View>
 
-        {/* Metadata Badges */}
         <View style={styles.metadataRow}>
           {item.year ? (
-            <FinoraText variant="caption" color="#8E8E9F" style={styles.badgeText}>
+            <FinoraText variant="caption" color="textSecondary" style={styles.badgeText}>
               {item.year}
             </FinoraText>
           ) : null}
 
           {item.runtimeMinutes ? (
-            <FinoraText variant="caption" color="#8E8E9F" style={styles.badgeText}>
+            <FinoraText variant="caption" color="textSecondary" style={styles.badgeText}>
               {formatRuntime(item.runtimeMinutes)}
             </FinoraText>
           ) : null}
@@ -187,7 +182,7 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
 
           {item.officialRating ? (
             <View style={styles.specPill}>
-              <FinoraText variant="caption" color="#8E8E9F" style={styles.specText}>
+              <FinoraText variant="caption" color="textSecondary" style={styles.specText}>
                 {item.officialRating}
               </FinoraText>
             </View>
@@ -195,7 +190,7 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
 
           {resolutionBadge ? (
             <View style={styles.specPill}>
-              <FinoraText variant="caption" color="#FFFFFF" style={styles.specText}>
+              <FinoraText variant="caption" color="textPrimary" style={styles.specText}>
                 {resolutionBadge}
               </FinoraText>
             </View>
@@ -203,14 +198,13 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
 
           {audioBadge ? (
             <View style={styles.specPill}>
-              <FinoraText variant="caption" color="#8E8E9F" style={styles.specText}>
+              <FinoraText variant="caption" color="textSecondary" style={styles.specText}>
                 {audioBadge}
               </FinoraText>
             </View>
           ) : null}
         </View>
 
-        {/* Action Buttons Row */}
         <View style={styles.actionRow}>
           <FinoraButton
             label={playLabel}
@@ -223,12 +217,10 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
 
           {onToggleFavorite ? (
             <FinoraIconButton
-              accessibilityLabel={item.isFavorite ? "Remove from watchlist" : "Add to watchlist"}
+              accessibilityLabel={item.isFavorite ? "Retirer de ma liste" : "Ajouter à ma liste"}
               onPress={() => onToggleFavorite(item)}
               size={48}
-              backgroundColor={
-                item.isFavorite ? colors.primary : colors.surface
-              }
+              backgroundColor={item.isFavorite ? colors.primary : colors.surface}
             >
               <Ionicons
                 name={item.isFavorite ? "bookmark" : "bookmark-outline"}
@@ -240,12 +232,10 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
 
           {onTogglePlayed ? (
             <FinoraIconButton
-              accessibilityLabel={item.isPlayed ? "Mark as unplayed" : "Mark as played"}
+              accessibilityLabel={item.isPlayed ? "Marquer comme non vu" : "Marquer comme vu"}
               onPress={() => onTogglePlayed(item)}
               size={48}
-              backgroundColor={
-                item.isPlayed ? colors.primary : colors.surface
-              }
+              backgroundColor={item.isPlayed ? colors.primary : colors.surface}
             >
               <Ionicons
                 name={item.isPlayed ? "checkmark-circle" : "checkmark-circle-outline"}
@@ -292,18 +282,18 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
           ) : null}
         </View>
 
-        {/* Tagline */}
         {item.tagline ? (
-          <FinoraText variant="body" color="#8E8E9F" style={styles.taglineText}>
+          <FinoraText variant="body" color="textSecondary" style={styles.taglineText}>
             {`"${item.tagline}"`}
           </FinoraText>
         ) : null}
 
-        {/* Overview Synopsis */}
         {item.overview ? (
           <Pressable
             onPress={() => setIsOverviewExpanded(!isOverviewExpanded)}
             style={styles.overviewContainer}
+            accessibilityRole="button"
+            accessibilityLabel={isOverviewExpanded ? "Réduire le synopsis" : "Développer le synopsis"}
           >
             <FinoraText
               variant="body"
@@ -314,18 +304,17 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
             </FinoraText>
             {item.overview.length > 150 ? (
               <FinoraText variant="caption" color={colors.primary} style={styles.expandText}>
-                {isOverviewExpanded ? "Show Less" : "Read More"}
+                {isOverviewExpanded ? "Voir moins" : "Voir plus"}
               </FinoraText>
             ) : null}
           </Pressable>
         ) : null}
 
-        {/* Genres */}
         {item.genres && item.genres.length > 0 ? (
           <View style={styles.genresRow}>
             {item.genres.map((genre, idx) => (
               <View key={`${genre}-${idx}`} style={styles.genreChip}>
-                <FinoraText variant="caption" color="#8E8E9F">
+                <FinoraText variant="caption" color="textSecondary">
                   {genre}
                 </FinoraText>
               </View>
@@ -333,12 +322,10 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
           </View>
         ) : null}
 
-        {/* Cast & Crew Section */}
         {item.people && item.people.length > 0 ? (
           <CastList people={item.people} serverUrl={serverUrl} />
         ) : null}
 
-        {/* Netflix: Similar Titles Carousel */}
         {similarItems && similarItems.length > 0 ? (
           <View style={{ marginTop: spacing.md }}>
             <MediaCarousel
@@ -397,12 +384,6 @@ const styles = StyleSheet.create({
     left: spacing.md,
     zIndex: 10
   },
-  backIcon: {
-    fontSize: 26,
-    lineHeight: 28,
-    color: "#FFFFFF",
-    marginTop: -2
-  },
   headerContent: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.md
@@ -459,11 +440,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md
   },
   playButton: {
-    flex: 1
-  },
-  playIcon: {
-    fontSize: 14,
-    marginRight: 6
+    flex: 1,
+    minWidth: 0
   },
   taglineText: {
     fontStyle: "italic",

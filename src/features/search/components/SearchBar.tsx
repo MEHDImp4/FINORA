@@ -17,7 +17,7 @@ export function SearchBar({
   onChangeText,
   onClear,
   onSubmitEditing,
-  placeholder = "Search movies, TV shows, series...",
+  placeholder = "Rechercher des films, séries, collections...",
   autoFocus = false
 }: SearchBarProps) {
   return (
@@ -28,21 +28,20 @@ export function SearchBar({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textMuted}
         returnKeyType="search"
         onSubmitEditing={onSubmitEditing}
         autoFocus={autoFocus}
         autoCapitalize="none"
         autoCorrect={false}
-        accessibilityLabel="Search input"
+        accessibilityLabel="Recherche"
       />
       {value.length > 0 && (
         <Pressable
           onPress={onClear}
           style={styles.clearButton}
           accessibilityRole="button"
-          accessibilityLabel="Clear search"
-          hitSlop={8}
+          accessibilityLabel="Effacer la recherche"
         >
           <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
         </Pressable>
@@ -57,8 +56,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#1C1C26",
     borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    height: 48,
+    paddingLeft: spacing.md,
+    minHeight: 48,
     borderWidth: 1,
     borderColor: "#2C2C3E"
   },
@@ -69,9 +68,13 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.textPrimary,
     fontSize: 16,
+    minHeight: 48,
     paddingVertical: 0
   },
   clearButton: {
-    padding: 4
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center"
   }
 });

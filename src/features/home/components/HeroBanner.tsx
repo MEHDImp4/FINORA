@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { View, StyleSheet, Dimensions, Pressable, Animated } from "react-native";
+import { View, StyleSheet, Pressable, Animated, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,9 +17,6 @@ interface HeroBannerProps {
   onPressDetails?: (item: MediaItem) => void;
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const HERO_HEIGHT = Math.round(SCREEN_WIDTH * 1.15); // Dynamic cinematic vertical elevation
-
 export const HeroBanner = React.memo(function HeroBanner({
   item,
   serverUrl,
@@ -27,25 +24,24 @@ export const HeroBanner = React.memo(function HeroBanner({
   onToggleFavorite,
   onPressDetails
 }: HeroBannerProps) {
+  const { width: screenWidth } = useWindowDimensions();
+  const heroHeight = Math.round(Math.max(340, Math.min(430, screenWidth * 1.02)));
   const candidateUrls = useMemo(
     () => (item ? getHeroBannerUrls(serverUrl, item, 1280) : []),
     [serverUrl, item]
   );
   const candidateKey = candidateUrls.join("|");
   const [candidateIndex, setCandidateIndex] = useState(0);
-
-  // Netflix-style smooth gentle dissolve when the featured item changes
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Gentle dissolve: starts at 0.35 so it never flashes black, smoothly transitioning to 1.0
     fadeAnim.setValue(0.35);
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 450,
       useNativeDriver: true
     }).start();
-  }, [item?.id]);
+  }, [item?.id, fadeAnim]);
 
   useEffect(() => {
     setCandidateIndex(0);
@@ -65,7 +61,7 @@ export const HeroBanner = React.memo(function HeroBanner({
     return (
       <View style={[styles.container, styles.emptyContainer]}>
         <FinoraText variant="caption" color="textMuted">
-          No featured media available
+          Aucun média à mettre en avant
         </FinoraText>
       </View>
     );
@@ -87,8 +83,6 @@ export const HeroBanner = React.memo(function HeroBanner({
 
   const runtimeString = formatRuntime(item.runtimeMinutes);
   const primaryGenre = item.genres && item.genres.length > 0 ? item.genres[0] : null;
-
-  // Fallback badge labels if ratings/genres are missing on Jellyfin items
   const typeLabel =
     item.type === "Movie"
       ? "Film"
@@ -105,12 +99,11 @@ export const HeroBanner = React.memo(function HeroBanner({
 
   return (
     <Pressable
-      style={styles.container}
+      style={[styles.container, { height: heroHeight }]}
       onPress={() => onPressDetails && onPressDetails(item)}
       accessibilityRole="imagebutton"
-      accessibilityLabel={`Featured: ${displayTitle}`}
+      accessibilityLabel={`À la une : ${displayTitle}`}
     >
-      {/* Dynamic Backdrop with continuous smooth crossfade without remounting */}
       {currentUri && candidateIndex < candidateUrls.length ? (
         <Image
           source={{ uri: currentUri }}
@@ -126,7 +119,6 @@ export const HeroBanner = React.memo(function HeroBanner({
         <View style={[styles.backdropImage, { backgroundColor: colors.surface }]} />
       )}
 
-      {/* Multi-stop Linear Gradient overlay blending into deep OLED black */}
       <LinearGradient
         colors={[
           "rgba(10, 10, 12, 0.2)",
@@ -138,11 +130,8 @@ export const HeroBanner = React.memo(function HeroBanner({
         style={styles.gradientOverlay}
       />
 
-      {/* Content Container */}
       <View style={styles.contentContainer}>
-        {/* Animated Metadata Info (Logo/Title and Badges) with gentle dissolve */}
         <Animated.View style={[styles.infoContainer, { opacity: fadeAnim }]}>
-          {/* Title or Logo */}
           {logoUri ? (
             <Image
               source={{ uri: logoUri }}
@@ -156,7 +145,6 @@ export const HeroBanner = React.memo(function HeroBanner({
             </FinoraText>
           )}
 
-          {/* Metadata Badges */}
           <View style={styles.badgeRow}>
             {item.communityRating ? (
               <View style={[styles.badge, styles.ratingBadge]}>
@@ -201,7 +189,6 @@ export const HeroBanner = React.memo(function HeroBanner({
               </View>
             ) : null}
 
-            {/* Guaranteed fallback badges when rating or genre is missing */}
             {(!hasRating || !hasGenre) && typeLabel ? (
               <View style={styles.badge}>
                 <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
@@ -220,10 +207,9 @@ export const HeroBanner = React.memo(function HeroBanner({
           </View>
         </Animated.View>
 
-        {/* Action CTAs: Solid and stable, never flash or disappear during rotation */}
         <View style={styles.actionsRow}>
           <FinoraButton
-            label="Play"
+            label="Lire"
             variant="primary"
             size="md"
             leftIcon={<Ionicons name="play" size={16} color="#FFFFFF" />}
@@ -232,7 +218,7 @@ export const HeroBanner = React.memo(function HeroBanner({
           />
 
           <FinoraButton
-            label={item.isFavorite ? "In Watchlist" : "Watchlist"}
+            label={item.isFavorite ? "Dans ma liste" : "Ma liste"}
             leftIcon={
               <Ionicons
                 name={item.isFavorite ? "bookmark" : "add"}
@@ -260,13 +246,12 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.12)",
-    height: HERO_HEIGHT,
     backgroundColor: colors.background,
     position: "relative",
     justifyContent: "flex-end"
   },
   emptyContainer: {
-    height: 240,
+    height: 220,
     alignItems: "center",
     justifyContent: "center",
     borderBottomWidth: 1,
@@ -281,7 +266,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     width: "100%",
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.lg,
     alignItems: "center",
     zIndex: 10
   },
@@ -290,8 +275,9 @@ const styles = StyleSheet.create({
     alignItems: "center"
   },
   logoImage: {
-    width: 240,
-    height: 70,
+    width: 220,
+    maxWidth: "82%",
+    height: 64,
     marginBottom: spacing.md
   },
   titleFallback: {
@@ -305,8 +291,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
+    gap: spacing.xs,
+    marginBottom: spacing.md,
     flexWrap: "wrap"
   },
   badge: {
@@ -317,8 +303,8 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.20)",
     borderTopColor: "rgba(255, 255, 255, 0.35)",
     borderWidth: 1,
-    paddingVertical: 5,
-    paddingHorizontal: 11,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
     borderRadius: 8,
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 2 },
@@ -335,20 +321,21 @@ const styles = StyleSheet.create({
     marginRight: 5
   },
   badgeText: {
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 17,
     fontWeight: "700"
   },
   actionsRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.md,
+    gap: spacing.sm,
     width: "100%"
   },
   playButton: {
-    minWidth: 130,
-    paddingHorizontal: 20,
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.28)",
     borderTopColor: "rgba(255, 255, 255, 0.45)",
@@ -358,8 +345,9 @@ const styles = StyleSheet.create({
     shadowRadius: 10
   },
   watchlistButton: {
-    minWidth: 175,
-    paddingHorizontal: 16,
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 10,
     backgroundColor: "rgba(30, 30, 42, 0.75)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.18)",

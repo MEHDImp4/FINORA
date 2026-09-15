@@ -59,47 +59,32 @@ const mockMovie: MediaItem = {
 
 describe("MovieDetailsView", () => {
   it("renders movie metadata, specs, tagline, and cast list accurately", () => {
-    const onPlay = jest.fn();
-    const onBack = jest.fn();
-
     let root: renderer.ReactTestRenderer;
     act(() => {
       root = renderer.create(
         <MovieDetailsView
           item={mockMovie}
           serverUrl="https://jellyfin.example.com"
-          onPlay={onPlay}
-          onBack={onBack}
+          onPlay={jest.fn()}
+          onBack={jest.fn()}
         />
       );
     });
 
     const instance = root!.root;
-
-    // Check year and runtime
     expect(instance.findByProps({ children: 2014 })).toBeTruthy();
     expect(instance.findByProps({ children: "2h 49m" })).toBeTruthy();
-
-    // Check community rating and official rating
     expect(instance.findByProps({ children: 8.7 })).toBeTruthy();
     expect(instance.findByProps({ children: "PG-13" })).toBeTruthy();
-
-    // Check 4K and 5.1 specs
     expect(instance.findByProps({ children: "4K" })).toBeTruthy();
     expect(instance.findByProps({ children: "5.1" })).toBeTruthy();
-
-    // Check tagline
     expect(instance.findByProps({ children: `"Mankind was born on Earth. It was never meant to die here."` })).toBeTruthy();
-
-    // Check cast member
     expect(instance.findByProps({ children: "Matthew McConaughey" })).toBeTruthy();
     expect(instance.findByProps({ children: "Cooper" })).toBeTruthy();
   });
 
-  it("triggers onPlay when Play button is pressed", () => {
+  it("triggers onPlay when Lire button is pressed", () => {
     const onPlay = jest.fn();
-    const onBack = jest.fn();
-
     let root: renderer.ReactTestRenderer;
     act(() => {
       root = renderer.create(
@@ -107,12 +92,12 @@ describe("MovieDetailsView", () => {
           item={mockMovie}
           serverUrl="https://jellyfin.example.com"
           onPlay={onPlay}
-          onBack={onBack}
+          onBack={jest.fn()}
         />
       );
     });
 
-    const playButton = root!.root.findByProps({ label: "Play" });
+    const playButton = root!.root.findByProps({ label: "Lire" });
     act(() => {
       playButton.props.onPress();
     });
@@ -120,7 +105,7 @@ describe("MovieDetailsView", () => {
     expect(onPlay).toHaveBeenCalledWith(mockMovie);
   });
 
-  it("renders Resume label when movie has partial playback progress", () => {
+  it("renders Reprendre label when movie has partial playback progress", () => {
     const inProgressMovie: MediaItem = {
       ...mockMovie,
       playedPercentage: 42,
@@ -139,7 +124,7 @@ describe("MovieDetailsView", () => {
       );
     });
 
-    expect(root!.root.findByProps({ label: "Resume (42%)" })).toBeTruthy();
+    expect(root!.root.findByProps({ label: "Reprendre (42 %)" })).toBeTruthy();
   });
 
   it("handles back button and favorite toggle", () => {
@@ -159,13 +144,13 @@ describe("MovieDetailsView", () => {
       );
     });
 
-    const backButton = root!.root.findByProps({ accessibilityLabel: "Go back" });
+    const backButton = root!.root.findByProps({ accessibilityLabel: "Retour" });
     act(() => {
       backButton.props.onPress();
     });
     expect(onBack).toHaveBeenCalled();
 
-    const watchlistButton = root!.root.findByProps({ accessibilityLabel: "Add to watchlist" });
+    const watchlistButton = root!.root.findByProps({ accessibilityLabel: "Ajouter à ma liste" });
     act(() => {
       watchlistButton.props.onPress();
     });

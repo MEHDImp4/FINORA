@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { View, FlatList, Pressable, StyleSheet } from "react-native";
+import { View, FlatList, Pressable, StyleSheet, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Image } from "expo-image";
@@ -103,20 +103,46 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
   );
 
   const handleDelete = useCallback(
-    async (record: OfflineMediaRecord) => {
+    (record: OfflineMediaRecord) => {
       hapticService.impactLight();
-      await offlineStorageService.deleteOfflineMedia(record.itemId);
-      await loadData();
+      Alert.alert(
+        "Supprimer le téléchargement ?",
+        `« ${record.title} » sera supprimé de cet appareil.`,
+        [
+          { text: "Annuler", style: "cancel" },
+          {
+            text: "Supprimer",
+            style: "destructive",
+            onPress: async () => {
+              await offlineStorageService.deleteOfflineMedia(record.itemId);
+              await loadData();
+            }
+          }
+        ]
+      );
     },
     [loadData]
   );
 
   const handleDeleteSeries = useCallback(
-    async (seriesIdOrName: string) => {
+    (seriesIdOrName: string) => {
       hapticService.impactMedium();
-      await offlineStorageService.deleteSeriesOfflineMedia(seriesIdOrName);
-      setSelectedSeriesKey(null);
-      await loadData();
+      Alert.alert(
+        "Supprimer la série téléchargée ?",
+        "Tous les épisodes téléchargés de cette série seront supprimés de cet appareil.",
+        [
+          { text: "Annuler", style: "cancel" },
+          {
+            text: "Tout supprimer",
+            style: "destructive",
+            onPress: async () => {
+              await offlineStorageService.deleteSeriesOfflineMedia(seriesIdOrName);
+              setSelectedSeriesKey(null);
+              await loadData();
+            }
+          }
+        ]
+      );
     },
     [loadData]
   );
@@ -147,7 +173,6 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     await downloadManager.cancelDownload(itemId);
   }, []);
 
-  // Group offline items: series grouped together, movies separate
   const catalogItems = useMemo<DownloadedCatalogItem[]>(() => {
     const seriesMap = new Map<string, DownloadedSeriesGroup>();
     const movieItems: DownloadedMovieGroup[] = [];
@@ -198,7 +223,6 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     return [...Array.from(seriesMap.values()), ...movieItems];
   }, [offlineItems]);
 
-  // Selected series for detail inspection
   const activeSeries = useMemo(() => {
     if (!selectedSeriesKey) return null;
     const found = catalogItems.find(
@@ -226,7 +250,6 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     [activeDownloads]
   );
 
-  // If a series is selected, render the dedicated series detail view
   if (activeSeries) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -262,10 +285,9 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
             setSelectedSeriesKey(item.seriesId || item.seriesName);
           }}
           accessibilityRole="button"
-          accessibilityLabel={`Browse series ${item.seriesName}, ${item.episodes.length} episodes`}
+          accessibilityLabel={`Parcourir ${item.seriesName}, ${item.episodes.length} épisodes téléchargés`}
           testID={`downloaded-series-card-${item.seriesId}`}
         >
-          {/* Poster with Episode Count Badge */}
           <View style={styles.cardPosterContainer}>
             {posterUri ? (
               <Image source={{ uri: posterUri }} style={styles.cardPoster} contentFit="cover" transition={200} />
@@ -281,7 +303,6 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
             </View>
           </View>
 
-          {/* Series Info */}
           <View style={styles.cardInfo}>
             <FinoraText variant="body" weight="700" style={styles.cardTitle} numberOfLines={1}>
               {item.seriesName}
@@ -294,7 +315,6 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
             </FinoraText>
           </View>
 
-          {/* Chevron */}
           <View style={styles.cardChevron}>
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </View>
@@ -302,7 +322,6 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
       );
     }
 
-    // Movie card
     const movie = item.movie;
     const isMissing = movie.fileExists === false;
     const retentionLabel = getRetentionLabel(movie);
@@ -314,12 +333,11 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
 
     return (
       <View style={styles.catalogCard} testID={`offline-item-${movie.itemId}`}>
-        {/* Poster */}
         <Pressable
           style={styles.cardPosterContainer}
           onPress={() => handlePlay(movie)}
           accessibilityRole="button"
-          accessibilityLabel={`Poster ${movie.title}`}
+          accessibilityLabel={`Lire ${movie.title}`}
         >
           {posterUri ? (
             <Image source={{ uri: posterUri }} style={styles.cardPoster} contentFit="cover" transition={200} />
@@ -335,7 +353,6 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
           </View>
         </Pressable>
 
-        {/* Info */}
         <View style={styles.cardInfo}>
           <FinoraText variant="body" weight="700" style={styles.cardTitle} numberOfLines={1}>
             {movie.title}
@@ -368,18 +385,17 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
           </View>
         </View>
 
-        {/* Actions */}
         <View style={styles.cardActions}>
           {!isMissing && (
             <Pressable
               style={styles.playButton}
               onPress={() => handlePlay(movie)}
               accessibilityRole="button"
-              accessibilityLabel={`Play offline ${movie.title}`}
+              accessibilityLabel={`Lire hors-ligne ${movie.title}`}
             >
               <Ionicons name="play" size={15} color="#FFFFFF" />
               <FinoraText variant="caption" weight="600" style={styles.playText}>
-                Play
+                Lire
               </FinoraText>
             </Pressable>
           )}
@@ -388,8 +404,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
             style={styles.deleteButton}
             onPress={() => handleDelete(movie)}
             accessibilityRole="button"
-            accessibilityLabel={`Delete ${movie.title}`}
-            hitSlop={8}
+            accessibilityLabel={`Supprimer ${movie.title}`}
           >
             <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />
           </Pressable>
@@ -400,7 +415,6 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-      {/* Header & Storage Indicator */}
       <View style={styles.header}>
         <FinoraText variant="title" weight="700" style={styles.headerTitle}>
           Téléchargements
@@ -410,7 +424,6 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
         </FinoraText>
       </View>
 
-      {/* Orphan Cleanup Banner */}
       {hasOrphans && (
         <View style={styles.orphanBanner}>
           <Ionicons name="information-circle-outline" size={20} color="#F5A623" style={{ marginRight: 8 }} />
@@ -435,7 +448,6 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
         </View>
       )}
 
-      {/* Active, Queued & Failed Downloads Section */}
       {pendingOrFailedDownloads.length > 0 && (
         <View style={styles.activeSection}>
           <FinoraText variant="caption" weight="700" style={styles.sectionTitle}>
@@ -455,7 +467,6 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
         </View>
       )}
 
-      {/* Downloaded Catalog List */}
       <FlatList
         data={catalogItems}
         keyExtractor={(item) => (item.type === "series" ? `series-${item.seriesId}` : `movie-${item.movie.itemId}`)}
@@ -486,7 +497,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
                 Aucun téléchargement
               </FinoraText>
               <FinoraText variant="caption" style={styles.emptySubtitle}>
-                Téléchargez des films et séries depuis votre catalogue pour en profiter partout en voyage ou en déplacement, même sans connexion.
+                Téléchargez des films et séries depuis votre catalogue pour en profiter partout, même sans connexion.
               </FinoraText>
               <Pressable
                 style={styles.exploreButton}
@@ -544,7 +555,7 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: 80
+    paddingBottom: 100
   },
   catalogHeader: {
     marginBottom: spacing.sm
@@ -674,8 +685,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   playButton: {
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 7,
@@ -687,7 +700,11 @@ const styles = StyleSheet.create({
     fontSize: 12
   },
   deleteButton: {
-    padding: 6
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center"
   },
   emptyState: {
     paddingVertical: spacing.xxl + spacing.lg,
@@ -698,8 +715,8 @@ const styles = StyleSheet.create({
   emptyBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(139, 92, 246, 0.12)",
-    borderColor: "rgba(139, 92, 246, 0.3)",
+    backgroundColor: "rgba(229, 9, 20, 0.10)",
+    borderColor: "rgba(229, 9, 20, 0.28)",
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -715,7 +732,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "rgba(139, 92, 246, 0.1)",
+    backgroundColor: "rgba(229, 9, 20, 0.08)",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.md
@@ -734,6 +751,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg
   },
   exploreButton: {
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -770,10 +788,11 @@ const styles = StyleSheet.create({
     fontSize: 11
   },
   cleanButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: "rgba(245, 166, 35, 0.2)"
+    minHeight: 44,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "rgba(245, 166, 35, 0.2)",
+    justifyContent: "center"
   },
   cleanButtonText: {
     color: "#F5A623"

@@ -86,20 +86,9 @@ const mockEpisodes: MediaItem[] = [
 
 describe("SeriesDetailsView", () => {
   beforeEach(() => {
-    (useSeasons as jest.Mock).mockReturnValue({
-      data: mockSeasons,
-      isLoading: false
-    });
-
-    (useEpisodes as jest.Mock).mockReturnValue({
-      data: mockEpisodes,
-      isLoading: false
-    });
-
-    (useSimilarItems as jest.Mock).mockReturnValue({
-      data: [],
-      isLoading: false
-    });
+    (useSeasons as jest.Mock).mockReturnValue({ data: mockSeasons, isLoading: false });
+    (useEpisodes as jest.Mock).mockReturnValue({ data: mockEpisodes, isLoading: false });
+    (useSimilarItems as jest.Mock).mockReturnValue({ data: [], isLoading: false });
   });
 
   it("renders series header, seasons count, community rating, and season pills", () => {
@@ -118,14 +107,14 @@ describe("SeriesDetailsView", () => {
 
     const instance = root!.root;
     expect(instance.findByProps({ children: 2008 })).toBeTruthy();
-    expect(instance.findByProps({ children: "2 Seasons" })).toBeTruthy();
+    expect(instance.findByProps({ children: "2 saisons" })).toBeTruthy();
     expect(instance.findByProps({ children: 9.5 })).toBeTruthy();
     expect(instance.findByProps({ children: "Season 1" })).toBeTruthy();
     expect(instance.findByProps({ children: "Season 2" })).toBeTruthy();
     expect(instance.findByProps({ children: "E1 · Pilot" })).toBeTruthy();
   });
 
-  it("triggers onPlayEpisode with the first unplayed episode when Play button is pressed", () => {
+  it("triggers onPlayEpisode with the first unplayed episode when Lire button is pressed", () => {
     const onPlayEpisode = jest.fn();
 
     let root: renderer.ReactTestRenderer;
@@ -141,7 +130,7 @@ describe("SeriesDetailsView", () => {
       );
     });
 
-    const playButton = root!.root.findByProps({ label: "Play S1:E1" });
+    const playButton = root!.root.findByProps({ label: "Lire S1:E1" });
     act(() => {
       playButton.props.onPress();
     });
@@ -165,7 +154,7 @@ describe("SeriesDetailsView", () => {
       );
     });
 
-    const backButton = root!.root.findByProps({ accessibilityLabel: "Go back" });
+    const backButton = root!.root.findByProps({ accessibilityLabel: "Retour" });
     act(() => {
       backButton.props.onPress();
     });

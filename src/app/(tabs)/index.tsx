@@ -131,7 +131,6 @@ export default function HomeScreen() {
   const userId = session?.userId;
   const serverUrl = session?.serverUrl || jellyfinClient.getServerUrl() || "";
 
-  // Data queries
   const {
     data: resumeItems,
     isError: isResumeError,
@@ -155,7 +154,7 @@ export default function HomeScreen() {
     isError: isWatchlistError
   } = useWatchlistItems(userId);
 
-  const isAnyError = Boolean(isResumeError || isRecentError || isLibrariesError);
+  const isAnyError = Boolean(isResumeError || isRecentError || isLibrariesError || isWatchlistError);
 
   const hasAnyContent = Boolean(
     (resumeItems && resumeItems.length > 0) ||
@@ -208,16 +207,11 @@ export default function HomeScreen() {
 
   const onRefresh = useCallback(async () => {
     setIsPullRefreshing(true);
-    // Dynamically cycle hero banner to next eligible media item
     setHeroIndex((prev) => prev + 1);
     try {
-      // 1. Ask Jellyfin to check disk changes / scan (throttled to 1/30s)
       await mediaRepository.refreshLibrary().catch(() => {});
-      // 2. Refetch active queries and wait for server responses
       await queryClient.refetchQueries({ queryKey: mediaKeys.all, type: "active" });
-      // 3. Re-run diagnostic
       await runDiagnostic();
-      // 4. Check for new media items and dispatch notifications
       await runNotificationSync();
     } finally {
       setIsPullRefreshing(false);
@@ -230,11 +224,9 @@ export default function HomeScreen() {
     useCallback(() => {
       isFocusedRef.current = true;
       const now = Date.now();
-      // Throttle focus refetch to at most once every 15 seconds
       if (now - lastFocusRef.current > 15000) {
         lastFocusRef.current = now;
         queryClient.invalidateQueries({ queryKey: mediaKeys.all, refetchType: "active" });
-        // Check for new media items when screen comes into focus
         runNotificationSync();
       }
       if (!hasAnyContent) {
@@ -246,7 +238,6 @@ export default function HomeScreen() {
     }, [queryClient, hasAnyContent, runDiagnostic, runNotificationSync])
   );
 
-  // Build candidate pool for the featured hero banner
   const heroPool = useMemo(() => {
     const list: MediaItem[] = [];
     const seen = new Set<string>();
@@ -263,21 +254,18 @@ export default function HomeScreen() {
       }
     };
 
-    // Priority 1: Items with official primary posters (Movies, Series, or Episodes with Series poster)
     addIfValid(
       recentItems?.filter(
         (i) => Boolean(i.primaryImageTag || i.seriesPrimaryImageTag || i.parentPrimaryImageTag)
       )
     );
-    // Priority 2: In-progress resume items with official posters
     addIfValid(resumeItems);
-    // Priority 3: Other items
     addIfValid(recentItems);
 
     return list;
   }, [recentItems, resumeItems]);
 
-  // Netflix-style automatic rotation every 5 seconds when screen is focused
+  // Keep the featured item alive long enough to be read before rotating.
   React.useEffect(() => {
     if (isPullRefreshing || heroPool.length <= 1) {
       return;
@@ -287,18 +275,16 @@ export default function HomeScreen() {
       if (isFocusedRef.current) {
         setHeroIndex((prev) => prev + 1);
       }
-    }, 5000);
+    }, 9000);
 
     return () => clearInterval(timer);
   }, [isPullRefreshing, heroPool.length]);
 
-  // Dynamically select featured item using circular rotation index
   const featuredItem = useMemo(() => {
     if (heroPool.length === 0) return null;
     return heroPool[heroIndex % heroPool.length];
   }, [heroPool, heroIndex]);
 
-  // Netflix-style Recommendations Engine
   const recommendedItems = useMemo(() => {
     return getRecommendedForYou(recentItems || [], resumeItems || [], watchlistItems || [], 16);
   }, [recentItems, resumeItems, watchlistItems]);
@@ -364,7 +350,6 @@ export default function HomeScreen() {
     });
   };
 
-  // 1. If server is confirmed unreachable or device is offline and no content is cached
   if (!hasAnyContent && failureType !== null) {
     return (
       <FinoraScreen safeTop={true} safeBottom={false}>
@@ -390,7 +375,6 @@ export default function HomeScreen() {
     );
   }
 
-  // 2. If queries or diagnostic are still checking initially and no content is yet available
   if (!hasAnyContent && (isInitialLoading || isDiagChecking)) {
     return (
       <FinoraScreen safeTop={true} safeBottom={false}>
@@ -405,7 +389,6 @@ export default function HomeScreen() {
     );
   }
 
-  // 3. If queries failed with error and catalog is empty
   if (!hasAnyContent && isAnyError) {
     return (
       <FinoraScreen safeTop={true} safeBottom={false}>
@@ -433,7 +416,6 @@ export default function HomeScreen() {
 
   return (
     <FinoraScreen safeTop={false} safeBottom={false}>
-      {/* Offline / Server Unreachable Banner if cached content is shown */}
       <OfflineBanner
         isOffline={Boolean(hasAnyContent && failureType !== null)}
         message={
@@ -457,7 +439,6 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* Netflix Top Header: Brand mark + "Home", Downloads & Notifications */}
         <View style={[styles.topHeader, { paddingTop: Math.max(insets.top, 12) }]}>
           <View style={styles.topHeaderRow}>
             <View style={styles.brandRow}>
@@ -469,13 +450,14 @@ export default function HomeScreen() {
                 accessibilityLabel="Logo FINORA"
               />
               <FinoraText variant="title" color="textPrimary" weight="800" style={styles.headerTitle}>
-                Home
+                Accueil
               </FinoraText>
             </View>
 
             <View style={styles.headerIconsRow}>
               <Pressable
                 style={styles.headerIconButton}
+                hitSlop={4}
                 onPress={() => router.push("/(tabs)/downloads")}
                 accessibilityRole="button"
                 accessibilityLabel="Téléchargements"
@@ -485,6 +467,7 @@ export default function HomeScreen() {
 
               <Pressable
                 style={styles.headerIconButton}
+                hitSlop={4}
                 onPress={() => {
                   hapticService.selection();
                   setIsNotifModalVisible(true);
@@ -498,38 +481,40 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Quick 4 Core Category Pills (Static, Non-Scrollable Row) */}
           <View style={styles.categoriesBar}>
-            <View style={styles.categoriesRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesRow}
+            >
               <CategoryPillItem
-                label={showsLib?.name || "Shows"}
+                label={showsLib?.name || "Séries"}
                 onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: showsLib?.id || "shows" } })}
-                accessibilityLabel="Browse Shows"
+                accessibilityLabel="Parcourir les séries"
               />
 
               <CategoryPillItem
-                label={moviesLib?.name || "Movies"}
+                label={moviesLib?.name || "Films"}
                 onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: moviesLib?.id || "movies" } })}
-                accessibilityLabel="Browse Movies"
+                accessibilityLabel="Parcourir les films"
               />
 
               <CategoryPillItem
                 label={collectionsLib?.name || "Collections"}
                 onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: collectionsLib?.id || "collections" } })}
-                accessibilityLabel="Browse Collections"
+                accessibilityLabel="Parcourir les collections"
               />
 
               <CategoryPillItem
-                label="Watchlist"
+                label="Ma liste"
                 icon={<Ionicons name="bookmark" size={11} color="#FFFFFF" style={styles.pillIcon} />}
                 onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: "watchlist" } })}
-                accessibilityLabel="Browse Watchlist"
+                accessibilityLabel="Parcourir ma liste"
               />
-            </View>
+            </ScrollView>
           </View>
         </View>
 
-        {/* Dynamic Hero Banner */}
         <HeroBanner
           item={featuredItem}
           serverUrl={serverUrl}
@@ -538,10 +523,9 @@ export default function HomeScreen() {
           onPressDetails={handleItemPress}
         />
 
-        {/* Continue Watching Section (Posters with progress bars) */}
         {resumeItems && resumeItems.length > 0 ? (
           <MediaCarousel
-            title="Continue Watching"
+            title="Continuer à regarder"
             items={resumeItems}
             serverUrl={serverUrl}
             variant="poster"
@@ -550,7 +534,6 @@ export default function HomeScreen() {
           />
         ) : null}
 
-        {/* Netflix Top Picks: Recommandé pour vous */}
         {recommendedItemsList.length > 0 ? (
           <MediaCarousel
             title="Recommandé pour vous"
@@ -562,7 +545,6 @@ export default function HomeScreen() {
           />
         ) : null}
 
-        {/* Netflix: Parce que vous avez regardé [Titre] */}
         {becauseYouWatched && becauseYouWatchedItems.length > 0 ? (
           <MediaCarousel
             title={`Parce que vous avez regardé ${becauseYouWatched.sourceItem.name}`}
@@ -574,10 +556,9 @@ export default function HomeScreen() {
           />
         ) : null}
 
-        {/* Watchlist Section (My List Posters) */}
         {watchlistItems && watchlistItems.length > 0 ? (
           <MediaCarousel
-            title="Watchlist"
+            title="Ma liste"
             items={watchlistItems}
             serverUrl={serverUrl}
             variant="poster"
@@ -586,10 +567,9 @@ export default function HomeScreen() {
           />
         ) : null}
 
-        {/* Recently Added Section (Posters) */}
         {recentItems && recentItems.length > 0 ? (
           <MediaCarousel
-            title="Recently Added"
+            title="Ajouts récents"
             items={recentItems}
             serverUrl={serverUrl}
             variant="poster"
@@ -598,7 +578,6 @@ export default function HomeScreen() {
           />
         ) : null}
 
-        {/* Dynamic Per-Library Sections (Movies, TV Shows, Anime, Collections...) */}
         {libraries?.map((library) => (
           <HomeLibraryRow
             key={library.id}
@@ -640,7 +619,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   contentContainer: {
-    paddingBottom: 80
+    paddingBottom: 100
   },
   failureContainer: {
     flexGrow: 1,
@@ -686,9 +665,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   headerIconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "rgba(255, 255, 255, 0.08)",
     justifyContent: "center",
     alignItems: "center",
@@ -696,8 +675,8 @@ const styles = StyleSheet.create({
   },
   notificationDot: {
     position: "absolute",
-    top: 7,
-    right: 8,
+    top: 8,
+    right: 9,
     width: 8,
     height: 8,
     borderRadius: 4,
@@ -707,20 +686,26 @@ const styles = StyleSheet.create({
   },
   categoriesBar: {
     marginTop: spacing.xs,
-    marginBottom: spacing.xs
+    marginBottom: spacing.xs,
+    marginHorizontal: -spacing.md
   },
   categoriesRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 7
+    gap: 8,
+    paddingHorizontal: spacing.md,
+    paddingRight: spacing.xl
   },
   pillPressable: {
-    flex: 1
+    minWidth: 96,
+    maxWidth: 180,
+    minHeight: 44,
+    justifyContent: "center"
   },
   categoryPill: {
-    paddingHorizontal: 4,
-    paddingVertical: 7.5,
+    minHeight: 40,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 18,
     backgroundColor: "rgba(255, 255, 255, 0.09)",
     borderWidth: 1,

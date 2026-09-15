@@ -8,8 +8,8 @@ export const colors = {
   primaryHover: "#F40612",
   accent: "#FFB800",
   textPrimary: "#FFFFFF",
-  textSecondary: "#8A8A9E",
-  textMuted: "#5A5A6E",
+  textSecondary: "#A0A0B2",
+  textMuted: "#76768B",
   error: "#FF3B30",
   success: "#34C759"
 } as const;

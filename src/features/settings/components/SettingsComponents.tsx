@@ -77,7 +77,7 @@ export function SettingsRow({
           {title}
         </Text>
         {subtitle ? (
-          <Text style={styles.rowSubtitle} numberOfLines={1}>
+          <Text style={styles.rowSubtitle} numberOfLines={2}>
             {subtitle}
           </Text>
         ) : null}
@@ -93,7 +93,7 @@ export function SettingsRow({
         <Ionicons
           name="chevron-forward"
           size={16}
-          color="#55556B"
+          color={colors.textMuted}
           style={styles.chevron}
         />
       ) : null}
@@ -106,6 +106,9 @@ export function SettingsRow({
         onPress={handlePress}
         activeOpacity={0.7}
         testID={testID}
+        accessibilityRole="button"
+        accessibilityLabel={title}
+        accessibilityHint={subtitle || value}
       >
         {Content}
       </TouchableOpacity>
@@ -159,6 +162,8 @@ export function SettingsSwitchRow({
         onValueChange={handleToggle}
         trackColor={{ false: "#2A2A38", true: colors.primary }}
         thumbColor={Platform.OS === "android" ? "#FFFFFF" : undefined}
+        accessibilityLabel={title}
+        accessibilityHint={subtitle}
       />
     </View>
   );
@@ -171,31 +176,31 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#8A8A9E",
+    color: colors.textSecondary,
     letterSpacing: 1.2,
     marginBottom: spacing.xs,
     marginLeft: 4
   },
   sectionDescription: {
     fontSize: 13,
-    color: "#6E6E82",
+    color: colors.textMuted,
     marginBottom: spacing.sm,
     marginLeft: 4,
     lineHeight: 18
   },
   card: {
-    backgroundColor: "rgba(20, 20, 28, 0.72)",
+    backgroundColor: "rgba(20, 20, 28, 0.82)",
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.09)",
-    borderTopColor: "rgba(255, 255, 255, 0.20)",
     overflow: "hidden",
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.28,
     shadowRadius: 10
   },
   rowContainer: {
+    minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 13,
@@ -229,13 +234,13 @@ const styles = StyleSheet.create({
   },
   rowSubtitle: {
     fontSize: 12,
-    color: "#8A8A9E",
+    color: colors.textSecondary,
     marginTop: 2,
     lineHeight: 16
   },
   rowValue: {
     fontSize: 14,
-    color: "#8A8A9E",
+    color: colors.textSecondary,
     marginRight: 6,
     maxWidth: "45%",
     textAlign: "right"
