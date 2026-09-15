@@ -9,31 +9,52 @@ import { jellyfinClient } from "../../core/jellyfin/jellyfinClient";
 import { MediaItem } from "../../types/media";
 import { logger } from "../../core/network/logger";
 
+/** Legacy unscoped key kept only so upgrades can delete it safely. */
 export const STORAGE_KEY_KNOWN_MEDIA = "@finora_known_media_ids";
+const STORAGE_KEY_KNOWN_MEDIA_PREFIX = "@finora_known_media_ids_v2";
 const MAX_KNOWN_IDS = 500;
-const SYNC_COOLDOWN_MS = 60000; // Throttle to at most once per minute
+const SYNC_COOLDOWN_MS = 60000;
+
+export function getKnownMediaStorageKey(serverId: string, userId: string): string {
+  return `${STORAGE_KEY_KNOWN_MEDIA_PREFIX}:${encodeURIComponent(serverId)}:${encodeURIComponent(userId)}`;
+}
 
 /**
  * Checks Jellyfin recent media additions against known items.
- * Triggers targeted notifications for:
- * 1. New episodes of currently watched series
- * 2. New movies added to library
- * 3. New series added to library
+ * Discovery state is isolated per Jellyfin server + user so switching accounts
+ * cannot suppress or leak notifications across servers.
  */
-export async function syncNewMediaNotifications(userId: string): Promise<void> {
+export async function syncNewMediaNotifications(
+  userId: string,
+  explicitServerId?: string
+): Promise<void> {
   const { preferences } = useNotificationStore.getState();
   if (!preferences.enabled) return;
 
-  const serverUrl =
-    jellyfinClient.getServerUrl() ||
-    (typeof useAuthStore.getState === "function"
-      ? useAuthStore.getState()?.session?.serverUrl
-      : undefined) ||
-    "";
+  const authSession =
+    typeof useAuthStore.getState === "function" ? useAuthStore.getState()?.session : null;
+  const serverUrl = jellyfinClient.getServerUrl() || authSession?.serverUrl || "";
+  const serverId = explicitServerId || authSession?.serverId || serverUrl;
+
+  if (!serverId) {
+    logger.warn("[NotificationSync] Skipped: cannot determine active server scope.");
+    return;
+  }
+
+  const storageKey = getKnownMediaStorageKey(serverId, userId);
 
   try {
-    // 1. Load known media IDs
-    const rawKnown = await AsyncStorage.getItem(STORAGE_KEY_KNOWN_MEDIA);
+    const [rawKnown, legacyKnown] = await Promise.all([
+      AsyncStorage.getItem(storageKey),
+      AsyncStorage.getItem(STORAGE_KEY_KNOWN_MEDIA)
+    ]);
+
+    // Never migrate a global baseline to the current account because it may have
+    // been created by another server/user. Delete it and seed this account cleanly.
+    if (legacyKnown !== null) {
+      await AsyncStorage.removeItem(STORAGE_KEY_KNOWN_MEDIA).catch(() => {});
+    }
+
     let knownSet = new Set<string>();
     let isFirstRun = false;
 
@@ -41,7 +62,7 @@ export async function syncNewMediaNotifications(userId: string): Promise<void> {
       try {
         const parsed = JSON.parse(rawKnown);
         if (Array.isArray(parsed)) {
-          knownSet = new Set(parsed);
+          knownSet = new Set(parsed.filter((id): id is string => typeof id === "string"));
         }
       } catch {
         knownSet = new Set();
@@ -50,7 +71,6 @@ export async function syncNewMediaNotifications(userId: string): Promise<void> {
       isFirstRun = true;
     }
 
-    // 2. Fetch recent items & resume items concurrently
     const [recentItems, resumeItems] = await Promise.all([
       mediaRepository.getRecentlyAdded(userId, undefined, 30).catch(() => [] as MediaItem[]),
       mediaRepository.getResumeItems(userId, 20).catch(() => [] as MediaItem[])
@@ -58,7 +78,6 @@ export async function syncNewMediaNotifications(userId: string): Promise<void> {
 
     if (!recentItems || recentItems.length === 0) return;
 
-    // 3. Build a map of currently watched series
     const watchedSeriesMap = new Map<string, string>();
     for (const item of resumeItems) {
       if (item.seriesId) {
@@ -68,20 +87,18 @@ export async function syncNewMediaNotifications(userId: string): Promise<void> {
       }
     }
 
-    // 4. If first run, establish baseline without spamming notifications
     if (isFirstRun) {
       const initialIds = recentItems.map((item) => item.id);
       await AsyncStorage.setItem(
-        STORAGE_KEY_KNOWN_MEDIA,
+        storageKey,
         JSON.stringify(initialIds.slice(0, MAX_KNOWN_IDS))
       );
       logger.info(
-        `[NotificationSync] Seeded baseline with ${initialIds.length} known items (no notifications dispatched)`
+        `[NotificationSync] Seeded account baseline with ${initialIds.length} known items (no notifications dispatched)`
       );
       return;
     }
 
-    // 5. Compare and dispatch notifications for new items
     const newlyDiscoveredIds: string[] = [];
 
     for (const item of recentItems) {
@@ -90,7 +107,6 @@ export async function syncNewMediaNotifications(userId: string): Promise<void> {
       newlyDiscoveredIds.push(item.id);
       const posterUrl = serverUrl ? getMediaPosterUrl(serverUrl, item, 200) : undefined;
 
-      // Category: New episode of watched series
       if (item.type === "Episode" && item.seriesId && watchedSeriesMap.has(item.seriesId)) {
         const seriesName = item.seriesName || watchedSeriesMap.get(item.seriesId) || "Série";
         await notificationService.notifyNewEpisode({
@@ -103,7 +119,6 @@ export async function syncNewMediaNotifications(userId: string): Promise<void> {
           posterUrl
         });
       } else if (item.type === "Movie") {
-        // Category: New movie added
         await notificationService.notifyNewMovie({
           movieTitle: item.name,
           movieId: item.id,
@@ -111,7 +126,6 @@ export async function syncNewMediaNotifications(userId: string): Promise<void> {
           posterUrl
         });
       } else if (item.type === "Series") {
-        // Category: New series added
         await notificationService.notifyNewSeries({
           seriesTitle: item.name,
           seriesId: item.id,
@@ -121,13 +135,11 @@ export async function syncNewMediaNotifications(userId: string): Promise<void> {
       }
     }
 
-    // 6. Update and persist known IDs
     if (newlyDiscoveredIds.length > 0) {
-      const updatedList = Array.from(new Set([...newlyDiscoveredIds, ...Array.from(knownSet)])).slice(
-        0,
-        MAX_KNOWN_IDS
-      );
-      await AsyncStorage.setItem(STORAGE_KEY_KNOWN_MEDIA, JSON.stringify(updatedList));
+      const updatedList = Array.from(
+        new Set([...newlyDiscoveredIds, ...Array.from(knownSet)])
+      ).slice(0, MAX_KNOWN_IDS);
+      await AsyncStorage.setItem(storageKey, JSON.stringify(updatedList));
       logger.info(
         `[NotificationSync] Dispatched notifications for ${newlyDiscoveredIds.length} new media item(s)`
       );
@@ -142,10 +154,11 @@ export async function syncNewMediaNotifications(userId: string): Promise<void> {
  */
 export function useNotificationSync(): { runSync: () => Promise<void> } {
   const userId = useAuthStore((state) => state.session?.userId);
+  const serverId = useAuthStore((state) => state.session?.serverId);
   const lastSyncRef = useRef<number>(0);
 
   const runSync = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || !serverId) return;
 
     const now = Date.now();
     if (now - lastSyncRef.current < SYNC_COOLDOWN_MS) {
@@ -153,14 +166,14 @@ export function useNotificationSync(): { runSync: () => Promise<void> } {
     }
     lastSyncRef.current = now;
 
-    await syncNewMediaNotifications(userId);
-  }, [userId]);
+    await syncNewMediaNotifications(userId, serverId);
+  }, [userId, serverId]);
 
   useEffect(() => {
-    if (userId) {
+    if (userId && serverId) {
       runSync();
     }
-  }, [userId, runSync]);
+  }, [userId, serverId, runSync]);
 
   return { runSync };
 }
