@@ -4,6 +4,7 @@ import { OnboardingScreen } from "../components/OnboardingScreen";
 import { DEFAULT_JELLYFIN_SERVER, validateAndDiscoverServer } from "../../../core/jellyfin/serverDiscovery";
 import { useAuthStore } from "../../../stores/authStore";
 import { useOnboardingStore } from "../../../stores/onboardingStore";
+import { useLanguageStore } from "../../../stores/languageStore";
 import { serverManager } from "../../../core/jellyfin/serverManager";
 
 /** Neutral test URL — never a personal server */
@@ -31,6 +32,10 @@ describe("OnboardingScreen", () => {
       isCompleted: false,
       isLoaded: true
     });
+    useLanguageStore.setState({
+      language: "en",
+      isLoaded: true
+    });
     jest.clearAllMocks();
   });
 
@@ -38,23 +43,38 @@ describe("OnboardingScreen", () => {
     expect(DEFAULT_JELLYFIN_SERVER).toBe("");
   });
 
-  it("renders onboarding slides and server input with empty default", () => {
+  it("renders onboarding slides with English as default and allows switching language to French", async () => {
     let component: ReactTestRenderer.ReactTestRenderer;
     ReactTestRenderer.act(() => {
       component = ReactTestRenderer.create(<OnboardingScreen />);
     });
 
     const root = component!.root;
-    // Check badge text and connection title from the current UI
+    // English default checks
+    expect(root.findByProps({ children: "LANGUAGE" })).toBeDefined();
+    expect(root.findByProps({ children: "Choose your language" })).toBeDefined();
+    expect(root.findByProps({ children: "YOUR JELLYFIN" })).toBeDefined();
+    expect(root.findByProps({ children: "FINORA PLAYBACK" })).toBeDefined();
+    expect(root.findByProps({ children: "Connect your Jellyfin" })).toBeDefined();
+
+    // Find French language selection card
+    const frenchCard = root.findByProps({ accessibilityLabel: "French" });
+    expect(frenchCard).toBeDefined();
+
+    // Select French
+    await ReactTestRenderer.act(async () => {
+      frenchCard.props.onPress();
+    });
+
+    // Language store should now be 'fr'
+    expect(useLanguageStore.getState().language).toBe("fr");
+
+    // Dynamic translation to French should now be reflected
+    expect(root.findByProps({ children: "LANGUE" })).toBeDefined();
+    expect(root.findByProps({ children: "Choisissez votre langue" })).toBeDefined();
     expect(root.findByProps({ children: "VOTRE JELLYFIN" })).toBeDefined();
     expect(root.findByProps({ children: "LECTURE FINORA" })).toBeDefined();
     expect(root.findByProps({ children: "Connectez votre Jellyfin" })).toBeDefined();
-
-    // Server input should start empty (no personal server pre-filled)
-    const inputs = root.findAllByType("TextInput" as any);
-    const serverInput = inputs.find((i) => i.props.placeholder === "https://votre-serveur.com");
-    expect(serverInput).toBeDefined();
-    expect(serverInput?.props.value).toBe("");
   });
 
   it("handles test server action successfully with a user-provided URL", async () => {
@@ -76,19 +96,19 @@ describe("OnboardingScreen", () => {
 
     // Type a server URL first
     const inputs = root.findAllByType("TextInput" as any);
-    const serverInput = inputs.find((i) => i.props.placeholder === "https://votre-serveur.com");
+    const serverInput = inputs.find((i) => i.props.placeholder === "https://your-server.com");
     ReactTestRenderer.act(() => {
       serverInput?.props.onChangeText(TEST_SERVER_URL);
     });
 
-    const testButton = root.findByProps({ children: "Tester" }).parent;
+    const testButton = root.findByProps({ children: "Test" }).parent;
 
     await ReactTestRenderer.act(async () => {
       testButton?.props.onPress();
     });
 
     expect(validateAndDiscoverServer).toHaveBeenCalledWith(TEST_SERVER_URL);
-    expect(root.findByProps({ children: "Serveur en ligne : Jellyfin Home" })).toBeDefined();
+    expect(root.findByProps({ children: "Server online: Jellyfin Home" })).toBeDefined();
   });
 
   it("authenticates and completes onboarding upon submitting valid credentials", async () => {
@@ -113,16 +133,15 @@ describe("OnboardingScreen", () => {
     const root = component!.root;
     const textInputs = root.findAllByType("TextInput" as any);
 
-    // Must provide a server URL first (DEFAULT_JELLYFIN_SERVER is now "")
-    const serverInput = textInputs.find((i) => i.props.placeholder === "https://votre-serveur.com");
-    const usernameInput = textInputs.find((i) => i.props.placeholder === "Votre identifiant");
+    const serverInput = textInputs.find((i) => i.props.placeholder === "https://your-server.com");
+    const usernameInput = textInputs.find((i) => i.props.placeholder === "Your username");
 
     ReactTestRenderer.act(() => {
       serverInput?.props.onChangeText(TEST_SERVER_URL);
       usernameInput?.props.onChangeText("Bastoz");
     });
 
-    const submitBtn = root.findByProps({ label: "Se connecter et commencer" });
+    const submitBtn = root.findByProps({ label: "Sign in and get started" });
 
     await ReactTestRenderer.act(async () => {
       submitBtn.props.onPress();
@@ -156,9 +175,9 @@ describe("OnboardingScreen", () => {
     });
 
     const root = component!.root;
-    expect(root.findByProps({ children: "Bienvenue, Bastoz !" })).toBeDefined();
+    expect(root.findByProps({ children: "Welcome back, Bastoz!" })).toBeDefined();
 
-    const enterBtn = root.findByProps({ label: "Accéder à FINORA" });
+    const enterBtn = root.findByProps({ label: "Enter FINORA" });
     await ReactTestRenderer.act(async () => {
       enterBtn.props.onPress();
     });

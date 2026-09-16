@@ -18,6 +18,7 @@ import { offlineSyncManager } from "../features/offline/offlineSyncManager";
 import { offlineStorageService } from "../features/offline/offlineStorage";
 import { downloadManager } from "../features/offline/downloadManager";
 import { useOnboardingStore } from "../stores/onboardingStore";
+import { useLanguageStore } from "../stores/languageStore";
 import { OnboardingScreen } from "../features/onboarding/components/OnboardingScreen";
 
 export default function RootLayout() {
@@ -31,11 +32,12 @@ export default function RootLayout() {
   const isOnboardingCompleted = useOnboardingStore((state) => state.isCompleted);
   const isOnboardingLoaded = useOnboardingStore((state) => state.isLoaded);
   const loadOnboardingStatus = useOnboardingStore((state) => state.loadOnboardingStatus);
+  const loadLanguage = useLanguageStore((state) => state.loadLanguage);
   const router = useRouter();
   const [minSplashDone, setMinSplashDone] = React.useState(false);
 
   useEffect(() => {
-    Promise.all([restoreSession(), loadOnboardingStatus()]).finally(() => {
+    Promise.all([restoreSession(), loadOnboardingStatus(), loadLanguage()]).finally(() => {
       setMinSplashDone(true);
     });
 

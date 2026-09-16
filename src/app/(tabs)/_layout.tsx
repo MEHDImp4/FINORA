@@ -69,7 +69,11 @@ function FinoraPillTabBar({ state, descriptors, navigation, insets }: any) {
   );
 }
 
+import { useTranslation } from "../../i18n";
+
 export default function TabsLayout() {
+  const { t } = useTranslation();
+
   return (
     <Tabs
       tabBar={(props) => <FinoraPillTabBar {...props} />}
@@ -80,7 +84,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Accueil",
+          title: t("tabs.home"),
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
               name={focused ? "home" : "home-outline"}
@@ -93,7 +97,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: "Recherche",
+          title: t("tabs.search"),
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
               name={focused ? "search" : "search-outline"}
@@ -106,7 +110,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="library"
         options={{
-          title: "Bibliothèque",
+          title: t("tabs.library"),
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
               name={focused ? "film" : "film-outline"}
@@ -125,7 +129,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Paramètres",
+          title: t("tabs.settings"),
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
               name={focused ? "settings" : "settings-outline"}

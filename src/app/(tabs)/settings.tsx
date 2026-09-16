@@ -36,6 +36,7 @@ import { useNotificationStore } from "../../stores/notificationStore";
 import { notificationService } from "../../core/notifications/notificationService";
 import { useQueryClient } from "@tanstack/react-query";
 import { cacheService } from "../../core/cache/cacheService";
+import { useTranslation, SupportedLanguage } from "../../i18n";
 
 const AUDIO_LANG_OPTIONS: SelectionOption<string>[] = [
   { id: "fr", label: "Français", subtitle: "Piste audio française prioritaire" },
@@ -105,6 +106,7 @@ const PLAYBACK_SPEED_OPTIONS: SelectionOption<number>[] = [
 export default function SettingsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t, language, setLanguage, languages } = useTranslation();
 
   const session = useAuthStore((state) => state.session);
   const logout = useAuthStore((state) => state.logout);
@@ -126,7 +128,9 @@ export default function SettingsScreen() {
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [showDiagModal, setShowDiagModal] = useState(false);
   const [showSubtitleStyleModal, setShowSubtitleStyleModal] = useState(false);
-  const [activePicker, setActivePicker] = useState<"audio" | "sub" | "subMode" | "speed" | "downloadQuality" | null>(null);
+  const [activePicker, setActivePicker] = useState<
+    "language" | "audio" | "sub" | "subMode" | "speed" | "downloadQuality" | null
+  >(null);
 
   useEffect(() => {
     loadSavedAccounts();
@@ -223,6 +227,8 @@ export default function SettingsScreen() {
     );
   };
 
+  const currentLanguageOption = languages.find((l) => l.code === language) || languages[0];
+  const languageLabel = `${currentLanguageOption.flag} ${currentLanguageOption.nativeName}`;
   const audioLabel = AUDIO_LANG_OPTIONS.find((o) => o.id === preferences.preferredAudioLanguage)?.label || preferences.preferredAudioLanguage;
   const subtitleLabel = SUBTITLE_LANG_OPTIONS.find((o) => o.id === preferences.preferredSubtitleLanguage)?.label || preferences.preferredSubtitleLanguage;
   const subtitleModeLabel = SUBTITLE_MODE_OPTIONS.find((o) => o.id === preferences.subtitleMode)?.label || preferences.subtitleMode;
@@ -233,10 +239,10 @@ export default function SettingsScreen() {
     <FinoraScreen safeBottom={false}>
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.headerContainer}>
-          <Text style={styles.pageTitle}>Paramètres</Text>
+          <Text style={styles.pageTitle}>{t("settings.title")}</Text>
         </View>
 
-        <SettingsSection title="Compte">
+        <SettingsSection title={t("settings.accountSection")}>
           {session ? (
             <View style={styles.sessionHeaderCard}>
               <View style={styles.sessionAvatar}>
@@ -256,14 +262,14 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="server-outline"
             iconColor={colors.textSecondary}
-            title="Changer de serveur"
-            value={session ? "Connecté" : "Non connecté"}
+            title={t("settings.switchServer")}
+            value={session ? t("settings.connected") : t("settings.notConnected")}
             onPress={() => setShowConnectModal(true)}
           />
 
           {savedAccounts.length > 1 ? (
             <View style={styles.savedAccountsContainer}>
-              <Text style={styles.subCategoryHeader}>COMPTES ENREGISTRÉS</Text>
+              <Text style={styles.subCategoryHeader}>{t("settings.savedAccounts")}</Text>
               {savedAccounts.map((acc, idx) => {
                 const isActive = session?.serverId === acc.serverId && session?.userId === acc.userId;
                 return (
@@ -282,8 +288,8 @@ export default function SettingsScreen() {
                       accessibilityState={{ selected: isActive, disabled: isActive }}
                       accessibilityLabel={
                         isActive
-                          ? `${acc.userName}, compte actif`
-                          : `Basculer vers le compte ${acc.userName}`
+                          ? t("settings.activeAccount", { username: acc.userName })
+                          : t("settings.switchAccountTo", { username: acc.userName })
                       }
                     >
                       <View style={[styles.accountAvatar, isActive && styles.accountAvatarActive]}>
@@ -311,7 +317,7 @@ export default function SettingsScreen() {
                         style={styles.accountRemoveButton}
                         onPress={() => handleRemoveAccount(acc.serverId, acc.userId, acc.userName)}
                         accessibilityRole="button"
-                        accessibilityLabel={`Retirer le compte ${acc.userName}`}
+                        accessibilityLabel={t("settings.removeAccount", { username: acc.userName })}
                       >
                         <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />
                       </Pressable>
@@ -325,14 +331,14 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="pulse-outline"
             iconColor="#FFB800"
-            title="Diagnostic réseau"
+            title={t("settings.diagnostics")}
             onPress={() => setShowDiagModal(true)}
           />
 
           {session ? (
             <SettingsRow
               iconName="log-out-outline"
-              title="Déconnexion"
+              title={t("settings.logout")}
               destructive
               showChevron={false}
               isLast
@@ -341,11 +347,11 @@ export default function SettingsScreen() {
           ) : null}
         </SettingsSection>
 
-        <SettingsSection title="Lecture">
+        <SettingsSection title={t("settings.playbackSpeed")}>
           <SettingsRow
             iconName="volume-medium-outline"
             iconColor={colors.primary}
-            title="Audio"
+            title={t("settings.preferredAudioLanguage")}
             value={audioLabel}
             onPress={() => setActivePicker("audio")}
           />
@@ -353,7 +359,7 @@ export default function SettingsScreen() {
           <SettingsSwitchRow
             iconName="play-skip-forward-outline"
             iconColor={colors.primary}
-            title="Passer les intros"
+            title={t("settings.autoSkipIntro")}
             value={preferences.autoSkipIntro}
             onValueChange={setAutoSkipIntro}
           />
@@ -361,18 +367,18 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="speedometer-outline"
             iconColor={colors.primary}
-            title="Vitesse"
+            title={t("settings.playbackSpeed")}
             value={speedLabel}
             isLast
             onPress={() => setActivePicker("speed")}
           />
         </SettingsSection>
 
-        <SettingsSection title="Sous-titres">
+        <SettingsSection title={t("settings.subtitleStyle")}>
           <SettingsRow
             iconName="chatbubble-ellipses-outline"
             iconColor={colors.textSecondary}
-            title="Langue"
+            title={t("settings.preferredSubtitleLanguage")}
             value={subtitleLabel}
             onPress={() => setActivePicker("sub")}
           />
@@ -380,7 +386,7 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="options-outline"
             iconColor={colors.textSecondary}
-            title="Affichage"
+            title={t("settings.subtitleMode")}
             value={subtitleModeLabel}
             onPress={() => setActivePicker("subMode")}
           />
@@ -388,17 +394,17 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="color-wand-outline"
             iconColor={colors.textSecondary}
-            title="Style et apparence"
+            title={t("settings.subtitleStyle")}
             isLast
             onPress={() => setShowSubtitleStyleModal(true)}
           />
         </SettingsSection>
 
-        <SettingsSection title="Téléchargements">
+        <SettingsSection title={t("settings.downloadsSection")}>
           <SettingsRow
             iconName="film-outline"
             iconColor={colors.textSecondary}
-            title="Qualité"
+            title={t("settings.defaultDownloadQuality")}
             value={downloadQualityLabel}
             onPress={() => setActivePicker("downloadQuality")}
           />
@@ -406,7 +412,7 @@ export default function SettingsScreen() {
           <SettingsSwitchRow
             iconName="wifi-outline"
             iconColor={colors.textSecondary}
-            title="Wi-Fi uniquement"
+            title={t("settings.wifiOnly")}
             value={preferences.downloadWifiOnly}
             onValueChange={setDownloadWifiOnly}
           />
@@ -414,24 +420,24 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="folder-open-outline"
             iconColor={colors.textSecondary}
-            title="Mes téléchargements"
+            title={t("settings.downloadsSection")}
             onPress={() => router.push("/(tabs)/downloads")}
           />
 
           <SettingsRow
             iconName="trash-outline"
             iconColor={colors.textSecondary}
-            title="Vider le cache"
+            title={t("settings.clearImageCache")}
             isLast
             onPress={handleClearCache}
           />
         </SettingsSection>
 
-        <SettingsSection title="Notifications">
+        <SettingsSection title={t("settings.notificationsSection")}>
           <SettingsSwitchRow
             iconName="notifications-outline"
             iconColor={colors.primary}
-            title="Autoriser les notifications"
+            title={t("settings.notificationsEnabled")}
             value={notifPreferences.enabled}
             onValueChange={handleToggleGlobalNotifs}
             isLast={!notifPreferences.enabled}
@@ -483,11 +489,20 @@ export default function SettingsScreen() {
           ) : null}
         </SettingsSection>
 
-        <SettingsSection title="Application">
+        <SettingsSection title={t("settings.preferencesSection")}>
+          <SettingsRow
+            iconName="language-outline"
+            iconColor={colors.primary}
+            title={t("settings.appLanguage")}
+            subtitle={t("settings.appLanguageSubtitle")}
+            value={languageLabel}
+            onPress={() => setActivePicker("language")}
+          />
+
           <SettingsSwitchRow
             iconName="phone-portrait-outline"
             iconColor={colors.textSecondary}
-            title="Vibrations"
+            title={t("settings.hapticFeedback")}
             value={preferences.hapticsEnabled}
             onValueChange={setHapticsEnabled}
           />
@@ -503,7 +518,7 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="information-circle-outline"
             iconColor={colors.textSecondary}
-            title="Version"
+            title={t("settings.appVersion")}
             value="1.0.0"
             showChevron={false}
           />
@@ -534,6 +549,23 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
       </ScrollView>
+
+      <SelectionPickerModal
+        visible={activePicker === "language"}
+        title={t("settings.selectLanguageModalTitle")}
+        options={languages.map((l) => ({
+          id: l.code,
+          label: l.nativeName,
+          subtitle: l.label,
+          badge: l.flag
+        }))}
+        selectedValue={language}
+        onSelect={(newLang) => {
+          hapticService.selection();
+          setLanguage(newLang as SupportedLanguage);
+        }}
+        onClose={() => setActivePicker(null)}
+      />
 
       <SelectionPickerModal
         visible={activePicker === "audio"}

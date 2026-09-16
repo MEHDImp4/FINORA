@@ -22,8 +22,11 @@ import { useOnboardingStore } from "../../../stores/onboardingStore";
 import { useServerStore } from "../../../stores/serverStore";
 import { serverManager } from "../../../core/jellyfin/serverManager";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { useTranslation, SupportedLanguage } from "../../../i18n";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const TOTAL_SLIDES = 4;
+const LAST_SLIDE_INDEX = TOTAL_SLIDES - 1;
 
 export interface OnboardingScreenProps {
   onCompleted?: () => void;
@@ -33,6 +36,8 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
+
+  const { t, language, setLanguage, languages } = useTranslation();
 
   const [serverUrl, setServerUrl] = useState(DEFAULT_JELLYFIN_SERVER);
   const [username, setUsername] = useState("");
@@ -80,7 +85,7 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
       hapticService.impactMedium();
     } catch (err) {
       setServerStatus("error");
-      setServerError((err as Error).message || "Serveur injoignable");
+      setServerError((err as Error).message || t("onboarding.serverErrorFallback"));
       hapticService.notificationError();
     } finally {
       setIsTestingServer(false);
@@ -96,11 +101,11 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
 
   const handleLoginAndComplete = async () => {
     if (!serverUrl.trim()) {
-      setLoginError("Veuillez spécifier l'adresse du serveur Jellyfin.");
+      setLoginError(t("onboarding.errorMissingServerUrl"));
       return;
     }
     if (!username.trim()) {
-      setLoginError("Veuillez renseigner votre nom d'utilisateur.");
+      setLoginError(t("onboarding.errorMissingUsername"));
       return;
     }
 
@@ -123,7 +128,7 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
         if (currentSession) {
           await serverManager.saveAccount({
             serverId: currentSession.serverId,
-            serverName: serverName || "Serveur Jellyfin",
+            serverName: serverName || "Jellyfin Server",
             serverUrl: currentSession.serverUrl,
             userId: currentSession.userId,
             userName: currentSession.userName,
@@ -135,11 +140,11 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
         onCompleted?.();
       } else {
         const err = useAuthStore.getState().errorMessage;
-        setLoginError(err || "Échec de connexion. Vérifiez vos identifiants.");
+        setLoginError(err || t("onboarding.errorInvalidCredentials"));
         hapticService.notificationError();
       }
     } catch (err) {
-      setLoginError((err as Error).message || "Impossible de se connecter au serveur.");
+      setLoginError((err as Error).message || t("onboarding.errorCannotConnect"));
       hapticService.notificationError();
     } finally {
       setIsSubmitting(false);
@@ -158,14 +163,14 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
           contentFit="contain"
           accessibilityLabel="FINORA"
         />
-        {currentSlide < 2 && (
+        {currentSlide < LAST_SLIDE_INDEX && (
           <Pressable
             style={styles.skipButton}
-            onPress={() => goToSlide(2)}
+            onPress={() => goToSlide(LAST_SLIDE_INDEX)}
             accessibilityRole="button"
-            accessibilityLabel="Passer la présentation"
+            accessibilityLabel={t("onboarding.skip")}
           >
-            <Text style={styles.skipButtonText}>Passer</Text>
+            <Text style={styles.skipButtonText}>{t("onboarding.skip")}</Text>
           </Pressable>
         )}
       </View>
@@ -179,75 +184,119 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
         scrollEventThrottle={16}
         style={styles.carousel}
       >
+        {/* Slide 0: Language Selection */}
+        <View style={styles.slide}>
+          <View style={styles.slideContent}>
+            <View style={styles.badgeContainer}>
+              <Ionicons name="language-outline" size={15} color={colors.primary} />
+              <Text style={styles.badgeText}>{t("onboarding.languageStepBadge")}</Text>
+            </View>
+
+            <Text style={styles.slideTitle}>{t("onboarding.languageSelectTitle")}</Text>
+
+            <Text style={styles.slideDescription}>{t("onboarding.languageSelectSubtitle")}</Text>
+
+            <View style={styles.languageCardsList}>
+              {languages.map((langOption) => {
+                const isSelected = language === langOption.code;
+                return (
+                  <Pressable
+                    key={langOption.code}
+                    style={[
+                      styles.languageCard,
+                      isSelected && styles.languageCardActive
+                    ]}
+                    onPress={() => {
+                      hapticService.selection();
+                      setLanguage(langOption.code as SupportedLanguage);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={langOption.label}
+                    accessibilityState={{ selected: isSelected }}
+                  >
+                    <Text style={styles.languageFlag}>{langOption.flag}</Text>
+                    <View style={styles.languageTexts}>
+                      <Text style={styles.languageName}>{langOption.nativeName}</Text>
+                      <Text style={styles.languageSubName}>{langOption.label}</Text>
+                    </View>
+                    <View style={[styles.languageRadio, isSelected && styles.languageRadioActive]}>
+                      {isSelected && <View style={styles.languageRadioDot} />}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
+        {/* Slide 1: Fast & Cinematic Intro */}
         <View style={styles.slide}>
           <View style={styles.slideContent}>
             <View style={styles.badgeContainer}>
               <Ionicons name="sparkles" size={14} color={colors.primary} />
-              <Text style={styles.badgeText}>VOTRE JELLYFIN</Text>
+              <Text style={styles.badgeText}>{t("onboarding.slide1Badge")}</Text>
             </View>
 
             <Text style={styles.slideTitle}>
-              Votre Jellyfin.{"\n"}
-              <Text style={styles.highlightText}>Une autre expérience.</Text>
+              {t("onboarding.slide1TitlePrefix")}
+              <Text style={styles.highlightText}>{t("onboarding.slide1TitleHighlight")}</Text>
             </Text>
 
-            <Text style={styles.slideDescription}>
-              Retrouvez vos films et séries dans une interface rapide, cinématique et pensée pour le mobile.
-            </Text>
+            <Text style={styles.slideDescription}>{t("onboarding.slide1Desc")}</Text>
 
             <View style={styles.featuresPillsRow}>
               <View style={styles.featureMiniPill}>
                 <Ionicons name="flash-outline" size={16} color="#FFB800" />
-                <Text style={styles.featureMiniText}>Rapide</Text>
+                <Text style={styles.featureMiniText}>{t("onboarding.fastPill")}</Text>
               </View>
               <View style={styles.featureMiniPill}>
                 <Ionicons name="film-outline" size={16} color={colors.textSecondary} />
-                <Text style={styles.featureMiniText}>Direct Play</Text>
+                <Text style={styles.featureMiniText}>{t("onboarding.directPlayPill")}</Text>
               </View>
               <View style={styles.featureMiniPill}>
                 <Ionicons name="shield-checkmark-outline" size={16} color="#34C759" />
-                <Text style={styles.featureMiniText}>Privé</Text>
+                <Text style={styles.featureMiniText}>{t("onboarding.privatePill")}</Text>
               </View>
             </View>
           </View>
         </View>
 
+        {/* Slide 2: Playback & Downloads */}
         <View style={styles.slide}>
           <View style={styles.slideContent}>
             <View style={styles.badgeContainer}>
               <Ionicons name="play-circle" size={14} color={colors.primary} />
-              <Text style={styles.badgeText}>LECTURE FINORA</Text>
+              <Text style={styles.badgeText}>{t("onboarding.slide2Badge")}</Text>
             </View>
 
             <Text style={styles.slideTitle}>
-              Regardez comme{"\n"}
-              <Text style={styles.highlightText}>vous voulez.</Text>
+              {t("onboarding.slide2TitlePrefix")}
+              <Text style={styles.highlightText}>{t("onboarding.slide2TitleHighlight")}</Text>
             </Text>
 
-            <Text style={styles.slideDescription}>
-              Direct Play, audio et sous-titres intelligents, reprise automatique et téléchargements hors-ligne : vos préférences vous suivent.
-            </Text>
+            <Text style={styles.slideDescription}>{t("onboarding.slide2Desc")}</Text>
 
             <View style={styles.highlightCardsList}>
               <View style={styles.featureHighlightCard}>
                 <Ionicons name="play-skip-forward-circle-outline" size={22} color={colors.primary} />
                 <View style={styles.featureHighlightTexts}>
-                  <Text style={styles.featureHighlightTitle}>Intros et crédits</Text>
-                  <Text style={styles.featureHighlightDesc}>Passez rapidement les séquences détectées lorsque vous le souhaitez.</Text>
+                  <Text style={styles.featureHighlightTitle}>{t("onboarding.introsTitle")}</Text>
+                  <Text style={styles.featureHighlightDesc}>{t("onboarding.introsDesc")}</Text>
                 </View>
               </View>
 
               <View style={styles.featureHighlightCard}>
                 <Ionicons name="cloud-download-outline" size={22} color={colors.textSecondary} />
                 <View style={styles.featureHighlightTexts}>
-                  <Text style={styles.featureHighlightTitle}>Lecture hors-ligne</Text>
-                  <Text style={styles.featureHighlightDesc}>Téléchargez vos contenus pour les regarder sans réseau.</Text>
+                  <Text style={styles.featureHighlightTitle}>{t("onboarding.offlineTitle")}</Text>
+                  <Text style={styles.featureHighlightDesc}>{t("onboarding.offlineDesc")}</Text>
                 </View>
               </View>
             </View>
           </View>
         </View>
 
+        {/* Slide 3: Server Connection */}
         <View style={styles.slide}>
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -260,16 +309,16 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
             >
               <View style={styles.badgeContainer}>
                 <Ionicons name="server" size={14} color={colors.primary} />
-                <Text style={styles.badgeText}>CONNEXION JELLYFIN</Text>
+                <Text style={styles.badgeText}>{t("onboarding.slide3Badge")}</Text>
               </View>
 
               {status === "authenticated" && session && !showSwitchAccount ? (
                 <>
                   <Text style={styles.connectionTitle}>
-                    {`Bienvenue, ${session.userName || "Cinéphile"} !`}
+                    {t("onboarding.welcomeBackUser", { username: session.userName || "User" })}
                   </Text>
                   <Text style={styles.connectionSubtitle}>
-                    Votre compte Jellyfin est déjà configuré et prêt à être utilisé.
+                    {t("onboarding.sessionReadyDesc")}
                   </Text>
 
                   <View style={styles.activeSessionCard}>
@@ -279,7 +328,7 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                       </View>
                       <View style={styles.activeSessionTexts}>
                         <Text style={styles.activeSessionUser}>
-                          {session.userName || "Utilisateur FINORA"}
+                          {session.userName || "FINORA User"}
                         </Text>
                         <Text style={styles.activeSessionServer} numberOfLines={1}>
                           {session.serverUrl}
@@ -290,7 +339,7 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                   </View>
 
                   <FinoraButton
-                    label="Accéder à FINORA"
+                    label={t("onboarding.enterFinora")}
                     variant="primary"
                     size="lg"
                     onPress={handleCompleteExistingSession}
@@ -301,16 +350,16 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                     style={styles.secondaryActionButton}
                     onPress={() => setShowSwitchAccount(true)}
                     accessibilityRole="button"
-                    accessibilityLabel="Changer de compte ou de serveur"
+                    accessibilityLabel={t("onboarding.switchAccount")}
                   >
-                    <Text style={styles.secondaryActionText}>Changer de compte ou de serveur</Text>
+                    <Text style={styles.secondaryActionText}>{t("onboarding.switchAccount")}</Text>
                   </Pressable>
                 </>
               ) : (
                 <>
-                  <Text style={styles.connectionTitle}>Connectez votre Jellyfin</Text>
+                  <Text style={styles.connectionTitle}>{t("onboarding.connectTitle")}</Text>
                   <Text style={styles.connectionSubtitle}>
-                    FINORA a besoin d'un serveur Jellyfin pour afficher votre catalogue et lancer la lecture.
+                    {t("onboarding.connectSubtitle")}
                   </Text>
 
                   {session && (
@@ -318,17 +367,17 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                       style={styles.returnSessionButton}
                       onPress={() => setShowSwitchAccount(false)}
                       accessibilityRole="button"
-                      accessibilityLabel="Retourner au compte connecté"
+                      accessibilityLabel={t("onboarding.keepAccount", { username: session.userName || "" })}
                     >
                       <Ionicons name="arrow-back" size={16} color={colors.textSecondary} />
                       <Text style={styles.returnSessionText}>
-                        {`Conserver le compte ${session.userName}`}
+                        {t("onboarding.keepAccount", { username: session.userName || "" })}
                       </Text>
                     </Pressable>
                   )}
 
                   <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Serveur Jellyfin</Text>
+                    <Text style={styles.inputLabel}>{t("onboarding.serverUrlLabel")}</Text>
                     <View style={styles.inputFieldContainer}>
                       <Ionicons name="globe-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
                       <TextInput
@@ -339,12 +388,12 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                           setServerStatus("idle");
                           setServerError(null);
                         }}
-                        placeholder="https://votre-serveur.com"
+                        placeholder={t("onboarding.serverUrlPlaceholder")}
                         placeholderTextColor={colors.textMuted}
                         autoCapitalize="none"
                         autoCorrect={false}
                         keyboardType="url"
-                        accessibilityLabel="Adresse du serveur Jellyfin"
+                        accessibilityLabel={t("onboarding.serverUrlLabel")}
                       />
                       <Pressable
                         style={({ pressed }) => [
@@ -355,12 +404,12 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                         onPress={handleTestServer}
                         disabled={isTestingServer || !serverUrl.trim()}
                         accessibilityRole="button"
-                        accessibilityLabel="Tester le serveur"
+                        accessibilityLabel={t("onboarding.testServer")}
                       >
                         {isTestingServer ? (
                           <ActivityIndicator size="small" color="#FFFFFF" />
                         ) : (
-                          <Text style={styles.testServerText}>Tester</Text>
+                          <Text style={styles.testServerText}>{t("onboarding.testServer")}</Text>
                         )}
                       </Pressable>
                     </View>
@@ -370,7 +419,7 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                     <View style={styles.serverSuccessBanner}>
                       <Ionicons name="checkmark-circle" size={16} color="#34C759" style={{ marginRight: 6 }} />
                       <Text style={styles.serverSuccessText}>
-                        {`Serveur en ligne : ${serverName || "Jellyfin OK"}`}
+                        {t("onboarding.serverOnline", { name: serverName || "Jellyfin OK" })}
                       </Text>
                     </View>
                   )}
@@ -382,36 +431,36 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                   )}
 
                   <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Nom d'utilisateur</Text>
+                    <Text style={styles.inputLabel}>{t("onboarding.usernameLabel")}</Text>
                     <View style={styles.inputFieldContainer}>
                       <Ionicons name="person-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
                       <TextInput
                         style={styles.textInput}
                         value={username}
                         onChangeText={setUsername}
-                        placeholder="Votre identifiant"
+                        placeholder={t("onboarding.usernamePlaceholder")}
                         placeholderTextColor={colors.textMuted}
                         autoCapitalize="none"
                         autoCorrect={false}
-                        accessibilityLabel="Nom d'utilisateur Jellyfin"
+                        accessibilityLabel={t("onboarding.usernameLabel")}
                       />
                     </View>
                   </View>
 
                   <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Mot de passe</Text>
+                    <Text style={styles.inputLabel}>{t("onboarding.passwordLabel")}</Text>
                     <View style={styles.inputFieldContainer}>
                       <Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
                       <TextInput
                         style={styles.textInput}
                         value={password}
                         onChangeText={setPassword}
-                        placeholder="Mot de passe (si configuré)"
+                        placeholder={t("onboarding.passwordPlaceholder")}
                         placeholderTextColor={colors.textMuted}
                         secureTextEntry
                         autoCapitalize="none"
                         autoCorrect={false}
-                        accessibilityLabel="Mot de passe Jellyfin"
+                        accessibilityLabel={t("onboarding.passwordLabel")}
                       />
                     </View>
                   </View>
@@ -424,7 +473,7 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                   )}
 
                   <FinoraButton
-                    label="Se connecter et commencer"
+                    label={t("onboarding.loginAndStart")}
                     variant="primary"
                     size="lg"
                     loading={isSubmitting}
@@ -434,7 +483,7 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                   />
 
                   <Text style={styles.connectionRequirementText}>
-                    Aucune donnée Jellyfin n'est disponible dans FINORA tant qu'un serveur n'est pas connecté.
+                    {t("onboarding.serverRequiredWarning")}
                   </Text>
                 </>
               )}
@@ -445,13 +494,13 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
 
       <View style={styles.bottomBar}>
         <View style={styles.paginationDots}>
-          {[0, 1, 2].map((idx) => (
+          {Array.from({ length: TOTAL_SLIDES }).map((_, idx) => (
             <Pressable
               key={idx}
               onPress={() => goToSlide(idx)}
               style={styles.dotTouchTarget}
               accessibilityRole="button"
-              accessibilityLabel={`Étape ${idx + 1}`}
+              accessibilityLabel={`Step ${idx + 1}`}
               accessibilityState={{ selected: currentSlide === idx }}
             >
               <View
@@ -464,9 +513,9 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
           ))}
         </View>
 
-        {currentSlide < 2 && (
+        {currentSlide < LAST_SLIDE_INDEX && (
           <FinoraButton
-            label="Continuer"
+            label={t("onboarding.next")}
             variant="primary"
             size="md"
             rightIcon={<Ionicons name="arrow-forward" size={18} color="#FFFFFF" />}
@@ -542,7 +591,8 @@ const styles = StyleSheet.create({
   slideContent: {
     paddingHorizontal: 28,
     justifyContent: "center",
-    alignItems: "flex-start"
+    alignItems: "flex-start",
+    width: "100%"
   },
   badgeContainer: {
     flexDirection: "row",
@@ -577,7 +627,60 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 24,
     color: colors.textSecondary,
-    marginBottom: 32
+    marginBottom: 28
+  },
+  languageCardsList: {
+    width: "100%",
+    gap: 12
+  },
+  languageCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(24, 24, 34, 0.78)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.10)",
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    gap: 14
+  },
+  languageCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: "rgba(229, 9, 20, 0.08)"
+  },
+  languageFlag: {
+    fontSize: 28
+  },
+  languageTexts: {
+    flex: 1
+  },
+  languageName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF"
+  },
+  languageSubName: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 2
+  },
+  languageRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  languageRadioActive: {
+    borderColor: colors.primary
+  },
+  languageRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primary
   },
   featuresPillsRow: {
     flexDirection: "row",
