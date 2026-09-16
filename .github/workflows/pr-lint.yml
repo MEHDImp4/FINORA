@@ -1,0 +1,133 @@
+name: "PR Quality & Rules Linter"
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  pull-requests: write
+  contents: read
+  statuses: write
+
+jobs:
+  title-lint:
+    name: Validate PR Title (Conventional Commits)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR Title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            docs
+            test
+            chore
+            ci
+            security
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: "The commit subject must not start with an uppercase letter."
+          wip: true
+
+  body-and-checklist-lint:
+    name: Validate PR Description & Checklist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR Description and Checklist
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+            const errors = [];
+
+            // 1. Check description length
+            const cleanBody = body.replace(/<!--[\s\S]*?-->/g, '').trim();
+            if (cleanBody.length < 30) {
+              errors.push("⚠️ **Description trop courte ou vide** : Veuillez décrire brièvement les changements apportés et leur contexte.");
+            }
+
+            // 2. Check if default placeholder wasn't touched
+            if (body.includes("*(paste screenshot)*") && (body.includes("🐛") || body.includes("💄"))) {
+              // optional warning, not an error
+            }
+
+            // 3. Check for at least one checked item in the checklist
+            const checkedBoxes = (body.match(/-\s*\[x\]/gi) || []).length;
+            if (checkedBoxes === 0) {
+              errors.push("⚠️ **Checklist non complétée** : Veuillez cocher au moins les cases pertinentes de la checklist (tests, typecheck, sécurité).");
+            }
+
+            if (errors.length > 0) {
+              const commentBody = [
+                `👋 Bonjour @${pr.user.login} ! Merci pour votre contribution à **FINORA** 🎬.`,
+                "",
+                "Pour assurer la qualité de la codebase, notre bot a détecté quelques éléments manquants :",
+                ...errors.map(e => `- ${e}`),
+                "",
+                "👉 *Veuillez modifier la description de votre Pull Request pour compléter ces points.*"
+              ].join("\n");
+
+              // Post or update comment
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+              });
+
+              const botComment = comments.find(c => c.user.type === 'Bot' && c.body.includes("Merci pour votre contribution à **FINORA**"));
+              if (botComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: botComment.id,
+                  body: commentBody
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: commentBody
+                });
+              }
+
+              core.setFailed("PR description or checklist did not meet requirements.");
+            } else {
+              core.info("PR description and checklist validation passed!");
+            }
+
+  lockfile-check:
+    name: Check Lockfile Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify package-lock.json if package.json was touched
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+
+            const filenames = files.map(f => f.filename);
+            const packageJsonChanged = filenames.includes("package.json");
+            const lockfileChanged = filenames.includes("package-lock.json");
+
+            if (packageJsonChanged && !lockfileChanged) {
+              core.setFailed("❌ 'package.json' a été modifié sans mettre à jour 'package-lock.json'. Veuillez exécuter 'npm install' et commiter le lockfile.");
+            } else {
+              core.info("Lockfile integrity check passed.");
+            }

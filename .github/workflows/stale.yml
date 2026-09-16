@@ -1,0 +1,43 @@
+name: "Stale Issues & PRs Manager"
+
+on:
+  schedule:
+    # Run every day at midnight UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    name: Manage Inactive Issues and PRs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark and Close Stale Items
+        uses: actions/stale@v9
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          days-before-issue-stale: 45
+          days-before-issue-close: 7
+          stale-issue-label: 'stale'
+          stale-issue-message: |
+            Bonjour ! Cette issue a été marquée comme **stale** (inactive) car elle n'a reçu aucune mise à jour depuis 45 jours.
+            
+            Si le problème persiste toujours avec la dernière version de FINORA, veuillez laisser un commentaire pour la garder ouverte. Sans activité sous 7 jours, elle sera automatiquement fermée. Merci !
+          close-issue-message: |
+            Cette issue a été fermée automatiquement en raison de son inactivité prolongée. N'hésitez pas à en ouvrir une nouvelle avec des informations à jour si nécessaire.
+          
+          days-before-pr-stale: 45
+          days-before-pr-close: 7
+          stale-pr-label: 'stale'
+          stale-pr-message: |
+            Bonjour ! Cette Pull Request a été marquée comme **stale** car elle n'a reçu aucune activité depuis 45 jours.
+            
+            Veuillez mettre à jour votre branche ou laisser un commentaire si le travail est toujours en cours. Sans retour d'ici 7 jours, elle sera fermée.
+          close-pr-message: |
+            Cette Pull Request a été fermée en raison de son inactivité. Merci pour votre temps et vos efforts !
+
+          exempt-issue-labels: 'pinned,security,enhancement,keep,blocked'
+          exempt-pr-labels: 'pinned,security,enhancement,keep,work-in-progress,wip'

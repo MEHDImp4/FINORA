@@ -1,0 +1,63 @@
+# Configuration for actions/labeler
+# Labels PRs automatically based on the paths of modified files
+
+"playback":
+  - changed-files:
+      - any-glob-to-any-file: "src/features/player/**"
+
+"downloads":
+  - changed-files:
+      - any-glob-to-any-file: "src/features/downloads/**"
+
+"ui/ux":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/components/**"
+          - "app/**"
+
+"search":
+  - changed-files:
+      - any-glob-to-any-file: "src/features/search/**"
+
+"auth":
+  - changed-files:
+      - any-glob-to-any-file: "src/features/auth/**"
+
+"network":
+  - changed-files:
+      - any-glob-to-any-file: "src/core/network/**"
+
+"security":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/core/security/**"
+          - "src/core/storage/secureStore*.ts"
+          - "SECURITY.md"
+
+"android":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "android/**"
+          - "plugins/**"
+
+"ios":
+  - changed-files:
+      - any-glob-to-any-file: "ios/**"
+
+"ci/automation":
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+          - "eas.json"
+
+"documentation":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "docs/**"
+
+"dependencies":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "package.json"
+          - "package-lock.json"

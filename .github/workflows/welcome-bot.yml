@@ -1,0 +1,32 @@
+name: "Welcome First-time Contributors"
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  welcome:
+    name: Greet New Contributor
+    runs-on: ubuntu-latest
+    steps:
+      - name: Welcome First-time Issue & PR Authors
+        uses: actions/first-interaction@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-message: |
+            👋 Bonjour et bienvenue dans la communauté **FINORA** ! 🎉
+            Merci beaucoup d'avoir ouvert votre première issue sur le projet.
+            
+            L'équipe va examiner votre signalement sous peu. En attendant, n'hésitez pas à consulter notre [Documentation](https://github.com/MEHDImp4/FINORA#readme) ou à rejoindre nos [Discussions](https://github.com/MEHDImp4/FINORA/discussions). 🎬🍿
+          pr-message: |
+            👋 Bienvenue et merci pour votre toute première Pull Request sur **FINORA** ! 🚀
+            
+            Notre équipe apprécie grandement votre contribution. Nos workflows automatisés vérifient actuellement vos modifications (tests unitaires, TypeScript strict, conventions de commits).
+            
+            N'hésitez pas à jeter un œil à notre [Guide de Contribution (CONTRIBUTING.md)](https://github.com/MEHDImp4/FINORA/blob/master/CONTRIBUTING.md) si ce n'est pas déjà fait. 🍿
