@@ -87,19 +87,19 @@ jobs:
           sha256sum "${APK_NAME}" > "${APK_NAME}.sha256"
           
           CHANGELOG=$(git log -n 10 --pretty=format:"- %s (%h)")
-          cat <<EOF > preview_release_notes.md
-### 🎬 FINORA Preview Build (Standalone)
-- **Version** : \`v${VERSION}\`
-- **Commit** : \`${SHORT_SHA}\`
-- **Type** : Preview APK autonome (assembleRelease)
-
-📥 **Installation directe** : Cliquez directement sur le fichier \`.apk\` ci-dessous sur votre téléphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire).
-
----
-
-### 📋 Dernières modifications (Changelog)
-${CHANGELOG}
-EOF
+          {
+            echo "### 🎬 FINORA Preview Build (Standalone)"
+            echo "- **Version** : \`v${VERSION}\`"
+            echo "- **Commit** : \`${SHORT_SHA}\`"
+            echo "- **Type** : Preview APK autonome (assembleRelease)"
+            echo ""
+            echo "📥 **Installation directe** : Cliquez directement sur le fichier \`.apk\` ci-dessous sur votre téléphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire)."
+            echo ""
+            echo "---"
+            echo ""
+            echo "### 📋 Dernières modifications (Changelog)"
+            echo "$CHANGELOG"
+          } > preview_release_notes.md
 
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
@@ -192,19 +192,19 @@ EOF
           sha256sum "${APK_NAME}" > "${APK_NAME}.sha256"
           
           CHANGELOG=$(git log -n 12 --pretty=format:"- %s (%h)")
-          cat <<EOF > beta_release_notes.md
-### 🚀 FINORA Beta Build
-- **Version** : \`v${VERSION}\`
-- **Commit** : \`${SHORT_SHA}\`
-- **Type** : Beta APK (assembleRelease)
-
-📥 **Installation directe** : Cliquez directement sur le fichier \`.apk\` ci-dessous sur votre téléphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire).
-
----
-
-### 📋 Dernières modifications (Changelog)
-${CHANGELOG}
-EOF
+          {
+            echo "### 🚀 FINORA Beta Build"
+            echo "- **Version** : \`v${VERSION}\`"
+            echo "- **Commit** : \`${SHORT_SHA}\`"
+            echo "- **Type** : Beta APK (assembleRelease)"
+            echo ""
+            echo "📥 **Installation directe** : Cliquez directement sur le fichier \`.apk\` ci-dessous sur votre téléphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire)."
+            echo ""
+            echo "---"
+            echo ""
+            echo "### 📋 Dernières modifications (Changelog)"
+            echo "$CHANGELOG"
+          } > beta_release_notes.md
 
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
@@ -319,22 +319,22 @@ EOF
           sha256sum "${APK_NAME}" > "${APK_NAME}.sha256"
           
           CHANGELOG=$(git log -n 15 --pretty=format:"- %s (%h)")
-          cat <<EOF > release_notes.md
-### 🌟 FINORA Production Release
-- **Version** : \`v${VERSION}\`
-- **Commit** : \`${SHORT_SHA}\`
-- **Type** : Production Release APK
-
-📥 **Installation directe** : Cliquez directement sur le fichier \`.apk\` ci-dessous sur votre smartphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire).
-
----
-
-### 📋 Notes de version & Nouveautés (Changelog)
-Consultez le fichier [CHANGELOG.md](https://github.com/MEHDImp4/FINORA/blob/master/CHANGELOG.md) complet pour l'ensemble des fonctionnalités et correctifs détaillés.
-
-#### Principaux changements récents :
-${CHANGELOG}
-EOF
+          {
+            echo "### 🌟 FINORA Production Release"
+            echo "- **Version** : \`v${VERSION}\`"
+            echo "- **Commit** : \`${SHORT_SHA}\`"
+            echo "- **Type** : Production Release APK"
+            echo ""
+            echo "📥 **Installation directe** : Cliquez directement sur le fichier \`.apk\` ci-dessous sur votre smartphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire)."
+            echo ""
+            echo "---"
+            echo ""
+            echo "### 📋 Notes de version & Nouveautés (Changelog)"
+            echo "Consultez le fichier [CHANGELOG.md](https://github.com/MEHDImp4/FINORA/blob/master/CHANGELOG.md) complet pour l'ensemble des fonctionnalités et correctifs détaillés."
+            echo ""
+            echo "#### Principaux changements récents :"
+            echo "$CHANGELOG"
+          } > release_notes.md
 
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
