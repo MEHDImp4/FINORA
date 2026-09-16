@@ -1,0 +1,67 @@
+name: 💡 Feature Request
+description: Suggest a new feature, improvement, or UX idea for FINORA
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting an improvement for FINORA!
+        FINORA prioritizes fluid performance (60/120 FPS), cinematic visual design, and rock-solid playback over bloat.
+
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: Problem or User Need
+      description: Is your feature request related to a problem? Please describe what you are trying to accomplish.
+      placeholder: "I'm always frustrated when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: Describe what you would like to see added or changed.
+      placeholder: A clear and concise description of the feature or behavior you'd like.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: Describe other options you looked into...
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Feature Category
+      options:
+        - "Player & Streaming Controls"
+        - "UI / Animations / Visual Design"
+        - "Offline Downloads & Storage"
+        - "Library Browsing & Search"
+        - "Authentication & Multi-server"
+        - "Subtitles & Audio"
+        - "Settings & Customization"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups, Screenshots, or Reference Examples
+      description: If you have visual mockups or examples from other apps (e.g. Netflix, Prime Video, Jellyfin Web), please attach them here.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing feature requests to avoid duplicates.
+          required: true
+        - label: I understand that FINORA focuses on performance, polish, and solid core features.
+          required: true

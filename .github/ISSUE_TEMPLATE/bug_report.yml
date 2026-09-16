@@ -1,0 +1,116 @@
+name: 🐛 Bug Report
+description: Report a reproducible bug or unexpected behavior in FINORA
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue with FINORA!
+        Please fill out this form as completely as possible to help us reproduce and resolve the problem quickly.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description of the Bug
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe what happened...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: Steps To Reproduce
+      description: Steps to reproduce the behavior in FINORA.
+      placeholder: |
+        1. Open FINORA
+        2. Go to '...'
+        3. Click on '....'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+      placeholder: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: A clear and concise description of what actually happened.
+      placeholder: What went wrong?
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: FINORA Version
+      description: The version or commit of FINORA you are using (e.g. v1.0.0-preview-ebc9320).
+      placeholder: e.g. v1.0.0, commit ebc9320
+    validations:
+      required: true
+
+  - type: input
+    id: jellyfin-version
+    attributes:
+      label: Jellyfin Server Version
+      description: The version of your Jellyfin media server.
+      placeholder: e.g. 10.9.11, 10.10.3
+    validations:
+      required: true
+
+  - type: input
+    id: device-info
+    attributes:
+      label: Device & Operating System
+      description: The device manufacturer, model, and OS version.
+      placeholder: e.g. Google Pixel 8 (Android 14) / Samsung Galaxy S23 (One UI 6.1) / iPhone 15 Pro (iOS 18)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation-type
+    attributes:
+      label: How was FINORA installed?
+      options:
+        - "Direct GitHub Release APK (Preview / Beta / Stable)"
+        - "Local development build (npx expo run:android / run:ios)"
+        - "EAS Build"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: |
+        Please paste any relevant console logs, adb logcat output, or stack traces.
+        ⚠️ IMPORTANT: NEVER include authentication tokens, passwords, or personal server addresses. FINORA automatically redacts tokens in its internal logs, but verify before posting.
+      render: shell
+
+  - type: textarea
+    id: media-attachments
+    attributes:
+      label: Screenshots or Screen Recordings
+      description: Drag and drop screenshots or screen recordings showing the issue if applicable.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched existing issues to ensure this bug has not already been reported.
+          required: true
+        - label: I am using the latest version of FINORA available on GitHub Releases.
+          required: true
+        - label: I have verified that no sensitive credentials (tokens, passwords, private URLs) are present in the logs.
+          required: true

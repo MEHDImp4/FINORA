@@ -1,0 +1,131 @@
+name: 🎬 Playback & Video Streaming Issue
+description: Report a playback error, audio/subtitle sync issue, or transcoding problem
+title: "[Playback]: "
+labels: ["playback", "player", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template specifically for video player issues, codec incompatibilities, subtitle rendering (ASS/SSA, PGS, SRT), audio track selection, or transcoding problems.
+
+  - type: textarea
+    id: issue-summary
+    attributes:
+      label: Playback Issue Description
+      description: Describe what fails during playback (e.g. infinite buffering, black screen with audio, subtitle desync, transcode failure).
+      placeholder: Describe playback behavior...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: stream-mode
+    attributes:
+      label: Playback / Stream Mode
+      description: Which stream mode was being used?
+      options:
+        - "Direct Play"
+        - "Direct Stream"
+        - "Transcode (Server-side)"
+        - "Offline Download Playback"
+        - "Unknown / Not Sure"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: media-container
+    attributes:
+      label: Media Container Format
+      options:
+        - "MKV (.mkv)"
+        - "MP4 (.mp4 / .m4v)"
+        - "WebM (.webm)"
+        - "AVI / TS / Other"
+        - "Unknown"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: video-codec
+    attributes:
+      label: Video Codec & Resolution
+      options:
+        - "H.264 (AVC) - 1080p / 720p"
+        - "H.264 (AVC) - 4K"
+        - "H.265 (HEVC) - 1080p / SDR"
+        - "H.265 (HEVC) - 4K HDR10 / Dolby Vision"
+        - "AV1"
+        - "VP9"
+        - "Other / Unknown"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: audio-codec
+    attributes:
+      label: Audio Codec
+      options:
+        - "AAC"
+        - "AC3 / E-AC3 (Dolby Digital / Plus)"
+        - "DTS / DTS-HD"
+        - "TrueHD / Atmos"
+        - "FLAC / Opus"
+        - "Other / Unknown"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: subtitle-format
+    attributes:
+      label: Subtitle Format (if enabled)
+      options:
+        - "No subtitles enabled"
+        - "SubRip (SRT / WebVTT)"
+        - "Advanced SubStation Alpha (ASS / SSA)"
+        - "Picture-based (PGS / VOBSUB)"
+        - "Embedded in container"
+        - "External file"
+    validations:
+      required: false
+
+  - type: input
+    id: app-version
+    attributes:
+      label: FINORA Version
+      placeholder: e.g. v1.0.0, commit ebc9320
+    validations:
+      required: true
+
+  - type: input
+    id: jellyfin-version
+    attributes:
+      label: Jellyfin Server Version
+      placeholder: e.g. 10.9.11, 10.10.3
+    validations:
+      required: true
+
+  - type: input
+    id: device-info
+    attributes:
+      label: Device & Android/iOS Version
+      placeholder: e.g. Google Pixel 8 (Android 14)
+    validations:
+      required: true
+
+  - type: textarea
+    id: jellyfin-transcode-log
+    attributes:
+      label: Jellyfin Transcode Log / Player Log
+      description: |
+        If transcoding was triggered, copy the relevant part of the Jellyfin transcode log (from Dashboard > Logs) or adb logcat output.
+        ⚠️ Ensure all personal tokens and server IP/domains are redacted before posting.
+      render: shell
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: Does this video play correctly in Jellyfin Web or the official Jellyfin client?
+        - label: I verified the playback settings (quality bitrate limit, audio track selection).
+        - label: All sensitive server credentials have been removed from the logs.
+          required: true

@@ -4,6 +4,15 @@
   <img src="./assets/finora-logo-text.png" alt="FINORA Logo" width="360" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/MEHDImp4/FINORA/actions/workflows/ci.yml"><img src="https://github.com/MEHDImp4/FINORA/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
+  <a href="https://github.com/MEHDImp4/FINORA/releases/latest"><img src="https://img.shields.io/github/v/release/MEHDImp4/FINORA?color=blue&label=release" alt="Latest Release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="License: GPL-3.0" /></a>
+  <a href="https://expo.dev"><img src="https://img.shields.io/badge/Expo-SDK%2057-000020.svg?logo=expo" alt="Expo SDK 57" /></a>
+  <a href="https://reactnative.dev"><img src="https://img.shields.io/badge/React%20Native-0.86-61DAFB.svg?logo=react" alt="React Native 0.86" /></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-Strict-3178C6.svg?logo=typescript" alt="TypeScript Strict" /></a>
+</p>
+
 FINORA is a modern, high-performance personal streaming client for [Jellyfin](https://jellyfin.org/), built with Expo, React Native (New Architecture & Hermes), and TypeScript.
 
 It delivers a cinematic, polished streaming experience comparable to Netflix, Prime Video, or Crunchyroll, with instant playback, smooth 60/120 FPS navigation, Apple-inspired Liquid Glass aesthetics, and offline media caching.
@@ -113,6 +122,25 @@ CI runs automatically via GitHub Actions on every push and PR to `master` — se
 
 ---
 
+## Contributing
+
+Contributions from the community are warmly welcomed!
+
+Whether you are reporting bugs, proposing new features, or submitting code improvements, please read our [Contributing Guide](CONTRIBUTING.md) and adhere to our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+For vulnerability disclosures, please refer to our [Security Policy](SECURITY.md).
+
+---
+
+## Community & Support
+
+- **Bug Reports & Feature Requests**: Use our structured [GitHub Issue Templates](https://github.com/MEHDImp4/FINORA/issues/new/choose).
+- **Discussions**: Connect with other users and contributors in [GitHub Discussions](https://github.com/MEHDImp4/FINORA/discussions).
+- **Releases**: Download the latest standalone Android APK directly from [GitHub Releases](https://github.com/MEHDImp4/FINORA/releases/latest).
+
+---
+
 ## License
 
-Private repository. All rights reserved. Open-source release planned.
+This project is licensed under the **GNU General Public License v3.0** — see the [LICENSE](LICENSE) file for details.
+
