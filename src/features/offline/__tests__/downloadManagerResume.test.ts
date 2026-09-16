@@ -86,6 +86,7 @@ async function settle() {
 
 describe("DownloadManager — true resume after process death", () => {
   beforeEach(async () => {
+    DownloadManager.destroyAll();
     jest.clearAllMocks();
     await AsyncStorage.clear();
     fileSystem.__reset();
@@ -94,6 +95,10 @@ describe("DownloadManager — true resume after process death", () => {
       preferences: { ...DEFAULT_PLAYBACK_PREFERENCES, downloadWifiOnly: false },
       isLoaded: true
     });
+  });
+
+  afterEach(() => {
+    DownloadManager.destroyAll();
   });
 
   it("resumes from the existing partial file after a process death (Test 1)", async () => {

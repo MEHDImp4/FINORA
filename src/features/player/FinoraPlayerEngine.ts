@@ -117,6 +117,10 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
         this.handleTimeUpdate(cur, this.player.bufferedPosition);
       }
     }, 500);
+
+    if (typeof (this.playheadTimer as any)?.unref === "function") {
+      (this.playheadTimer as any).unref();
+    }
   }
 
   private stopPlayheadTimer(): void {

@@ -45,8 +45,20 @@ function createMockPlayer(): VideoPlayer {
 }
 
 describe("FinoraPlayerEngine", () => {
+  let createdEngines: FinoraPlayerEngine[] = [];
+
+  function trackEngine(engine: FinoraPlayerEngine): FinoraPlayerEngine {
+    createdEngines.push(engine);
+    return engine;
+  }
+
+  afterEach(() => {
+    createdEngines.forEach((engine) => engine.destroy());
+    createdEngines = [];
+  });
+
   it("initializes with idle snapshot and initial position", () => {
-    const engine = new FinoraPlayerEngine(null, 45);
+    const engine = trackEngine(new FinoraPlayerEngine(null, 45));
     const snapshot = engine.getSnapshot();
 
     expect(snapshot.state).toBe("idle");
@@ -57,7 +69,7 @@ describe("FinoraPlayerEngine", () => {
 
   it("attaches player and notifies subscribers on state transitions", () => {
     const mockPlayer = createMockPlayer();
-    const engine = new FinoraPlayerEngine();
+    const engine = trackEngine(new FinoraPlayerEngine());
 
     const snapshots: any[] = [];
     const unsubscribe = engine.subscribe((snap) => {
@@ -88,7 +100,7 @@ describe("FinoraPlayerEngine", () => {
 
   it("handles playToEnd event by setting state to ended", () => {
     const mockPlayer = createMockPlayer();
-    const engine = new FinoraPlayerEngine(mockPlayer);
+    const engine = trackEngine(new FinoraPlayerEngine(mockPlayer));
 
     (mockPlayer as any)._emit("playToEnd", {});
     expect(engine.getSnapshot().state).toBe("ended");
@@ -100,7 +112,7 @@ describe("FinoraPlayerEngine", () => {
 
   it("handles statusChange errors gracefully", () => {
     const mockPlayer = createMockPlayer();
-    const engine = new FinoraPlayerEngine(mockPlayer);
+    const engine = trackEngine(new FinoraPlayerEngine(mockPlayer));
 
     (mockPlayer as any)._emit("statusChange", {
       status: "error",
@@ -114,7 +126,7 @@ describe("FinoraPlayerEngine", () => {
 
   it("handles volume, rate, and mute updates properly", () => {
     const mockPlayer = createMockPlayer();
-    const engine = new FinoraPlayerEngine(mockPlayer);
+    const engine = trackEngine(new FinoraPlayerEngine(mockPlayer));
 
     engine.setVolume(0.5);
     expect(mockPlayer.volume).toBe(0.5);
@@ -128,7 +140,7 @@ describe("FinoraPlayerEngine", () => {
 
   it("mutes through the muted flag instead of assigning volume 0", () => {
     const mockPlayer = createMockPlayer();
-    const engine = new FinoraPlayerEngine(mockPlayer);
+    const engine = trackEngine(new FinoraPlayerEngine(mockPlayer));
 
     engine.setVolume(0.4);
     expect(mockPlayer.volume).toBe(0.4);
@@ -151,7 +163,7 @@ describe("FinoraPlayerEngine", () => {
 
   it("cleans up subscriptions on destroy", () => {
     const mockPlayer = createMockPlayer();
-    const engine = new FinoraPlayerEngine(mockPlayer);
+    const engine = trackEngine(new FinoraPlayerEngine(mockPlayer));
 
     const listener = jest.fn();
     engine.subscribe(listener);
@@ -167,7 +179,7 @@ describe("FinoraPlayerEngine", () => {
     jest.useFakeTimers();
     try {
       const mockPlayer = createMockPlayer();
-      const engine = new FinoraPlayerEngine(mockPlayer);
+      const engine = trackEngine(new FinoraPlayerEngine(mockPlayer));
 
       const snapshots: number[] = [];
       engine.subscribe((snap) => {

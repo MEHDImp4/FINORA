@@ -160,6 +160,9 @@ export class HttpClient {
       attempt++;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
+      if (typeof (timer as any)?.unref === "function") {
+        (timer as any).unref();
+      }
 
       try {
         logger.debug(`[HTTP] ${method} ${url}`, { headers });

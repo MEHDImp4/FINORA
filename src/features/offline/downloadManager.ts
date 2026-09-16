@@ -165,6 +165,18 @@ export class DownloadManager {
   private authContext: DownloadAuthContext | null = null;
   private initialized = false;
   private appStateSubscription: { remove: () => void } | null = null;
+  private static activeInstances: Set<DownloadManager> = new Set();
+
+  public constructor() {
+    DownloadManager.activeInstances.add(this);
+  }
+
+  public static destroyAll(): void {
+    for (const inst of DownloadManager.activeInstances) {
+      inst.destroy();
+    }
+    DownloadManager.activeInstances.clear();
+  }
 
   // ─── Persistence ───────────────────────────────────────────────────────────
 
@@ -179,6 +191,9 @@ export class DownloadManager {
     this.persistDebounceTimer = setTimeout(() => {
       this.persistQueue().catch(() => {});
     }, 200);
+    if (typeof (this.persistDebounceTimer as any)?.unref === "function") {
+      (this.persistDebounceTimer as any).unref();
+    }
   }
 
   /**
@@ -248,6 +263,21 @@ export class DownloadManager {
       this.persistDebounceTimer = null;
     }
     await this.persistQueue();
+  }
+
+  /**
+   * Cleans up all pending timers and listeners.
+   */
+  public destroy(): void {
+    DownloadManager.activeInstances.delete(this);
+    if (this.persistDebounceTimer) {
+      clearTimeout(this.persistDebounceTimer);
+      this.persistDebounceTimer = null;
+    }
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
   }
 
 

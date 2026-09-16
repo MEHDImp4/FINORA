@@ -153,6 +153,9 @@ export function usePlaybackSession({
       timerRef.current = setInterval(() => {
         reportProgress("TimeUpdate", false);
       }, throttleIntervalMs);
+      if (typeof (timerRef.current as any)?.unref === "function") {
+        (timerRef.current as any).unref();
+      }
     }
 
     return () => {

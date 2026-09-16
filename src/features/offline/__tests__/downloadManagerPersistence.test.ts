@@ -21,6 +21,10 @@ describe("DownloadManager — persistence", () => {
     manager = new DownloadManager();
   });
 
+  afterEach(() => {
+    DownloadManager.destroyAll();
+  });
+
   it("persists queue to AsyncStorage after starting a download", async () => {
     await manager.startDownload(MOCK_ITEM);
 

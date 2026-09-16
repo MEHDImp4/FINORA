@@ -33,22 +33,26 @@ const CONNECTIVITY_TEST_URLS = [
  */
 export async function checkInternetReachability(timeoutMs: number = 2000): Promise<boolean> {
   for (const url of CONNECTIVITY_TEST_URLS) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    if (typeof (timer as any)?.unref === "function") {
+      (timer as any).unref();
+    }
 
+    try {
       const response = await fetch(url, {
         method: "GET",
         signal: controller.signal,
         headers: { "Cache-Control": "no-cache" }
       });
-      clearTimeout(timer);
 
       if (response.status >= 200 && response.status < 400) {
         return true;
       }
     } catch {
       // Continue to fallback probe
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -73,17 +77,18 @@ export async function checkServerReachability(
   }
 
   const endpoint = `${cleanUrl}/System/Info/Public`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  if (typeof (timer as any)?.unref === "function") {
+    (timer as any).unref();
+  }
 
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
     const response = await fetch(endpoint, {
       method: "GET",
       signal: controller.signal,
       headers: { Accept: "application/json", "Cache-Control": "no-cache" }
     });
-    clearTimeout(timer);
 
     // 502 Bad Gateway, 503 Service Unavailable, 504 Gateway Timeout, 404 or 5xx: backend container is stopped
     if (response.status >= 500 || response.status === 404 || response.status < 200 || response.status >= 400) {
@@ -99,6 +104,8 @@ export async function checkServerReachability(
     }
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
