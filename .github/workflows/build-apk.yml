@@ -86,6 +86,21 @@ jobs:
           cp "$RELEASE_APK" "${APK_NAME}"
           sha256sum "${APK_NAME}" > "${APK_NAME}.sha256"
           
+          CHANGELOG=$(git log -n 10 --pretty=format:"- %s (%h)")
+          cat <<EOF > preview_release_notes.md
+### 🎬 FINORA Preview Build (Standalone)
+- **Version** : \`v${VERSION}\`
+- **Commit** : \`${SHORT_SHA}\`
+- **Type** : Preview APK autonome (assembleRelease)
+
+📥 **Installation directe** : Cliquez directement sur le fichier \`.apk\` ci-dessous sur votre téléphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire).
+
+---
+
+### 📋 Dernières modifications (Changelog)
+${CHANGELOG}
+EOF
+
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "apk_name=${APK_NAME}" >> $GITHUB_OUTPUT
@@ -109,16 +124,11 @@ jobs:
           name: "FINORA v${{ steps.prepare.outputs.version }} (Preview ${{ steps.prepare.outputs.short_sha }})"
           prerelease: true
           make_latest: false
+          body_path: preview_release_notes.md
+          generate_release_notes: true
           files: |
             finora-*-preview-*.apk
             finora-*-preview-*.apk.sha256
-          body: |
-            ### 🎬 FINORA Preview Build (Standalone)
-            - **Version** : `${{ steps.prepare.outputs.version }}`
-            - **Commit** : `${{ steps.prepare.outputs.short_sha }}`
-            - **Type** : Preview APK autonome (assembleRelease)
-
-            📥 **Installation directe** : Cliquez directement sur le fichier `.apk` ci-dessous sur votre téléphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire).
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -181,6 +191,21 @@ jobs:
           cp "$RELEASE_APK" "${APK_NAME}"
           sha256sum "${APK_NAME}" > "${APK_NAME}.sha256"
           
+          CHANGELOG=$(git log -n 12 --pretty=format:"- %s (%h)")
+          cat <<EOF > beta_release_notes.md
+### 🚀 FINORA Beta Build
+- **Version** : \`v${VERSION}\`
+- **Commit** : \`${SHORT_SHA}\`
+- **Type** : Beta APK (assembleRelease)
+
+📥 **Installation directe** : Cliquez directement sur le fichier \`.apk\` ci-dessous sur votre téléphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire).
+
+---
+
+### 📋 Dernières modifications (Changelog)
+${CHANGELOG}
+EOF
+
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "apk_name=${APK_NAME}" >> $GITHUB_OUTPUT
@@ -204,16 +229,11 @@ jobs:
           name: "FINORA v${{ steps.prepare.outputs.version }} (Beta ${{ steps.prepare.outputs.short_sha }})"
           prerelease: true
           make_latest: false
+          body_path: beta_release_notes.md
+          generate_release_notes: true
           files: |
             finora-*-beta-*.apk
             finora-*-beta-*.apk.sha256
-          body: |
-            ### 🚀 FINORA Beta Build
-            - **Version** : `${{ steps.prepare.outputs.version }}`
-            - **Commit** : `${{ steps.prepare.outputs.short_sha }}`
-            - **Type** : Beta APK (assembleRelease)
-
-            📥 **Installation directe** : Cliquez directement sur le fichier `.apk` ci-dessous sur votre téléphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire).
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -297,6 +317,25 @@ jobs:
           
           SHORT_SHA=$(git rev-parse --short HEAD)
           sha256sum "${APK_NAME}" > "${APK_NAME}.sha256"
+          
+          CHANGELOG=$(git log -n 15 --pretty=format:"- %s (%h)")
+          cat <<EOF > release_notes.md
+### 🌟 FINORA Production Release
+- **Version** : \`v${VERSION}\`
+- **Commit** : \`${SHORT_SHA}\`
+- **Type** : Production Release APK
+
+📥 **Installation directe** : Cliquez directement sur le fichier \`.apk\` ci-dessous sur votre smartphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire).
+
+---
+
+### 📋 Notes de version & Nouveautés (Changelog)
+Consultez le fichier [CHANGELOG.md](https://github.com/MEHDImp4/FINORA/blob/master/CHANGELOG.md) complet pour l'ensemble des fonctionnalités et correctifs détaillés.
+
+#### Principaux changements récents :
+${CHANGELOG}
+EOF
+
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "apk_name=${APK_NAME}" >> $GITHUB_OUTPUT
@@ -320,14 +359,10 @@ jobs:
           name: "FINORA v${{ steps.prepare.outputs.version }}"
           prerelease: false
           make_latest: true
+          body_path: release_notes.md
+          generate_release_notes: true
           files: |
             finora-*-release.apk
             finora-*-release.apk.sha256
-          body: |
-            ### 🌟 FINORA Production Release
-            - **Version** : `v${{ steps.prepare.outputs.version }}`
-            - **Type** : Production Release APK
-
-            📥 **Installation directe** : Cliquez directement sur le fichier `.apk` ci-dessous sur votre téléphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire).
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
