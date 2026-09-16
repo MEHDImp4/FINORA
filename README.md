@@ -27,14 +27,14 @@ It delivers a cinematic, polished streaming experience comparable to Netflix, Pr
 
 | Layer | Technologies |
 |---|---|
-| **Framework** | Expo SDK 52+, React Native 0.86+ |
+| **Framework** | Expo SDK 57, React Native 0.86+, React 19 |
 | **Engine** | Hermes Bytecode Engine, New Architecture (Fabric + Bridgeless) |
 | **Routing** | Expo Router v4 (Typed File-based routing) |
 | **Video Playback** | `expo-video` (AndroidX Media3 / ExoPlayer & AVPlayer) |
 | **Images & Caching**| `expo-image` (multi-tier memory + disk caching) |
 | **State Management**| TanStack Query v5 (server cache), Zustand (client stores) |
 | **Security & Auth** | `expo-secure-store`, `react-native-url-polyfill` |
-| **Background Tasks** | `expo-background-fetch`, `expo-task-manager` |
+| **Background Tasks** | `expo-background-task`, `expo-task-manager` |
 | **Language** | TypeScript Strict Mode |
 
 ---
@@ -93,7 +93,7 @@ It delivers a cinematic, polished streaming experience comparable to Netflix, Pr
 FINORA enforces strict automated testing, TypeScript validation, and CI on every push:
 
 ```bash
-# Run the full test suite (71 test suites, 393 unit tests)
+# Run the full test suite (77 test suites, 478 unit tests)
 npm test
 
 # Run TypeScript typecheck in strict mode
