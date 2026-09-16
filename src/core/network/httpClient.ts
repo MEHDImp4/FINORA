@@ -7,11 +7,18 @@ import {
 } from "../errors";
 import { logger, sanitizeData } from "./logger";
 
+export type RetryPolicy = "safe" | "none" | "explicit";
+
 export interface RequestOptions extends RequestInit {
   timeoutMs?: number;
   retries?: number;
+  retryPolicy?: RetryPolicy;
+  retrySafe?: boolean;
   params?: Record<string, string | number | boolean | undefined>;
 }
+
+/** HTTP methods considered idempotent/safe to retry automatically on network errors. */
+const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 export interface HttpClientConfig {
   baseUrl?: string;
@@ -116,11 +123,26 @@ export class HttpClient {
   public async request<T = unknown>(endpoint: string, options: RequestOptions = {}): Promise<T> {
     const {
       timeoutMs = this.defaultTimeoutMs,
-      retries = this.defaultRetries,
+      retries,
+      retryPolicy = "safe",
+      retrySafe = false,
       params,
       headers: customHeaders,
       ...fetchOptions
     } = options;
+
+    const method = (fetchOptions.method || "GET").toUpperCase();
+    const isSafeMethod = SAFE_HTTP_METHODS.has(method);
+
+    let effectiveRetries: number;
+    if (retryPolicy === "none") {
+      effectiveRetries = 0;
+    } else if (retryPolicy === "explicit" || retrySafe) {
+      effectiveRetries = retries !== undefined ? retries : this.defaultRetries;
+    } else {
+      // Default: "safe" policy -> only safe HTTP methods (GET, HEAD, OPTIONS) retry by default
+      effectiveRetries = isSafeMethod ? (retries !== undefined ? retries : this.defaultRetries) : 0;
+    }
 
     const url = this.buildUrl(endpoint, params);
     const headers: Record<string, string> = {
@@ -134,13 +156,13 @@ export class HttpClient {
     let attempt = 0;
     let lastError: Error | null = null;
 
-    while (attempt <= retries) {
+    while (attempt <= effectiveRetries) {
       attempt++;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
-        logger.debug(`[HTTP] ${fetchOptions.method || "GET"} ${url}`, { headers });
+        logger.debug(`[HTTP] ${method} ${url}`, { headers });
 
         const response = await fetch(url, {
           ...fetchOptions,
@@ -172,7 +194,7 @@ export class HttpClient {
           }
 
           if (status === 503 || status === 502 || status === 504) {
-            if (attempt <= retries) {
+            if (attempt <= effectiveRetries) {
               const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
               await new Promise((r) => setTimeout(r, delay));
               continue;
@@ -222,7 +244,7 @@ export class HttpClient {
 
         lastError = err as Error;
 
-        if (attempt <= retries) {
+        if (attempt <= effectiveRetries) {
           const delay = Math.min(500 * Math.pow(2, attempt - 1), 3000);
           await new Promise((r) => setTimeout(r, delay));
           continue;

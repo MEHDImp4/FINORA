@@ -52,7 +52,7 @@ describe("HttpClient", () => {
     await expect(client.get("/Items")).rejects.toThrow(NetworkError);
   });
 
-  it("retries on 503 and throws ServerUnavailableError after retries exhausted", async () => {
+  it("retries on 503 for safe GET requests and throws ServerUnavailableError after retries exhausted", async () => {
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 503,
@@ -62,6 +62,41 @@ describe("HttpClient", () => {
     const client = new HttpClient({ baseUrl: "https://demo.jellyfin.org", defaultRetries: 1 });
 
     await expect(client.get("/System/Info")).rejects.toThrow(ServerUnavailableError);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("does NOT retry on 503 for POST mutations by default (retries=0)", async () => {
+    globalThis.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: async () => "Service Unavailable"
+    } as Response);
+
+    const client = new HttpClient({ baseUrl: "https://demo.jellyfin.org", defaultRetries: 2 });
+
+    await expect(client.post("/Sessions/Playing", { ItemId: "123" })).rejects.toThrow(ServerUnavailableError);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows retries on mutations when explicitly declared retrySafe or retryPolicy='explicit'", async () => {
+    globalThis.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: async () => "Service Unavailable"
+    } as Response);
+
+    const client = new HttpClient({ baseUrl: "https://demo.jellyfin.org", defaultRetries: 1 });
+
+    await expect(
+      client.post("/Sessions/Playing/Progress", { ItemId: "123" }, { retrySafe: true })
+    ).rejects.toThrow(ServerUnavailableError);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+
+    (globalThis.fetch as jest.Mock).mockClear();
+
+    await expect(
+      client.post("/Sessions/Playing/Progress", { ItemId: "123" }, { retryPolicy: "explicit", retries: 1 })
+    ).rejects.toThrow(ServerUnavailableError);
     expect(globalThis.fetch).toHaveBeenCalledTimes(2);
   });
 });
