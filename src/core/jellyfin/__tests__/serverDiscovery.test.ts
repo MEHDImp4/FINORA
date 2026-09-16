@@ -68,6 +68,25 @@ describe("serverDiscovery", () => {
       expect(result.url).toBe("https://jellyfin.example.com");
       expect(result.isHttps).toBe(true);
     });
+
+    it("does not mistake a public DNS name starting with fc/fd/fe for a private address", () => {
+      expect(isLocalNetworkHost("fc-proxy.example.com")).toBe(false);
+      expect(isLocalNetworkHost("fdcdn.example.com")).toBe(false);
+      expect(isLocalNetworkHost("fcorp.jellyfin.example.com")).toBe(false);
+      expect(isLocalNetworkHost("february.example.com")).toBe(false);
+
+      expect(() => normalizeServerUrlForCredentials("http://fc-proxy.example.com")).toThrow(
+        "Unencrypted HTTP is only allowed for local/private Jellyfin servers"
+      );
+    });
+
+    it("still recognises genuine IPv6 loopback, unique-local and link-local literals", () => {
+      expect(isLocalNetworkHost("::1")).toBe(true);
+      expect(isLocalNetworkHost("fc00::1")).toBe(true);
+      expect(isLocalNetworkHost("fd7a:115c:a1e0::1")).toBe(true);
+      expect(isLocalNetworkHost("fe80::1")).toBe(true);
+      expect(isLocalNetworkHost("[fd00::1]")).toBe(true);
+    });
   });
 
   describe("validateAndDiscoverServer", () => {

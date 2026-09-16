@@ -69,11 +69,14 @@ export function isLocalNetworkHost(rawHostname: string): boolean {
   if (!hostname.includes(".") && !hostname.includes(":")) return true;
   if (isPrivateIpv4(hostname)) return true;
 
-  // IPv6 loopback, unique-local (fc00::/7), and link-local (fe80::/10).
-  if (hostname === "::1" || hostname.startsWith("fc") || hostname.startsWith("fd")) {
-    return true;
+  // IPv6 literals only. Applying these to DNS names would let a public host
+  // such as "fc-proxy.example.com" satisfy a bare `startsWith("fc")` and be
+  // treated as private, permitting cleartext credentials to the Internet.
+  if (hostname.includes(":")) {
+    if (hostname === "::1") return true; // loopback
+    if (/^f[cd][0-9a-f]{2}:/i.test(hostname)) return true; // fc00::/7 unique-local
+    if (/^fe[89ab][0-9a-f]:/i.test(hostname)) return true; // fe80::/10 link-local
   }
-  if (/^fe[89ab]/i.test(hostname)) return true;
 
   return false;
 }
