@@ -2,6 +2,7 @@ import {
   NetworkError,
   AuthenticationError,
   ServerUnavailableError,
+  SecurityError,
   FinoraError
 } from "../errors";
 import { logger, sanitizeData } from "./logger";
@@ -18,6 +19,15 @@ export interface HttpClientConfig {
   defaultTimeoutMs?: number;
   defaultRetries?: number;
 }
+
+/** Headers that carry a Jellyfin credential and must never leave the server origin. */
+const CREDENTIAL_HEADERS = [
+  "authorization",
+  "x-emby-token",
+  "x-emby-authorization",
+  "x-mediabrowser-token",
+  "cookie"
+];
 
 export class HttpClient {
   private baseUrl: string;
@@ -46,6 +56,44 @@ export class HttpClient {
 
   public removeDefaultHeader(key: string): void {
     delete this.defaultHeaders[key];
+  }
+
+  private static originOf(value: string): string | null {
+    if (!value) return null;
+    try {
+      return new URL(value).origin;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Central credential-leak boundary.
+   *
+   * A request carrying an Authorization / X-Emby-Token / Cookie header may only
+   * target the origin configured as `baseUrl`. An absolute endpoint pointing
+   * somewhere else would otherwise forward the Jellyfin token to a third party.
+   *
+   * An empty `baseUrl` (no trusted origin known) is deny-by-default, and a
+   * request without credential headers may still target any URL.
+   */
+  private assertSameOriginIfAuthenticated(url: string, headers: Record<string, string>): void {
+    const carriesCredentials = Object.keys(headers).some((key) =>
+      CREDENTIAL_HEADERS.includes(key.toLowerCase())
+    );
+    if (!carriesCredentials) return;
+
+    const targetOrigin = HttpClient.originOf(url);
+    const trustedOrigin = HttpClient.originOf(this.baseUrl);
+
+    if (!targetOrigin || !trustedOrigin || targetOrigin !== trustedOrigin) {
+      throw new SecurityError(
+        `Cross-origin authenticated request blocked. Target origin "${
+          targetOrigin ?? "unknown"
+        }" is not the configured origin "${trustedOrigin ?? "unknown"}".`,
+        targetOrigin ?? undefined
+      );
+    }
   }
 
   private buildUrl(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
@@ -79,6 +127,9 @@ export class HttpClient {
       ...this.defaultHeaders,
       ...(customHeaders as Record<string, string>)
     };
+
+    // Refuse before the retry loop so no fetch, timer or retry ever runs.
+    this.assertSameOriginIfAuthenticated(url, headers);
 
     let attempt = 0;
     let lastError: Error | null = null;

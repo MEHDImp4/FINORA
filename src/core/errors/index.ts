@@ -58,3 +58,12 @@ export class PlaybackError extends FinoraError {
     this.codec = options.codec;
   }
 }
+
+export class SecurityError extends FinoraError {
+  public readonly host?: string;
+
+  constructor(message: string, host?: string) {
+    super(message, "SECURITY_ERROR");
+    this.host = host;
+  }
+}
