@@ -69,4 +69,63 @@ describe("searchHistoryService", () => {
     const history = await searchHistoryService.getRecentSearches();
     expect(history).toEqual([]);
   });
+
+  it("isolates search history across different accounts (PRIV-001)", async () => {
+    const { useAuthStore } = require("../../../stores/authStore");
+
+    // Compte A logs in and searches "Breaking Bad"
+    useAuthStore.setState({
+      status: "authenticated",
+      session: {
+        serverId: "server-alpha",
+        userId: "user-a",
+        serverUrl: "https://jellyfin.example.com",
+        token: "tok-a"
+      }
+    });
+
+    await searchHistoryService.addSearchTerm("Breaking Bad");
+    const historyA = await searchHistoryService.getRecentSearches();
+    expect(historyA).toEqual(["Breaking Bad"]);
+
+    // Logout
+    useAuthStore.setState({
+      status: "unauthenticated",
+      session: null
+    });
+
+    // Compte B logs in on same server
+    useAuthStore.setState({
+      status: "authenticated",
+      session: {
+        serverId: "server-alpha",
+        userId: "user-b",
+        serverUrl: "https://jellyfin.example.com",
+        token: "tok-b"
+      }
+    });
+
+    // History of B must NOT contain "Breaking Bad"
+    const historyB = await searchHistoryService.getRecentSearches();
+    expect(historyB).not.toContain("Breaking Bad");
+    expect(historyB).toEqual([]);
+
+    // B searches "Better Call Saul"
+    await searchHistoryService.addSearchTerm("Better Call Saul");
+
+    // Compte A logs back in
+    useAuthStore.setState({
+      status: "authenticated",
+      session: {
+        serverId: "server-alpha",
+        userId: "user-a",
+        serverUrl: "https://jellyfin.example.com",
+        token: "tok-a"
+      }
+    });
+
+    const restoredHistoryA = await searchHistoryService.getRecentSearches();
+    expect(restoredHistoryA).toContain("Breaking Bad");
+    expect(restoredHistoryA).not.toContain("Better Call Saul");
+  });
 });

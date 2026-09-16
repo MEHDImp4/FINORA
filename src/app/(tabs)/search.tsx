@@ -46,10 +46,10 @@ export default function SearchScreen() {
     return () => clearTimeout(handler);
   }, [query]);
 
-  // Load recent searches on mount
+  // Load recent searches on mount and when active account changes
   useEffect(() => {
     searchHistoryService.getRecentSearches().then(setRecentSearches);
-  }, []);
+  }, [session?.serverId, session?.userId]);
 
   const {
     data: results = [],
