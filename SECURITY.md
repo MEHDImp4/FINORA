@@ -1,5 +1,7 @@
 # Security Policy
 
+> 🇫🇷 *Une version française de cette politique de sécurité est disponible dans [SECURITY.fr.md](SECURITY.fr.md).*
+
 The FINORA team takes security and user privacy very seriously. We appreciate your efforts to responsibly disclose vulnerabilities.
 
 ---

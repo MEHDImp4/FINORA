@@ -1,5 +1,7 @@
 # Contributing to FINORA
 
+> 🇫🇷 *Une version française de ce guide de contribution est disponible dans [CONTRIBUTING.fr.md](CONTRIBUTING.fr.md).*
+
 Thank you for your interest in contributing to **FINORA**! 🎉
 
 FINORA is an open-source, cinematic personal streaming client for [Jellyfin](https://jellyfin.org/) built with Expo, React Native (New Architecture & Hermes), and TypeScript.

@@ -10,6 +10,11 @@
 </p>
 
 <p align="center">
+  <strong>🇬🇧 English</strong> •
+  <a href="README.fr.md">🇫🇷 Français</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/MEHDImp4/FINORA/releases/latest"><img src="https://img.shields.io/github/v/release/MEHDImp4/FINORA?color=6366f1&label=latest%20apk" alt="Latest Release" /></a>
   <a href="https://github.com/MEHDImp4/FINORA/actions/workflows/ci.yml"><img src="https://github.com/MEHDImp4/FINORA/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="License: GPL-3.0" /></a>

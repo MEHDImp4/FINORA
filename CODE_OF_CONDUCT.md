@@ -1,5 +1,7 @@
 # Contributor Covenant Code of Conduct
 
+> 🇫🇷 *Une version française de ce Code de Conduite est disponible dans [CODE_OF_CONDUCT.fr.md](CODE_OF_CONDUCT.fr.md).*
+
 ## Our Pledge
 
 We as members, contributors, and leaders pledge to make participation in our
