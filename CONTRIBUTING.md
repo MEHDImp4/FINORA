@@ -126,31 +126,68 @@ Screen (UI / Animations)
 
 ---
 
-## 🔀 Git Workflow & Commit Guidelines
+## 🔀 Contribution Workflow
 
-### Branching
-1. Always create your feature or bugfix branch from `master`:
-   ```bash
-   git checkout master
-   git pull upstream master
-   git checkout -b fix/playback-subtitle-sync
-   ```
+```text
+Fork Repository
+       │
+       ▼
+Create Feature Branch (e.g. feat/offline-download-ui)
+       │
+       ▼
+Implement Changes & Add Tests
+       │
+       ▼
+Run Local Validation (npm test && npm run typecheck)
+       │
+       ▼
+Commit (Conventional Commits)
+       │
+       ▼
+Push to Fork & Open Pull Request
+       │
+       ▼
+Automated CI & PR Checks
+       │
+       ▼
+Maintainer Review & Revisions
+       │
+       ▼
+Squash & Merge into master
+```
+
+### Branch Naming Conventions
+Always branch off from `master`:
+```bash
+git checkout master
+git pull upstream master
+git checkout -b <type>/<description>
+```
+
+**Recommended branch names:**
+- `feat/offline-download-ui`
+- `fix/player-audio-track`
+- `perf/carousel-render-optimization`
+- `docs/readme-installation`
 
 ### Conventional Commits
-We follow [Conventional Commits](https://www.conventionalcommits.org/) to keep history readable and generate changelogs cleanly:
+We follow [Conventional Commits](https://www.conventionalcommits.org/) to keep history readable:
 
 - `feat:` A new user-facing feature
 - `fix:` A bug fix
 - `perf:` A code change that improves performance
 - `refactor:` A code change that neither fixes a bug nor adds a feature
-- `test:` Adding or updating tests
 - `docs:` Documentation changes
-- `chore:` Maintenance tasks, dependency updates, build tooling
+- `test:` Adding or updating tests
+- `chore:` Maintenance tasks or tooling
+- `ci:` Continuous integration or GitHub Actions
+- `security:` Vulnerability fixes or security hardening
 
 **Examples:**
-- `feat(player): add gesture brightness control slider`
-- `fix(offline): handle download retry on network reconnection`
-- `docs(readme): add contributing guide link`
+- `feat(offline): add background resume support`
+- `fix(player): sync playback position correctly`
+- `docs: improve Android setup instructions`
+- `perf(home): optimize carousel memoization`
 
 ---
 
@@ -158,11 +195,11 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/) to keep h
 
 1. Push your branch to your GitHub fork:
    ```bash
-   git push origin fix/playback-subtitle-sync
+   git push origin feat/offline-download-ui
    ```
 2. Open a Pull Request against the `master` branch on the upstream repository.
 3. Fill out the **Pull Request Template** completely.
-4. Ensure all CI automated checks (tests, typecheck, Expo prebuild) pass cleanly.
-5. Our team will review your PR, suggest improvements if needed, and merge it!
+4. Ensure all CI automated checks (Type check, Tests & Security, PR Title, Lockfile Integrity) pass.
+5. A maintainer will review your PR, suggest changes if needed, and merge it!
 
 Thank you for helping make FINORA the best personal streaming client! 🎬🍿

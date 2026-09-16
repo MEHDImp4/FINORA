@@ -1,8 +1,8 @@
-## 📝 Description
+## 📝 Summary
 
-Please provide a clear and concise summary of the changes made in this Pull Request, including the motivation and context.
+Provide a concise explanation of what this Pull Request changes and why.
 
-Fixes #(issue) <!-- Replace with issue number, e.g. Fixes #42 -->
+Closes # <!-- e.g. Closes #123 -->
 
 ---
 
@@ -10,19 +10,23 @@ Fixes #(issue) <!-- Replace with issue number, e.g. Fixes #42 -->
 
 Select all that apply:
 
-- [ ] 🐛 **Bug fix** (non-breaking change which fixes an issue)
-- [ ] ✨ **New feature** (non-breaking change which adds functionality)
-- [ ] ⚡ **Performance improvement** (optimizations, reduced memory footprint, faster render loop)
-- [ ] ♻️ **Refactoring** (code reorganization without functional changes)
-- [ ] 💄 **UI / UX update** (visual design, animations, typography, themes)
-- [ ] 📝 **Documentation** (README, comments, developer guides)
-- [ ] 🧪 **Tests** (adding missing tests or improving existing test coverage)
-- [ ] 🔧 **CI / Build tooling** (GitHub Actions, Gradle, Expo config)
+- [ ] 🐛 **Bug fix** (non-breaking change fixing an issue)
+- [ ] ✨ **New feature** (non-breaking change adding functionality)
+- [ ] ⚡ **Performance improvement** (optimizations, reduced memory footprint, faster render loops)
+- [ ] ♻️ **Refactor** (code reorganization without functional changes)
+- [ ] 📝 **Documentation** (README, guides, comments)
+- [ ] 🛡️ **Security** (vulnerability fix, credential protection, or hardening)
+- [ ] 🔧 **Build / CI** (GitHub Actions, build tools, dependency manifests)
+- [ ] 📦 **Other**
 
 ---
 
-## 📱 Platforms & Environments Tested
+## 🧪 Testing & Verification
 
+### How was this change tested?
+Describe the tests performed (manual steps or automated tests executed):
+
+### Platforms & Environments Tested
 - [ ] Android Physical Device (Model: `________________`, Android Version: `____`)
 - [ ] Android Emulator (API Level: `____`)
 - [ ] iOS Physical Device (Model: `________________`, iOS Version: `____`)
@@ -31,22 +35,22 @@ Select all that apply:
 
 ---
 
-## 📸 Screenshots / Screen Recordings (if UI was touched)
+## 📸 Screenshots / Recordings (Visual changes only)
 
 | Before | After |
 |---|---|
-| *(paste screenshot)* | *(paste screenshot)* |
+| *(add image if UI changed)* | *(add image if UI changed)* |
 
 ---
 
-## ✅ Quality & Security Checklist
+## ✅ Checklist
 
-Before requesting a review, please ensure all boxes are checked:
+Please review and check the applicable items:
 
-- [ ] **Tests Pass**: `npm test` runs successfully with 0 errors.
-- [ ] **Typecheck Passes**: `npm run typecheck` passes with 0 TypeScript strict errors.
-- [ ] **Security**: No passwords, access tokens, API keys, or private server URLs are committed.
-- [ ] **Secure Storage**: Tokens/credentials are stored strictly in `expo-secure-store`, never in `AsyncStorage` or plaintext.
-- [ ] **Sanitized Logs**: Debug logs do not leak user passwords or unredacted tokens.
-- [ ] **Conventional Commits**: Commits follow the conventional commit format (`feat:`, `fix:`, `perf:`, `refactor:`, etc.).
-- [ ] **Code Style**: Code adheres to FINORA's coding conventions and architectural boundaries (Screen -> Hook -> Repository -> SDK).
+- [ ] My code adheres to the project's architecture and coding conventions.
+- [ ] All automated tests pass locally (`npm test`).
+- [ ] TypeScript strict validation passes (`npm run typecheck`).
+- [ ] No passwords, access tokens, API keys, or personal server URLs are committed.
+- [ ] No unnecessary dependencies have been introduced.
+- [ ] Documentation has been updated where appropriate.
+- [ ] The related issue is linked when applicable.

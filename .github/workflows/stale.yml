@@ -19,25 +19,25 @@ jobs:
         uses: actions/stale@v9
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          days-before-issue-stale: 45
-          days-before-issue-close: 7
+          days-before-issue-stale: 60
+          days-before-issue-close: 14
           stale-issue-label: 'stale'
           stale-issue-message: |
-            Hello! This issue has been marked as **stale** because it has had no activity for 45 days.
-            
-            If this issue still persists with the latest release of FINORA, please leave a comment to keep it active. Otherwise, it will be automatically closed in 7 days. Thank you!
+            Hello! This issue has been automatically marked as **stale** because it has had no activity for 60 days.
+
+            If this issue still persists with the latest release of FINORA, please leave a comment to keep it open. Otherwise, it will be automatically closed in 14 days. Thank you for your feedback!
           close-issue-message: |
-            This issue was automatically closed due to inactivity. Feel free to open a new issue with updated details if you still experience this problem.
-          
-          days-before-pr-stale: 45
-          days-before-pr-close: 7
+            This issue was automatically closed due to inactivity. If you still encounter this issue, feel free to open a new report with updated details and logs.
+
+          days-before-pr-stale: 30
+          days-before-pr-close: 14
           stale-pr-label: 'stale'
           stale-pr-message: |
-            Hello! This Pull Request has been marked as **stale** because it has had no activity for 45 days.
-            
-            Please rebase or update your branch, or leave a comment if work is still ongoing. It will be closed in 7 days without activity.
-          close-pr-message: |
-            This Pull Request was closed due to inactivity. Thank you for your time and contributions!
+            Hello! This Pull Request has been marked as **stale** because it has had no activity for 30 days.
 
-          exempt-issue-labels: 'pinned,security,enhancement,keep,blocked'
-          exempt-pr-labels: 'pinned,security,enhancement,keep,work-in-progress,wip'
+            Please rebase or update your branch, or leave a comment if work is ongoing. It will be closed in 14 days without activity.
+          close-pr-message: |
+            This Pull Request was closed due to inactivity. Thank you for your time and contribution!
+
+          exempt-issue-labels: 'pinned,security,priority: critical,priority: high,roadmap,keep,blocked'
+          exempt-pr-labels: 'pinned,security,priority: critical,priority: high,roadmap,keep,work-in-progress,wip'

@@ -1,0 +1,11 @@
+# Global default owner
+* @MEHDImp4
+
+# Critical architecture & playback
+/src/features/player/ @MEHDImp4
+/src/core/security/ @MEHDImp4
+/.github/ @MEHDImp4
+
+# Dependency manifests
+/package.json @MEHDImp4
+/package-lock.json @MEHDImp4

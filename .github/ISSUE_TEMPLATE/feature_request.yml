@@ -1,20 +1,20 @@
 name: 💡 Feature Request
 description: Suggest a new feature, improvement, or UX idea for FINORA
 title: "[Feature]: "
-labels: ["enhancement", "triage"]
+labels: ["feature", "needs triage"]
 body:
   - type: markdown
     attributes:
       value: |
         Thank you for suggesting an improvement for FINORA!
-        FINORA prioritizes fluid performance (60/120 FPS), cinematic visual design, and rock-solid playback over bloat.
+        FINORA focuses on high performance, clean cinematic design, and reliable core playback.
 
   - type: textarea
     id: problem-statement
     attributes:
       label: Problem or User Need
-      description: Is your feature request related to a problem? Please describe what you are trying to accomplish.
-      placeholder: "I'm always frustrated when..."
+      description: Is your feature request related to a problem or limitation?
+      placeholder: "Describe the situation or friction..."
     validations:
       required: true
 
@@ -23,7 +23,7 @@ body:
     attributes:
       label: Proposed Solution
       description: Describe what you would like to see added or changed.
-      placeholder: A clear and concise description of the feature or behavior you'd like.
+      placeholder: A clear and concise description of the feature or behavior you would like.
     validations:
       required: true
 
@@ -32,7 +32,7 @@ body:
     attributes:
       label: Alternatives Considered
       description: Have you considered any alternative solutions or workarounds?
-      placeholder: Describe other options you looked into...
+      placeholder: Describe other approaches you looked into...
 
   - type: dropdown
     id: category
@@ -54,7 +54,7 @@ body:
     id: mockups
     attributes:
       label: Mockups, Screenshots, or Reference Examples
-      description: If you have visual mockups or examples from other apps (e.g. Netflix, Prime Video, Jellyfin Web), please attach them here.
+      description: If you have visual mockups or examples from other apps, please attach them here.
 
   - type: checkboxes
     id: checklist
@@ -63,5 +63,5 @@ body:
       options:
         - label: I have searched existing feature requests to avoid duplicates.
           required: true
-        - label: I understand that FINORA focuses on performance, polish, and solid core features.
+        - label: I understand that FINORA prioritizes performance, polish, and solid core features.
           required: true

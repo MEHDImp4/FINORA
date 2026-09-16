@@ -28,6 +28,7 @@
   <a href="https://github.com/MEHDImp4/FINORA/releases/latest">📥 <strong>Télécharger le dernier APK</strong></a> •
   <a href="#-démarrage-rapide-développeurs">🚀 <strong>Démarrage rapide</strong></a> •
   <a href="CONTRIBUTING.fr.md">🤝 <strong>Contribuer</strong></a> •
+  <a href="https://github.com/MEHDImp4/FINORA/discussions">💬 <strong>Discussions</strong></a> •
   <a href="SECURITY.fr.md">🛡️ <strong>Sécurité</strong></a>
 </p>
 
@@ -359,6 +360,7 @@ Les contributions de la communauté sont les bienvenues !
 
 ## 💬 Communauté & Support
 
+- **Discussions GitHub** : Échangez sur vos configurations serveur, vos idées et vos retours dans les [Discussions](https://github.com/MEHDImp4/FINORA/discussions).
 - **Suivi des Problèmes** : Suivez les résolutions de bugs et évolutions dans les [Issues](https://github.com/MEHDImp4/FINORA/issues).
 - **Propositions & Idées** : Échangez autour de nouvelles fonctionnalités via les [Demandes de Fonctionnalités](https://github.com/MEHDImp4/FINORA/issues/new?template=feature_request.yml).
 - **Releases** : Téléchargez les versions publiées et consultez les notes de mise à jour dans les [Releases](https://github.com/MEHDImp4/FINORA/releases).

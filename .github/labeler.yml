@@ -1,29 +1,38 @@
-# Configuration for actions/labeler
-# Labels PRs automatically based on the paths of modified files
+# Configuration for actions/labeler v5
+# Labels PRs automatically based on changed file paths
 
-"playback":
+"player":
   - changed-files:
       - any-glob-to-any-file: "src/features/player/**"
 
 "downloads":
   - changed-files:
-      - any-glob-to-any-file: "src/features/downloads/**"
+      - any-glob-to-any-file: "src/features/offline/**"
 
 "ui/ux":
   - changed-files:
       - any-glob-to-any-file:
           - "src/components/**"
-          - "app/**"
+          - "src/design-system/**"
+          - "src/app/**"
+          - "src/features/home/**"
+          - "src/features/details/**"
 
 "search":
   - changed-files:
       - any-glob-to-any-file: "src/features/search/**"
 
-"auth":
+"library":
   - changed-files:
-      - any-glob-to-any-file: "src/features/auth/**"
+      - any-glob-to-any-file: "src/features/library/**"
 
-"network":
+"authentication":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/features/onboarding/**"
+          - "src/core/jellyfin/auth*"
+
+"networking":
   - changed-files:
       - any-glob-to-any-file: "src/core/network/**"
 
@@ -32,7 +41,7 @@
       - any-glob-to-any-file:
           - "src/core/security/**"
           - "src/core/storage/secureStore*.ts"
-          - "SECURITY.md"
+          - "SECURITY*.md"
 
 "android":
   - changed-files:
@@ -44,7 +53,7 @@
   - changed-files:
       - any-glob-to-any-file: "ios/**"
 
-"ci/automation":
+"ci":
   - changed-files:
       - any-glob-to-any-file:
           - ".github/**"

@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: 💬 GitHub Discussions
+    url: https://github.com/MEHDImp4/FINORA/discussions
+    about: Ask questions, seek setup help, or discuss FINORA with the community.
   - name: 📖 Documentation & Setup
     url: https://github.com/MEHDImp4/FINORA#getting-started
     about: Check the getting started guide and development setup instructions.

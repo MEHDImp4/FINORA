@@ -126,31 +126,68 @@ Pour préserver des animations à 60/120 FPS et une stabilité irréprochable :
 
 ---
 
-## 🔀 Flux Git & Règles de Commits
+## 🔀 Workflow de Contribution
+ 
+```text
+Fork du Dépôt
+      │
+      ▼
+Création de Branche Thématique (ex: feat/offline-download-ui)
+      │
+      ▼
+Implémentation & Ajout de Tests
+      │
+      ▼
+Validation Locale (npm test && npm run typecheck)
+      │
+      ▼
+Commit (Conventional Commits)
+      │
+      ▼
+Push vers le Fork & Ouverture de la PR
+      │
+      ▼
+Vérifications Automatisées CI & Linters
+      │
+      ▼
+Revue par les Mainteneurs & Retouches
+      │
+      ▼
+Squash & Merge dans master
+```
 
-### Gestion des Branches
-1. Créez toujours votre branche de travail à partir de `master` :
-   ```bash
-   git checkout master
-   git pull upstream master
-   git checkout -b fix/synchro-sous-titres
-   ```
+### Conventions de Nommage des Branches
+Créez systématiquement votre branche depuis `master` :
+```bash
+git checkout master
+git pull upstream master
+git checkout -b <type>/<description>
+```
+
+**Exemples de noms de branches recommandés :**
+- `feat/offline-download-ui`
+- `fix/player-audio-track`
+- `perf/carousel-render-optimization`
+- `docs/readme-installation`
 
 ### Conventions de Commits (Conventional Commits)
-Nous appliquons le standard [Conventional Commits](https://www.conventionalcommits.org/fr/) :
+Nous appliquons la spécification [Conventional Commits](https://www.conventionalcommits.org/) :
 
-- `feat:` Nouvelle fonctionnalité utilisateur
+- `feat:` Nouvelle fonctionnalité visible par l'utilisateur
 - `fix:` Correction d'un bug
-- `perf:` Optimisation de performance
-- `refactor:` Restructuration du code sans changement fonctionnel
-- `test:` Ajout ou modification de tests unitaires
-- `docs:` Documentation
-- `chore:` Tâches de maintenance, dépendances, configuration CI
+- `perf:` Optimisation des performances ou de la mémoire
+- `refactor:` Réorganisation du code sans changement fonctionnel
+- `docs:` Modifications apportées à la documentation
+- `test:` Ajout ou mise à jour de tests
+- `chore:` Tâches de maintenance, dépendances, configuration
+- `ci:` Workflows d'intégration continue ou actions GitHub
+- `security:` Correctif de sécurité ou durcissement
 
 **Exemples :**
-- `feat(player): ajout du geste de réglage de luminosité`
-- `fix(offline): reprise du téléchargement après perte de réseau`
-- `docs(readme): mise à jour du lien vers le guide de contribution`
+- `feat(offline): add background resume support`
+- `fix(player): sync playback position correctly`
+- `docs: improve Android setup instructions`
+- `perf(home): optimize carousel memoization`
 
 ---
 
@@ -158,11 +195,11 @@ Nous appliquons le standard [Conventional Commits](https://www.conventionalcommi
 
 1. Poussez votre branche sur votre fork GitHub :
    ```bash
-   git push origin fix/synchro-sous-titres
+   git push origin feat/offline-download-ui
    ```
-2. Ouvrez une Pull Request vers la branche `master` du dépôt principal.
-3. Remplissez consciencieusement le **Modèle de Pull Request**.
-4. Assurez-vous que tous les checks CI (tests unitaires, TypeScript strict, validation de titre) passent avec succès.
-5. Notre équipe examinera votre PR avec soin et vous accompagnera pour son intégration !
+2. Ouvrez une Pull Request ciblant la branche `master` du dépôt principal.
+3. Remplissez scrupuleusement le **Modèle de Pull Request**.
+4. Vérifiez que tous les contrôles automatisés CI passent au vert.
+5. Un mainteneur étudiera votre proposition, suggérera d'éventuels ajustements et validera l'intégration !
 
-Merci de participer à faire de FINORA le meilleur lecteur multimédia Jellyfin ! 🎬🍿
+Merci de contribuer à faire de FINORA le meilleur client de streaming personnel ! 🎬🍿

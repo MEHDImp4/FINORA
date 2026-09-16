@@ -1,12 +1,14 @@
 name: 🎬 Playback & Video Streaming Issue
 description: Report a playback error, audio/subtitle sync issue, or transcoding problem
 title: "[Playback]: "
-labels: ["playback", "player", "triage"]
+labels: ["bug", "player", "needs triage"]
 body:
   - type: markdown
     attributes:
       value: |
         Use this template specifically for video player issues, codec incompatibilities, subtitle rendering (ASS/SSA, PGS, SRT), audio track selection, or transcoding problems.
+        
+        ⚠️ **SECURITY NOTICE**: NEVER include passwords, authentication tokens, API keys, or private server credentials in your issue or logs.
 
   - type: textarea
     id: issue-summary
@@ -62,13 +64,14 @@ body:
   - type: dropdown
     id: audio-codec
     attributes:
-      label: Audio Codec
+      label: Audio Codec & Channels
       options:
-        - "AAC"
+        - "AAC (Stereo 2.0)"
+        - "AAC (Surround 5.1)"
         - "AC3 / E-AC3 (Dolby Digital / Plus)"
-        - "DTS / DTS-HD"
+        - "DTS / DTS-HD MA"
         - "TrueHD / Atmos"
-        - "FLAC / Opus"
+        - "FLAC / Opus / Vorbis"
         - "Other / Unknown"
     validations:
       required: true
@@ -76,22 +79,14 @@ body:
   - type: dropdown
     id: subtitle-format
     attributes:
-      label: Subtitle Format (if enabled)
+      label: Subtitle Track Format (if active)
       options:
-        - "No subtitles enabled"
-        - "SubRip (SRT / WebVTT)"
-        - "Advanced SubStation Alpha (ASS / SSA)"
-        - "Picture-based (PGS / VOBSUB)"
-        - "Embedded in container"
-        - "External file"
-    validations:
-      required: false
-
-  - type: input
-    id: app-version
-    attributes:
-      label: FINORA Version
-      placeholder: e.g. v1.0.0, commit ebc9320
+        - "None / Disabled"
+        - "SubRip (.srt)"
+        - "WebVTT (.vtt)"
+        - "Advanced SubStation Alpha (.ass / .ssa)"
+        - "PGS / VOBSUB (Picture-based)"
+        - "Other"
     validations:
       required: true
 
@@ -99,25 +94,27 @@ body:
     id: jellyfin-version
     attributes:
       label: Jellyfin Server Version
-      placeholder: e.g. 10.9.11, 10.10.3
+      description: Server version (e.g. 10.9.11, 10.10.3).
+      placeholder: e.g. 10.9.11
     validations:
       required: true
 
   - type: input
     id: device-info
     attributes:
-      label: Device & Android/iOS Version
-      placeholder: e.g. Google Pixel 8 (Android 14)
+      label: Device & Operating System
+      description: The device manufacturer, model, and OS version.
+      placeholder: e.g. Samsung Galaxy S24 (Android 14) / iPhone 15 (iOS 18)
     validations:
       required: true
 
   - type: textarea
-    id: jellyfin-transcode-log
+    id: playback-logs
     attributes:
-      label: Jellyfin Transcode Log / Player Log
+      label: Player Diagnostics & Logs
       description: |
-        If transcoding was triggered, copy the relevant part of the Jellyfin transcode log (from Dashboard > Logs) or adb logcat output.
-        ⚠️ Ensure all personal tokens and server IP/domains are redacted before posting.
+        Paste relevant log snippets from the app or server.
+        ⚠️ Verify that no user tokens, passwords, or personal server addresses are present.
       render: shell
 
   - type: checkboxes
@@ -125,7 +122,9 @@ body:
     attributes:
       label: Checklist
       options:
-        - label: Does this video play correctly in Jellyfin Web or the official Jellyfin client?
-        - label: I verified the playback settings (quality bitrate limit, audio track selection).
-        - label: All sensitive server credentials have been removed from the logs.
+        - label: I have tested if the media plays correctly in Jellyfin Web or other clients.
+          required: true
+        - label: I am using the latest version of FINORA.
+          required: true
+        - label: I have sanitized all logs to ensure no private credentials or tokens are shared.
           required: true
