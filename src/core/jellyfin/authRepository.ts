@@ -1,7 +1,10 @@
 import { Alert } from "react-native";
 import { HttpClient } from "../network/httpClient";
 import { jellyfinClient, JellyfinClient } from "./jellyfinClient";
-import { normalizeServerUrlForCredentials } from "./serverDiscovery";
+import {
+  normalizeServerUrlForCredentials,
+  ServerUrlValidationResult
+} from "./serverDiscovery";
 import {
   ISecureTokenStorage,
   IUserPreferencesStorage,
@@ -9,6 +12,7 @@ import {
   userPreferencesStorage
 } from "../security/storage";
 import { AuthenticationError, FinoraError } from "../errors";
+import { logger } from "../network/logger";
 
 export interface LoginCredentials {
   username: string;
@@ -213,22 +217,50 @@ export class AuthRepository {
 
       // Re-evaluate legacy saved sessions before placing the token on the wire.
       // A session saved by an older FINORA version may point at a public HTTP URL.
-      let targetUrl: string;
+      let normalized: ServerUrlValidationResult;
       try {
-        targetUrl = normalizeServerUrlForCredentials(descriptor.serverUrl).url;
+        normalized = normalizeServerUrlForCredentials(descriptor.serverUrl);
       } catch {
         await this.prefStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
         this.client.setAuthToken(null);
         return null;
       }
+      const targetUrl = normalized.url;
+      const clientHttp = httpClient || this.client.getHttpClient();
 
       if (typeof this.client.initialize === "function") {
         await this.client.initialize(targetUrl);
       } else {
         this.client.setServerUrl(targetUrl);
       }
+
+      if (!normalized.isHttps) {
+        // A private cleartext address is not proof of identity: after the user
+        // roams to another network a different machine can own the stored IP, so
+        // the token must not be sent until the host proves it is the same server
+        // that issued it. This probe is strictly unauthenticated.
+        this.client.setAuthToken(null);
+
+        let publicInfo: { Id?: string } | null = null;
+        try {
+          publicInfo = await clientHttp.request<{ Id?: string }>("/System/Info/Public", {
+            timeoutMs: 2500,
+            retries: 0
+          });
+        } catch {
+          // Unreachable host: identity cannot be verified, so the session is
+          // suspended rather than authenticated blindly.
+        }
+
+        if (!publicInfo?.Id || publicInfo.Id !== descriptor.serverId) {
+          logger.warn(
+            "[Auth] Cleartext server identity mismatch — session suspended, token withheld."
+          );
+          return null;
+        }
+      }
+
       this.client.setAuthToken(token);
-      const clientHttp = httpClient || this.client.getHttpClient();
 
       // Verify token validity against /System/Info or /Users/{userId} with fast timeout
       try {
