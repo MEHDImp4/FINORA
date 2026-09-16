@@ -162,4 +162,39 @@ describe("FinoraPlayerEngine", () => {
     // Player.play should not be called after destroy
     expect((mockPlayer as any).play).not.toHaveBeenCalled();
   });
+
+  it("uses timeUpdate as the primary playhead progression source without duplicate timer updates (PERF-001)", () => {
+    jest.useFakeTimers();
+    try {
+      const mockPlayer = createMockPlayer();
+      const engine = new FinoraPlayerEngine(mockPlayer);
+
+      const snapshots: number[] = [];
+      engine.subscribe((snap) => {
+        snapshots.push(snap.currentTimeSeconds);
+      });
+
+      engine.play();
+      snapshots.length = 0;
+
+      // Simulate native timeUpdate event at t=1.0
+      (mockPlayer as any)._emit("timeUpdate", { currentTime: 1.0, bufferedPosition: 10 });
+      expect(engine.getSnapshot().currentTimeSeconds).toBe(1.0);
+      expect(snapshots).toEqual([1.0]);
+
+      // Fast forward fake timers by 600ms (more than the 500ms fallback timer interval)
+      // Because native timeUpdate was received recently (<1000ms), fallback timer does not double-tick
+      mockPlayer.currentTime = 1.0;
+      jest.advanceTimersByTime(600);
+      expect(snapshots).toEqual([1.0]);
+
+      // Emit next native timeUpdate at t=1.25
+      (mockPlayer as any)._emit("timeUpdate", { currentTime: 1.25, bufferedPosition: 10 });
+      expect(snapshots).toEqual([1.0, 1.25]);
+
+      engine.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

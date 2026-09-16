@@ -12,6 +12,7 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
   private isDestroyed: boolean = false;
   private snapshot: FinoraPlayerSnapshot;
   private playheadTimer: any = null;
+  private lastNativeTimeUpdateAt: number = 0;
 
   constructor(
     player?: VideoPlayer | null,
@@ -60,6 +61,7 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
       this.handlePlayingChange(payload.isPlaying);
     });
     const subTime = this.player.addListener("timeUpdate", (payload) => {
+      this.lastNativeTimeUpdateAt = Date.now();
       this.handleTimeUpdate(payload.currentTime, payload.bufferedPosition);
     });
     const subRate = this.player.addListener("playbackRateChange", (payload) => {
@@ -88,6 +90,7 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
 
   public detachPlayer(): void {
     this.stopPlayheadTimer();
+    this.lastNativeTimeUpdateAt = 0;
     for (const sub of this.eventSubscriptions) {
       if (typeof sub?.remove === "function") {
         sub.remove();
@@ -99,14 +102,21 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
 
   private startPlayheadTimer(): void {
     this.stopPlayheadTimer();
+    // Fallback heartbeat: expo-video native timeUpdate events are the primary source of progression.
+    // The JS timer acts only as a fallback if native timeUpdate has not fired for over 1000ms.
     this.playheadTimer = setInterval(() => {
-      if (this.player && this.snapshot.state === "playing") {
-        const cur = this.player.currentTime;
-        if (typeof cur === "number" && !isNaN(cur)) {
-          this.handleTimeUpdate(cur, this.player.bufferedPosition);
-        }
+      if (!this.player || this.snapshot.state !== "playing") return;
+
+      const timeSinceLastNativeUpdate = Date.now() - this.lastNativeTimeUpdateAt;
+      if (timeSinceLastNativeUpdate < 1000) {
+        return;
       }
-    }, 250);
+
+      const cur = this.player.currentTime;
+      if (typeof cur === "number" && !isNaN(cur)) {
+        this.handleTimeUpdate(cur, this.player.bufferedPosition);
+      }
+    }, 500);
   }
 
   private stopPlayheadTimer(): void {
