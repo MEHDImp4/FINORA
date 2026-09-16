@@ -23,21 +23,21 @@ jobs:
           days-before-issue-close: 7
           stale-issue-label: 'stale'
           stale-issue-message: |
-            Bonjour ! Cette issue a été marquée comme **stale** (inactive) car elle n'a reçu aucune mise à jour depuis 45 jours.
+            Hello! This issue has been marked as **stale** because it has had no activity for 45 days.
             
-            Si le problème persiste toujours avec la dernière version de FINORA, veuillez laisser un commentaire pour la garder ouverte. Sans activité sous 7 jours, elle sera automatiquement fermée. Merci !
+            If this issue still persists with the latest release of FINORA, please leave a comment to keep it active. Otherwise, it will be automatically closed in 7 days. Thank you!
           close-issue-message: |
-            Cette issue a été fermée automatiquement en raison de son inactivité prolongée. N'hésitez pas à en ouvrir une nouvelle avec des informations à jour si nécessaire.
+            This issue was automatically closed due to inactivity. Feel free to open a new issue with updated details if you still experience this problem.
           
           days-before-pr-stale: 45
           days-before-pr-close: 7
           stale-pr-label: 'stale'
           stale-pr-message: |
-            Bonjour ! Cette Pull Request a été marquée comme **stale** car elle n'a reçu aucune activité depuis 45 jours.
+            Hello! This Pull Request has been marked as **stale** because it has had no activity for 45 days.
             
-            Veuillez mettre à jour votre branche ou laisser un commentaire si le travail est toujours en cours. Sans retour d'ici 7 jours, elle sera fermée.
+            Please rebase or update your branch, or leave a comment if work is still ongoing. It will be closed in 7 days without activity.
           close-pr-message: |
-            Cette Pull Request a été fermée en raison de son inactivité. Merci pour votre temps et vos efforts !
+            This Pull Request was closed due to inactivity. Thank you for your time and contributions!
 
           exempt-issue-labels: 'pinned,security,enhancement,keep,blocked'
           exempt-pr-labels: 'pinned,security,enhancement,keep,work-in-progress,wip'

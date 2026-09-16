@@ -20,13 +20,13 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           issue-message: |
-            👋 Bonjour et bienvenue dans la communauté **FINORA** ! 🎉
-            Merci beaucoup d'avoir ouvert votre première issue sur le projet.
+            👋 Hello and welcome to the **FINORA** community! 🎉
+            Thank you for opening your first issue on the project.
             
-            L'équipe va examiner votre signalement sous peu. En attendant, n'hésitez pas à consulter notre [Documentation](https://github.com/MEHDImp4/FINORA#readme) ou à rejoindre nos [Discussions](https://github.com/MEHDImp4/FINORA/discussions). 🎬🍿
+            Our team will review your report shortly. In the meantime, feel free to explore our [Documentation](https://github.com/MEHDImp4/FINORA#readme) or join our [Discussions](https://github.com/MEHDImp4/FINORA/discussions). 🎬🍿
           pr-message: |
-            👋 Bienvenue et merci pour votre toute première Pull Request sur **FINORA** ! 🚀
+            👋 Welcome and thank you for your very first Pull Request to **FINORA**! 🚀
             
-            Notre équipe apprécie grandement votre contribution. Nos workflows automatisés vérifient actuellement vos modifications (tests unitaires, TypeScript strict, conventions de commits).
+            We truly appreciate your contribution. Our automated workflows are currently validating your changes (unit tests, TypeScript strict mode, conventional commits).
             
-            N'hésitez pas à jeter un œil à notre [Guide de Contribution (CONTRIBUTING.md)](https://github.com/MEHDImp4/FINORA/blob/master/CONTRIBUTING.md) si ce n'est pas déjà fait. 🍿
+            Please feel free to review our [Contributing Guide (CONTRIBUTING.md)](https://github.com/MEHDImp4/FINORA/blob/master/CONTRIBUTING.md) if you haven't already. 🍿

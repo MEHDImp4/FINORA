@@ -54,7 +54,7 @@ jobs:
             // 1. Check description length
             const cleanBody = body.replace(/<!--[\s\S]*?-->/g, '').trim();
             if (cleanBody.length < 30) {
-              errors.push("⚠️ **Description trop courte ou vide** : Veuillez décrire brièvement les changements apportés et leur contexte.");
+              errors.push("⚠️ **Description too short or empty**: Please provide a concise summary of what was changed and the motivation.");
             }
 
             // 2. Check if default placeholder wasn't touched
@@ -65,17 +65,17 @@ jobs:
             // 3. Check for at least one checked item in the checklist
             const checkedBoxes = (body.match(/-\s*\[x\]/gi) || []).length;
             if (checkedBoxes === 0) {
-              errors.push("⚠️ **Checklist non complétée** : Veuillez cocher au moins les cases pertinentes de la checklist (tests, typecheck, sécurité).");
+              errors.push("⚠️ **Incomplete checklist**: Please check at least the applicable boxes in the quality & security checklist.");
             }
 
             if (errors.length > 0) {
               const commentBody = [
-                `👋 Bonjour @${pr.user.login} ! Merci pour votre contribution à **FINORA** 🎬.`,
+                `👋 Hello @${pr.user.login}! Thank you for contributing to **FINORA** 🎬.`,
                 "",
-                "Pour assurer la qualité de la codebase, notre bot a détecté quelques éléments manquants :",
+                "To ensure high code quality, our automated bot noticed a few missing details:",
                 ...errors.map(e => `- ${e}`),
                 "",
-                "👉 *Veuillez modifier la description de votre Pull Request pour compléter ces points.*"
+                "👉 *Please edit your Pull Request description to complete these items.*"
               ].join("\n");
 
               // Post or update comment
@@ -85,7 +85,7 @@ jobs:
                 issue_number: pr.number,
               });
 
-              const botComment = comments.find(c => c.user.type === 'Bot' && c.body.includes("Merci pour votre contribution à **FINORA**"));
+              const botComment = comments.find(c => c.user.type === 'Bot' && c.body.includes("Thank you for contributing to **FINORA**"));
               if (botComment) {
                 await github.rest.issues.updateComment({
                   owner: context.repo.owner,
@@ -127,7 +127,7 @@ jobs:
             const lockfileChanged = filenames.includes("package-lock.json");
 
             if (packageJsonChanged && !lockfileChanged) {
-              core.setFailed("❌ 'package.json' a été modifié sans mettre à jour 'package-lock.json'. Veuillez exécuter 'npm install' et commiter le lockfile.");
+              core.setFailed("❌ 'package.json' was modified without updating 'package-lock.json'. Please run 'npm install' and commit the updated lockfile.");
             } else {
               core.info("Lockfile integrity check passed.");
             }

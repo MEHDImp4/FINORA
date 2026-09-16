@@ -89,15 +89,15 @@ jobs:
           CHANGELOG=$(git log -n 10 --pretty=format:"- %s (%h)")
           {
             echo "### 🎬 FINORA Preview Build (Standalone)"
-            echo "- **Version** : \`v${VERSION}\`"
-            echo "- **Commit** : \`${SHORT_SHA}\`"
-            echo "- **Type** : Preview APK autonome (assembleRelease)"
+            echo "- **Version**: \`v${VERSION}\`"
+            echo "- **Commit**: \`${SHORT_SHA}\`"
+            echo "- **Type**: Standalone Preview APK (assembleRelease)"
             echo ""
-            echo "📥 **Installation directe** : Cliquez directement sur le fichier \`.apk\` ci-dessous sur votre téléphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire)."
+            echo "📥 **Direct Installation**: Tap the \`.apk\` file below on your Android device to download and install in 1 click (no zip archive to extract)."
             echo ""
             echo "---"
             echo ""
-            echo "### 📋 Dernières modifications (Changelog)"
+            echo "### 📋 Recent Changes (Changelog)"
             echo "$CHANGELOG"
           } > preview_release_notes.md
 
@@ -204,15 +204,15 @@ jobs:
           CHANGELOG=$(git log -n 12 --pretty=format:"- %s (%h)")
           {
             echo "### 🚀 FINORA Beta Build"
-            echo "- **Version** : \`v${VERSION}\`"
-            echo "- **Commit** : \`${SHORT_SHA}\`"
-            echo "- **Type** : Beta APK (assembleRelease)"
+            echo "- **Version**: \`v${VERSION}\`"
+            echo "- **Commit**: \`${SHORT_SHA}\`"
+            echo "- **Type**: Standalone Beta APK (assembleRelease)"
             echo ""
-            echo "📥 **Installation directe** : Cliquez directement sur le fichier \`.apk\` ci-dessous sur votre téléphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire)."
+            echo "📥 **Direct Installation**: Tap the \`.apk\` file below on your Android device to download and install in 1 click (no zip archive to extract)."
             echo ""
             echo "---"
             echo ""
-            echo "### 📋 Dernières modifications (Changelog)"
+            echo "### 📋 Recent Changes (Changelog)"
             echo "$CHANGELOG"
           } > beta_release_notes.md
 
@@ -341,18 +341,18 @@ jobs:
           CHANGELOG=$(git log -n 15 --pretty=format:"- %s (%h)")
           {
             echo "### 🌟 FINORA Production Release"
-            echo "- **Version** : \`v${VERSION}\`"
-            echo "- **Commit** : \`${SHORT_SHA}\`"
-            echo "- **Type** : Production Release APK"
+            echo "- **Version**: \`v${VERSION}\`"
+            echo "- **Commit**: \`${SHORT_SHA}\`"
+            echo "- **Type**: Production Release APK"
             echo ""
-            echo "📥 **Installation directe** : Cliquez directement sur le fichier \`.apk\` ci-dessous sur votre smartphone Android pour le télécharger et l'installer en 1 clic (aucun fichier zip à extraire)."
+            echo "📥 **Direct Installation**: Tap the \`.apk\` file below on your Android smartphone to download and install in 1 click (no zip archive to extract)."
             echo ""
             echo "---"
             echo ""
-            echo "### 📋 Notes de version & Nouveautés (Changelog)"
-            echo "Consultez le fichier [CHANGELOG.md](https://github.com/MEHDImp4/FINORA/blob/master/CHANGELOG.md) complet pour l'ensemble des fonctionnalités et correctifs détaillés."
+            echo "### 📋 Release Notes & Highlights (Changelog)"
+            echo "See the full [CHANGELOG.md](https://github.com/MEHDImp4/FINORA/blob/master/CHANGELOG.md) for detailed features and bug fixes."
             echo ""
-            echo "#### Principaux changements récents :"
+            echo "#### Recent Highlights:"
             echo "$CHANGELOG"
           } > release_notes.md
 
