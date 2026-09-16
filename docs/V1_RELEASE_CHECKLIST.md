@@ -137,7 +137,27 @@ This checklist documents the mandatory end-to-end manual and automated verificat
 
 ---
 
-## 8. GitHub Master Branch Protection Configuration
+## 8. GitHub Actions APK Builds (Preview, Beta, Release)
+
+A standalone GitHub Actions workflow is provided in [`.github/workflows/build-apk.yml`](../.github/workflows/build-apk.yml).
+
+### Available Jobs & Artifacts
+| Job | Output Artifact | Retention | Description / Trigger |
+|---|---|---|---|
+| `build-preview` | `finora-v<version>-preview-<sha>.apk` | 14 days | Debug/Internal build for rapid testing. Triggered on push tags `*-preview*` or via manual dispatch. |
+| `build-beta` | `finora-v<version>-beta-<sha>.apk` | 30 days | Staging/Release candidate build for beta testers. Triggered on tags `*-beta*`, tags `v*`, or via manual dispatch. |
+| `build-release` | `finora-v<version>-release.apk` | 90 days | Official production APK. Triggered on release tags `v*` or via manual dispatch. Automatically attached to GitHub Releases. |
+
+### Optional Release Signing Secrets (GitHub Repository Secrets)
+If not configured, the workflow uses the default Android build signing (installable immediately on all devices for sideloading). To sign with an official release keystore:
+- `ANDROID_KEYSTORE_BASE64`: Base64 string of the `.keystore` or `.jks` file (`base64 -w 0 release.keystore`).
+- `ANDROID_KEYSTORE_PASSWORD`: Keystore password.
+- `ANDROID_KEY_ALIAS`: Key alias.
+- `ANDROID_KEY_PASSWORD`: Key password.
+
+---
+
+## 9. GitHub Master Branch Protection Configuration
 
 To guarantee code quality and prevent accidental breaking changes to FINORA v1.0.0+:
 

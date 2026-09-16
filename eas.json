@@ -28,6 +28,28 @@
       },
       "env": {}
     },
+    "beta": {
+      "distribution": "internal",
+      "channel": "beta",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      },
+      "env": {}
+    },
+    "release": {
+      "distribution": "internal",
+      "channel": "release",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      },
+      "env": {}
+    },
     "production": {
       "autoIncrement": true,
       "channel": "production",
