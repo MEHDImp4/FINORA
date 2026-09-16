@@ -90,7 +90,7 @@ FINORA enforces strict automated testing and TypeScript strict mode. All checks 
 npm test
 
 # Run tests in watch mode during development:
-npm run test:watch
+npm test -- --watch
 
 # Run TypeScript typechecks in strict mode:
 npm run typecheck

@@ -86,11 +86,11 @@ npx expo run:ios
 FINORA applique une rigueur stricte sur les tests automatisés et le typage TypeScript. Tous les voyants doivent être au vert pour qu'une Pull Request soit acceptée :
 
 ```bash
-# Exécuter l'ensemble des 77 suites de tests automatisés :
+# Exécuter l'ensemble des 79 suites de tests automatisés :
 npm test
 
 # Exécuter les tests en mode interactif continu pendant le développement :
-npm run test:watch
+npm test -- --watch
 
 # Valider le typage TypeScript en mode strict :
 npm run typecheck
