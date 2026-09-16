@@ -16,6 +16,13 @@ jest.mock("../../../core/jellyfin/authRepository", () => ({
   authRepository: { restoreSession: jest.fn() }
 }));
 
+// The module above is mocked, so take the real key directly. The offline
+// catalogue is read back through the logged-in account scope, and a real
+// process death always leaves that descriptor behind.
+const { ACTIVE_SESSION_STORAGE_KEY } = jest.requireActual(
+  "../../../core/jellyfin/authRepository"
+) as { ACTIVE_SESSION_STORAGE_KEY: string };
+
 const fileSystem = FileSystem as any;
 const restoreSessionMock = authRepository.restoreSession as jest.Mock;
 
@@ -391,6 +398,12 @@ describe("DownloadManager — true resume after process death", () => {
     ]);
     // The file on disk is already the full media.
     fileSystem.__setFileSize(localPath, 1_000_000_000);
+    // A process death leaves the signed-in account descriptor in storage, and
+    // the offline catalogue is read back through that account scope.
+    await AsyncStorage.setItem(
+      ACTIVE_SESSION_STORAGE_KEY,
+      JSON.stringify({ ...SERVER_A, userName: "Alice", lastActiveAt: Date.now() })
+    );
 
     const manager = new DownloadManager();
     await manager.initialize();
@@ -400,7 +413,7 @@ describe("DownloadManager — true resume after process death", () => {
     expect(fileSystem.__getDownloadTasks()).toHaveLength(0);
     expect(manager.getDownload("movie-done")).toBeUndefined();
     const record = await offlineStorageService.getOfflineMedia("movie-done");
-    expect(record).toBeDefined();
+    expect(record).not.toBeNull();
     expect(record?.fileSizeBytes).toBe(1_000_000_000);
   });
 
