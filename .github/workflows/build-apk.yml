@@ -65,10 +65,10 @@ jobs:
       - name: Ensure gradlew is executable
         run: chmod +x android/gradlew
 
-      - name: Build Preview APK (assembleDebug)
+      - name: Build Preview APK (assembleRelease)
         run: |
           cd android
-          ./gradlew assembleDebug -PreactNativeReleaseLevel=preview
+          ./gradlew assembleRelease -PreactNativeReleaseLevel=preview
 
       - name: Prepare Preview Artifact & Checksum
         id: prepare
@@ -77,7 +77,13 @@ jobs:
           SHORT_SHA=$(git rev-parse --short HEAD)
           APK_NAME="finora-v${VERSION}-preview-${SHORT_SHA}.apk"
           
-          cp android/app/build/outputs/apk/debug/app-debug.apk "${APK_NAME}"
+          RELEASE_APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$RELEASE_APK" ]; then
+            echo "Error: Preview Release APK not found!"
+            exit 1
+          fi
+          
+          cp "$RELEASE_APK" "${APK_NAME}"
           sha256sum "${APK_NAME}" > "${APK_NAME}.sha256"
           
           echo "apk_name=${APK_NAME}" >> $GITHUB_OUTPUT
