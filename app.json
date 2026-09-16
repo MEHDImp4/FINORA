@@ -6,13 +6,6 @@
     "version": "1.0.0",
     "orientation": "default",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
-    "jsEngine": "hermes",
-    "splash": {
-      "image": "./assets/finora-logo-text.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0A0A0C"
-    },
     "icon": "./assets/finora-icon-f.png",
     "ios": {
       "supportsTablet": true,
@@ -36,7 +29,14 @@
       "expo-secure-store",
       "expo-video",
       "expo-asset",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/finora-logo-text.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0A0A0C"
+        }
+      ],
       "expo-brightness",
       [
         "expo-notifications",
@@ -55,7 +55,9 @@
       ],
       "./plugins/withBackgroundService",
       "./plugins/withSplashBackgroundColor",
-      "./plugins/withPiP"
+      "./plugins/withPiP",
+      "expo-font",
+      "expo-background-task"
     ],
     "experiments": {
       "typedRoutes": true
