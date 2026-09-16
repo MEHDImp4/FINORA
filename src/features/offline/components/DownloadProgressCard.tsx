@@ -39,7 +39,8 @@ export function DownloadProgressCard({
   const isFailed = download.status === "failed";
   const isQueued = download.status === "queued";
   const isPaused = download.status === "paused";
-  const isDownloading = download.status === "downloading";
+  const isFinalizing = download.status === "finalizing";
+  const isDownloading = download.status === "downloading" || isFinalizing;
   const progressPercent = Math.round(download.progress * 100);
 
   // Jellyfin sends no Content-Length for transcoded downloads, so fall back to
@@ -148,7 +149,9 @@ export function DownloadProgressCard({
             </View>
             <View style={styles.progressStatusRow}>
               <FinoraText variant="caption" style={styles.progressMeta} numberOfLines={1}>
-                {hasRealTotal
+                {isFinalizing
+                  ? "Finalisation..."
+                  : hasRealTotal
                   ? `${formatBytes(download.bytesDownloaded)} / ${formatBytes(download.totalBytes)}`
                   : isEstimated
                   ? `${formatBytes(download.bytesDownloaded)} / ~${formatBytes(displayTotal)}`
@@ -181,7 +184,7 @@ export function DownloadProgressCard({
             <Ionicons name="refresh" size={14} color="#FFFFFF" />
           </Pressable>
         )}
-        {isDownloading && onPause && (
+        {!isFinalizing && isDownloading && onPause && (
           <Pressable
             style={styles.pauseButton}
             onPress={() => onPause(download.itemId)}

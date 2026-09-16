@@ -235,6 +235,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     return activeDownloads.filter(
       (d) =>
         d.status === "downloading" ||
+        d.status === "finalizing" ||
         d.status === "queued" ||
         d.status === "failed" ||
         d.status === "paused"
@@ -242,7 +243,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
   }, [activeDownloads]);
 
   const activeCount = useMemo(
-    () => activeDownloads.filter((d) => d.status === "downloading").length,
+    () => activeDownloads.filter((d) => d.status === "downloading" || d.status === "finalizing").length,
     [activeDownloads]
   );
   const queuedCount = useMemo(

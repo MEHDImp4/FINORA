@@ -304,15 +304,11 @@ export class DownloadManager {
     context: DownloadAuthContext
   ): boolean {
     const identity = config.identity;
-    if (!identity?.serverUrl) {
-      // Entry persisted before identity tracking existed — nothing to validate.
-      return true;
+    if (!identity?.serverId || !identity?.userId || !identity?.serverUrl) {
+      // FAIL CLOSED: Entry lacks serverId or userId proof — never adopt for current user.
+      return false;
     }
-    if (identity.serverId && identity.userId) {
-      return matchesDownloadIdentity(identity, context);
-    }
-    // Partial legacy identity: the server URL is the strongest signal available.
-    return normalizeServerUrl(identity.serverUrl) === normalizeServerUrl(context.serverUrl);
+    return matchesDownloadIdentity(identity, context);
   }
 
   /**
@@ -322,7 +318,7 @@ export class DownloadManager {
   private async reconcileCompletedOnDisk(
     entry: PersistedDownloadEntry,
     size: number
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       await offlineStorageService.saveOfflineMedia({
         itemId: entry.itemId,
@@ -346,11 +342,13 @@ export class DownloadManager {
       logger.info(
         `[DownloadManager] Reconciled already-complete file for ${entry.itemId} (${size} bytes).`
       );
+      return true;
     } catch (err: any) {
       logger.warn(
         `[DownloadManager] Failed to reconcile complete file for ${entry.itemId}:`,
         err?.message ?? err
       );
+      return false;
     }
   }
 
@@ -424,8 +422,13 @@ export class DownloadManager {
 
         // Case D — already fully downloaded on disk
         if (entry.totalBytes > 0 && fileSizeBytes >= entry.totalBytes) {
-          await this.reconcileCompletedOnDisk(entry, fileSizeBytes);
-          continue;
+          const reconciled = await this.reconcileCompletedOnDisk(entry, fileSizeBytes);
+          if (reconciled) {
+            continue;
+          }
+          // Failed to save in catalog — keep item in failed state so it is not lost
+          entry.status = "failed";
+          entry.error = "Échec de l'enregistrement dans le catalogue hors-ligne";
         }
 
         // Case B — metadata claims progress but nothing is on disk. Never show a
@@ -438,7 +441,7 @@ export class DownloadManager {
           : 0;
 
         let restoredStatus: DownloadStatus;
-        if (entry.status === "downloading" || entry.status === "queued") {
+        if (entry.status === "downloading" || entry.status === "queued" || entry.status === "finalizing") {
           // Genuinely active before the kill → requeue for continuation.
           restoredStatus = "queued";
         } else {
@@ -505,13 +508,14 @@ export class DownloadManager {
           },
           metadata: entry.metadata,
           quality: entry.quality,
-          identity: restoredServerUrl
-            ? {
-                serverId: entry.serverId || "",
-                userId: entry.userId || "",
-                serverUrl: restoredServerUrl
-              }
-            : undefined,
+          identity:
+            entry.serverId && entry.userId && restoredServerUrl
+              ? {
+                  serverId: entry.serverId,
+                  userId: entry.userId,
+                  serverUrl: restoredServerUrl
+                }
+              : undefined,
           restored: true
         });
 
@@ -717,14 +721,56 @@ export class DownloadManager {
     }
 
     let localPath = item.localPath;
-    if (FileSystem.documentDirectory) {
-      const mediaDir = `${FileSystem.documentDirectory}finora_downloads/`;
-      try {
-        await FileSystem.makeDirectoryAsync(mediaDir, { intermediates: true });
-        localPath = `${mediaDir}${item.itemId}.mp4`;
-      } catch {
-        // Fallback to provided path
+    if (!localPath || !localPath.includes("://")) {
+      if (FileSystem.documentDirectory) {
+        const mediaDir = `${FileSystem.documentDirectory}finora_downloads/`;
+        try {
+          await FileSystem.makeDirectoryAsync(mediaDir, { intermediates: true });
+          localPath = `${mediaDir}${item.itemId}.mp4`;
+        } catch {
+          // Fallback to provided path
+        }
       }
+    }
+
+    if (typeof FileSystem.createDownloadResumable !== "function") {
+      const errorMsg = "Moteur de téléchargement non disponible";
+      logger.error(`[DownloadManager] FileSystem.createDownloadResumable is not available for ${item.itemId}`);
+      const downloadItem: DownloadItem = {
+        ...item,
+        localPath: localPath || item.localPath || "",
+        status: "failed",
+        progress: 0,
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        error: errorMsg,
+        startedAt: Date.now()
+      };
+      this.downloads.set(item.itemId, downloadItem);
+      this.schedulePersist();
+      this.notify();
+      this.processQueue();
+      return downloadItem;
+    }
+
+    if (!localPath || !localPath.startsWith("file://")) {
+      const errorMsg = "Chemin de destination local invalide";
+      logger.error(`[DownloadManager] Invalid localPath for ${item.itemId}: "${localPath}"`);
+      const downloadItem: DownloadItem = {
+        ...item,
+        localPath: localPath || item.localPath || "",
+        status: "failed",
+        progress: 0,
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        error: errorMsg,
+        startedAt: Date.now()
+      };
+      this.downloads.set(item.itemId, downloadItem);
+      this.schedulePersist();
+      this.notify();
+      this.processQueue();
+      return downloadItem;
     }
 
     const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
@@ -981,6 +1027,18 @@ export class DownloadManager {
     const { item, metadata } = config;
     const localPath = downloadItem.localPath;
 
+    if (typeof FileSystem.createDownloadResumable !== "function") {
+      logger.error(`[DownloadManager] FileSystem.createDownloadResumable is not available for ${itemId}`);
+      this.failDownload(itemId, "Moteur de téléchargement non disponible");
+      return;
+    }
+
+    if (!localPath || !localPath.startsWith("file://")) {
+      logger.error(`[DownloadManager] Invalid localPath for ${itemId}: "${localPath}"`);
+      this.failDownload(itemId, "Chemin de destination local invalide");
+      return;
+    }
+
     const request = await this.resolveRequest(itemId);
     if (!request) {
       // No usable Jellyfin session: keep the partial file and metadata so the
@@ -991,10 +1049,6 @@ export class DownloadManager {
     }
 
     logger.info(`[DownloadManager] Executing download: ${item.title} -> ${localPath}`);
-
-    if (typeof FileSystem.createDownloadResumable !== "function" || !localPath.startsWith("file://")) {
-      return;
-    }
 
     try {
       // Reconcile against the real partial file before starting.
@@ -1293,6 +1347,7 @@ export class DownloadManager {
     const item = this.downloads.get(itemId);
     if (!item) return;
 
+    this.activeTasks.delete(itemId);
     this.speedTrackers.delete(itemId);
     this.progressPersistMarkers.delete(itemId);
     item.speedBytesPerSecond = undefined;
@@ -1312,44 +1367,114 @@ export class DownloadManager {
     totalBytes: number,
     metadata?: Partial<OfflineMediaRecord>
   ): Promise<void> {
-    this.markCompleted(itemId, totalBytes);
     const item = this.downloads.get(itemId);
-    if (item) {
-      const finalLocalPath = metadata?.localPath || item.localPath;
-      item.localPath = finalLocalPath;
-      const record: OfflineMediaRecord = {
-        itemId: item.itemId,
-        title: item.title,
-        type: item.type,
-        year: item.year,
-        localPath: finalLocalPath,
-        fileSizeBytes: totalBytes,
-        totalTicks: metadata?.totalTicks || 0,
-        playbackPositionTicks: metadata?.playbackPositionTicks || 0,
-        overview: metadata?.overview,
-        posterPath: metadata?.posterPath || item.posterPath,
-        seriesPosterPath: metadata?.seriesPosterPath || item.seriesPosterPath,
-        posterLocalPath: metadata?.posterLocalPath || item.posterLocalPath,
-        seriesId: item.seriesId,
-        seriesName: item.seriesName,
-        seasonIndex: item.seasonIndex,
-        episodeIndex: item.episodeIndex,
-        savedAt: Date.now()
-      };
-      await offlineStorageService.saveOfflineMedia(record);
-      // Notify user of completed download
-      notificationService.notifyDownloadComplete(item.title, item.itemId, item.type).catch(() => {});
-      // Notify listeners so UI updates catalog
-      this.notify();
+    if (!item) return;
+
+    // 1. Transition: DOWNLOADING -> FINALIZING
+    this.activeTasks.delete(itemId);
+    this.speedTrackers.delete(itemId);
+    this.progressPersistMarkers.delete(itemId);
+    item.speedBytesPerSecond = undefined;
+    item.estimatedSecondsRemaining = undefined;
+    item.status = "finalizing";
+    item.progress = 1.0;
+    item.bytesDownloaded = totalBytes;
+    item.totalBytes = totalBytes;
+
+    // Persist immediately in finalizing state to protect crash window
+    this.schedulePersist();
+    this.notify();
+    this.syncForegroundService();
+
+    // 2. Validation du fichier sur disque
+    const finalLocalPath = metadata?.localPath || item.localPath;
+    item.localPath = finalLocalPath;
+
+    let finalSize = 0;
+    try {
+      finalSize = await this.getExistingFileSize(finalLocalPath);
+    } catch (e: any) {
+      logger.warn(`[DownloadManager] Error checking file size during finalization for ${itemId}:`, e?.message || e);
     }
+
+    if (finalSize <= 0 && totalBytes > 0) {
+      logger.error(`[DownloadManager] File missing or empty on disk during finalization for ${itemId}`);
+      this.failDownload(itemId, "Fichier téléchargé introuvable ou corrompu sur le disque");
+      return;
+    }
+
+    const verifiedSize = finalSize > 0 ? finalSize : totalBytes;
+
+    // 3. Persistence du catalogue offline
+    const record: OfflineMediaRecord = {
+      itemId: item.itemId,
+      title: item.title,
+      type: item.type,
+      year: item.year,
+      localPath: finalLocalPath,
+      fileSizeBytes: verifiedSize,
+      totalTicks: metadata?.totalTicks || 0,
+      playbackPositionTicks: metadata?.playbackPositionTicks || 0,
+      overview: metadata?.overview,
+      posterPath: metadata?.posterPath || item.posterPath,
+      seriesPosterPath: metadata?.seriesPosterPath || item.seriesPosterPath,
+      posterLocalPath: metadata?.posterLocalPath || item.posterLocalPath,
+      seriesId: item.seriesId,
+      seriesName: item.seriesName,
+      seasonIndex: item.seasonIndex,
+      episodeIndex: item.episodeIndex,
+      savedAt: Date.now()
+    };
+
+    try {
+      await offlineStorageService.saveOfflineMedia(record);
+    } catch (err: any) {
+      logger.error(
+        `[DownloadManager] Failed to save offline media for ${itemId}:`,
+        err?.message || err
+      );
+      this.failDownload(
+        itemId,
+        `Échec de l'enregistrement dans le catalogue hors-ligne: ${err?.message || err}`
+      );
+      return;
+    }
+
+    // 4. Completed: mark completed only after persistent catalog save is guaranteed
+    this.markCompleted(itemId, verifiedSize);
+
+    // 5. Notify user of completed download
+    notificationService.notifyDownloadComplete(item.title, item.itemId, item.type).catch(() => {});
+
+    // 6. Retrait de la queue & promotion suivante
+    this.schedulePersist();
+    this.notify();
     this.processQueue();
     this.syncForegroundService();
+  }
+
+  /**
+   * Explicitly fails a download, cancels any native task, cleans up references,
+   * persists state, notifies observers, updates foreground service, and frees the slot.
+   */
+  public failDownload(itemId: string, error: string): void {
+    const task = this.activeTasks.get(itemId);
+    if (task && typeof task.cancelAsync === "function") {
+      try {
+        task.cancelAsync().catch(() => {});
+      } catch {
+        // Safe execution
+      }
+    }
+    this.activeTasks.delete(itemId);
+    this.markFailed(itemId, error);
   }
 
   public markFailed(itemId: string, error: string): void {
     const item = this.downloads.get(itemId);
     if (!item) return;
 
+    this.activeTasks.delete(itemId);
     this.speedTrackers.delete(itemId);
     this.progressPersistMarkers.delete(itemId);
     item.speedBytesPerSecond = undefined;

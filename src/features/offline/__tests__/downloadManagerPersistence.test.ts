@@ -258,4 +258,46 @@ describe("DownloadManager — persistence", () => {
     // Canceled item must not be in the persisted queue
     expect(entries.find((e: any) => e.itemId === MOCK_ITEM.itemId)).toBeUndefined();
   });
+
+  it("enforces fail-closed: legacy queue without userId is never adopted by user B on same server", async () => {
+    const { authRepository } = require("../../../core/jellyfin/authRepository");
+    const restoreSpy = jest.spyOn(authRepository, "restoreSession").mockResolvedValue({
+      serverId: "server-1",
+      userId: "user-b",
+      serverUrl: "https://jellyfin.example.com",
+      token: "token-b"
+    });
+
+    try {
+      // Persisted download from legacy state: same server URL and serverId, but NO userId
+      const legacyPersisted = [
+        {
+          itemId: "legacy-movie-no-user",
+          title: "Legacy Movie Without User",
+          type: "Movie",
+          downloadUrl: "https://jellyfin.example.com/Videos/legacy/stream.mp4",
+          localPath: "file:///data/finora_downloads/legacy.mp4",
+          status: "downloading",
+          progress: 0.5,
+          bytesDownloaded: 500000000,
+          totalBytes: 1000000000,
+          serverId: "server-1",
+          serverUrl: "https://jellyfin.example.com"
+        }
+      ];
+
+      (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(JSON.stringify(legacyPersisted));
+
+      await manager.initialize();
+
+      const item = manager.getDownload("legacy-movie-no-user");
+      expect(item).toBeDefined();
+      // Must fail closed (paused with AUTH_REQUIRED) rather than being queued or downloaded under user B
+      expect(item?.status).toBe("paused");
+      expect(item?.error).toBe("AUTH_REQUIRED");
+      expect(manager.getQueueLength()).toBe(0);
+    } finally {
+      restoreSpy.mockRestore();
+    }
+  });
 });

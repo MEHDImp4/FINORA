@@ -161,4 +161,117 @@ describe("DownloadManager", () => {
     expect(item.seriesPosterPath).toBe("tag-bb-poster");
     expect(item.posterPath).toBe("tag-ep-poster");
   });
+
+  it("transitions to failed and frees active slot when createDownloadResumable is unavailable (BUG-001)", async () => {
+    const FileSystem = require("expo-file-system");
+    const originalCreate = FileSystem.createDownloadResumable;
+    FileSystem.createDownloadResumable = undefined;
+
+    try {
+      // Start a download when engine is unavailable
+      await manager.startDownload({
+        itemId: "ep-bug-unavailable",
+        title: "Unavailable Engine Episode",
+        type: "Episode",
+        downloadUrl: "https://jellyfin.example.com/Videos/ep-bug/stream.mp4",
+        localPath: "file:///mock-documents/finora_downloads/ep-bug.mp4"
+      });
+
+      await Promise.resolve();
+
+      const failedItem = manager.getDownload("ep-bug-unavailable");
+      expect(failedItem?.status).toBe("failed");
+      expect(failedItem?.error).toBe("Moteur de téléchargement non disponible");
+
+      // Slot must be freed: restore FileSystem.createDownloadResumable and queue another download
+      FileSystem.createDownloadResumable = originalCreate;
+
+      const nextItem = await manager.startDownload({
+        itemId: "ep-bug-next",
+        title: "Next Queued Episode",
+        type: "Episode",
+        downloadUrl: "https://jellyfin.example.com/Videos/ep-next/stream.mp4",
+        localPath: "file:///mock-documents/finora_downloads/ep-next.mp4"
+      });
+
+      // nextItem should be able to acquire an active slot without being blocked
+      expect(nextItem.status).toBe("downloading");
+    } finally {
+      FileSystem.createDownloadResumable = originalCreate;
+    }
+  });
+
+  it("transitions to failed when localPath is invalid and queue continues normally (BUG-001)", async () => {
+    // Fill up 2 slots so we have 2 downloading
+    await manager.startDownload({
+      itemId: "active-1",
+      title: "Active 1",
+      type: "Movie",
+      downloadUrl: "https://jellyfin.example.com/Videos/act-1/stream.mp4",
+      localPath: "file:///mock-documents/finora_downloads/act-1.mp4"
+    });
+    await manager.startDownload({
+      itemId: "active-2",
+      title: "Active 2",
+      type: "Movie",
+      downloadUrl: "https://jellyfin.example.com/Videos/act-2/stream.mp4",
+      localPath: "file:///mock-documents/finora_downloads/act-2.mp4"
+    });
+
+    // Start 3rd download with invalid localPath (does not start with file://)
+    await manager.startDownload({
+      itemId: "invalid-path-item",
+      title: "Invalid Path Item",
+      type: "Episode",
+      downloadUrl: "https://jellyfin.example.com/Videos/invalid/stream.mp4",
+      localPath: "content://media/external/downloads/123.mp4"
+    });
+
+    await Promise.resolve();
+
+    const invalidItem = manager.getDownload("invalid-path-item");
+    expect(invalidItem?.status).toBe("failed");
+    expect(invalidItem?.error).toBe("Chemin de destination local invalide");
+
+    // Queue 4th item: since 3rd failed, slot is free, so 4th item can become downloading
+    const fourthItem = await manager.startDownload({
+      itemId: "active-3",
+      title: "Active 3",
+      type: "Movie",
+      downloadUrl: "https://jellyfin.example.com/Videos/act-3/stream.mp4",
+      localPath: "file:///mock-documents/finora_downloads/act-3.mp4"
+    });
+
+    expect(fourthItem.status).toBe("downloading");
+  });
+
+  it("does not mark completed and retains failed state if saveOfflineMedia fails during finalization (DATA-001)", async () => {
+    const { offlineStorageService } = require("../offlineStorage");
+    const saveSpy = jest
+      .spyOn(offlineStorageService, "saveOfflineMedia")
+      .mockRejectedValueOnce(new Error("Disk full or database lock"));
+
+    try {
+      await manager.startDownload({
+        itemId: "movie-fail-finalize",
+        title: "Finalize Fail Movie",
+        type: "Movie",
+        downloadUrl: "https://jellyfin.example.com/Videos/fail-finalize/stream.mp4",
+        localPath: "file:///mock-documents/finora_downloads/fail-finalize.mp4"
+      });
+
+      await manager.completeDownload("movie-fail-finalize", 500000000);
+
+      const download = manager.getDownload("movie-fail-finalize");
+      expect(download).toBeDefined();
+      expect(download?.status).toBe("failed");
+      expect(download?.status).not.toBe("completed");
+      expect(download?.error).toContain("Échec de l'enregistrement dans le catalogue hors-ligne");
+      // File path and bytes must remain intact so recovery is possible
+      expect(download?.localPath).toBe("file:///mock-documents/finora_downloads/fail-finalize.mp4");
+      expect(download?.totalBytes).toBe(500000000);
+    } finally {
+      saveSpy.mockRestore();
+    }
+  });
 });
