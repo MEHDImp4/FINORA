@@ -42,4 +42,4 @@ jobs:
         run: npx expo-doctor
 
       - name: Run tests
-        run: npm test -- --ci --no-coverage --passWithNoTests
+        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --maxWorkers=2

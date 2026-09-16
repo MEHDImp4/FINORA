@@ -61,8 +61,6 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          build-root-directory: android
 
       - name: Ensure gradlew is executable
         run: chmod +x android/gradlew
@@ -129,8 +127,6 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          build-root-directory: android
 
       - name: Ensure gradlew is executable
         run: chmod +x android/gradlew
@@ -203,8 +199,6 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          build-root-directory: android
 
       - name: Ensure gradlew is executable
         run: chmod +x android/gradlew
