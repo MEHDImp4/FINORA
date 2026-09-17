@@ -36,6 +36,11 @@ const TouchableOpacity = React.forwardRef((props, ref) =>
 );
 TouchableOpacity.displayName = "TouchableOpacity";
 
+const Switch = React.forwardRef((props, ref) =>
+  React.createElement("Switch", { ...props, ref })
+);
+Switch.displayName = "Switch";
+
 const RefreshControl = (props) => React.createElement("RefreshControl", props);
 RefreshControl.displayName = "RefreshControl";
 
@@ -47,7 +52,21 @@ const FlatList = React.forwardRef((props, ref) => {
         return element ? React.cloneElement(element, { key }) : null;
       })
     : null;
-  return React.createElement("FlatList", { ...props, ref }, items);
+  const header =
+    typeof props.ListHeaderComponent === "function"
+      ? React.createElement(props.ListHeaderComponent)
+      : props.ListHeaderComponent || null;
+  const footer =
+    typeof props.ListFooterComponent === "function"
+      ? React.createElement(props.ListFooterComponent)
+      : props.ListFooterComponent || null;
+  const empty =
+    (!props.data || props.data.length === 0)
+      ? typeof props.ListEmptyComponent === "function"
+        ? React.createElement(props.ListEmptyComponent)
+        : props.ListEmptyComponent || null
+      : null;
+  return React.createElement("FlatList", { ...props, ref }, header, items, empty, footer);
 });
 FlatList.displayName = "FlatList";
 
@@ -186,6 +205,7 @@ module.exports = {
   TextInput,
   Keyboard,
   Pressable,
+  Switch,
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
@@ -204,6 +224,7 @@ module.exports = {
   useWindowDimensions,
   Alert,
   Animated,
+  NativeModules: {},
   Vibration: {
     vibrate: jest.fn(),
     cancel: jest.fn()

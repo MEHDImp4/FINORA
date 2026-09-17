@@ -5,6 +5,7 @@ import { DEFAULT_JELLYFIN_SERVER, validateAndDiscoverServer } from "../../../cor
 import { useAuthStore } from "../../../stores/authStore";
 import { useOnboardingStore } from "../../../stores/onboardingStore";
 import { useLanguageStore } from "../../../stores/languageStore";
+import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
 import { serverManager } from "../../../core/jellyfin/serverManager";
 
 /** Neutral test URL — never a personal server */
@@ -18,6 +19,23 @@ jest.mock("../../../core/jellyfin/serverDiscovery", () => ({
 jest.mock("../../../core/jellyfin/serverManager", () => ({
   serverManager: {
     saveAccount: jest.fn()
+  }
+}));
+
+jest.mock("../../../core/jellyfin/authRepository", () => {
+  const actual = jest.requireActual("../../../core/jellyfin/authRepository");
+  return {
+    ...actual,
+    authRepository: {
+      ...actual.authRepository,
+      getPublicUsers: jest.fn().mockResolvedValue([])
+    }
+  };
+});
+
+jest.mock("../../../core/notifications/notificationService", () => ({
+  notificationService: {
+    requestPermissions: jest.fn().mockResolvedValue(true)
   }
 }));
 
@@ -184,5 +202,78 @@ describe("OnboardingScreen", () => {
 
     expect(useOnboardingStore.getState().isCompleted).toBe(true);
     expect(onCompletedMock).toHaveBeenCalled();
+  });
+
+  it("allows selecting download quality in slide 2 and updates preference store", async () => {
+    let component: ReactTestRenderer.ReactTestRenderer;
+    ReactTestRenderer.act(() => {
+      component = ReactTestRenderer.create(<OnboardingScreen />);
+    });
+
+    const root = component!.root;
+    // Check 1080p option exists and is selected by default
+    const radios = root.findAllByProps({ accessibilityRole: "radio" });
+    expect(radios.length).toBeGreaterThanOrEqual(3);
+
+    const radio1080 = radios.find((r) => r.props.accessibilityLabel.includes("1080p"));
+    expect(radio1080).toBeDefined();
+    expect(radio1080!.props.accessibilityState.selected).toBe(true);
+
+    // Select 720p
+    const radio720 = radios.find((r) => r.props.accessibilityLabel.includes("720p"));
+    expect(radio720).toBeDefined();
+    await ReactTestRenderer.act(async () => {
+      radio720!.props.onPress();
+    });
+
+    expect(usePlaybackPreferencesStore.getState().preferences.defaultDownloadQuality).toBe("720p");
+  });
+
+  it("scans public profiles upon testing server and allows profile selection", async () => {
+    const { authRepository } = require("../../../core/jellyfin/authRepository");
+    authRepository.getPublicUsers.mockResolvedValue([
+      {
+        id: "user-alice",
+        name: "Alice",
+        serverId: "srv-1",
+        hasPassword: true
+      },
+      {
+        id: "user-bob",
+        name: "Bob",
+        serverId: "srv-1",
+        hasPassword: false
+      }
+    ]);
+
+    (validateAndDiscoverServer as jest.Mock).mockResolvedValue({
+      serverName: "Jellyfin Home",
+      version: "10.8.13"
+    });
+
+    let component: ReactTestRenderer.ReactTestRenderer;
+    ReactTestRenderer.act(() => {
+      component = ReactTestRenderer.create(<OnboardingScreen />);
+    });
+
+    const root = component!.root;
+    const textInputs = root.findAllByType("TextInput" as any);
+    const serverInput = textInputs.find((i) => i.props.placeholder === "https://your-server.com");
+
+    ReactTestRenderer.act(() => {
+      serverInput?.props.onChangeText(TEST_SERVER_URL);
+    });
+
+    const testButton = root.findByProps({ children: "Test" }).parent;
+
+    await ReactTestRenderer.act(async () => {
+      testButton?.props.onPress();
+    });
+
+    expect(authRepository.getPublicUsers).toHaveBeenCalledWith(TEST_SERVER_URL);
+    // Profile picker appears
+    expect(root.findByProps({ children: "Who's watching?" })).toBeDefined();
+    expect(root.findByProps({ children: "Alice" })).toBeDefined();
+    expect(root.findByProps({ children: "Bob" })).toBeDefined();
   });
 });
