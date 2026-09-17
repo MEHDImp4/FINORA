@@ -126,6 +126,56 @@ Pour préserver des animations à 60/120 FPS et une stabilité irréprochable :
 
 ---
 
+## 🤖 Contributions Assistées par IA
+
+FINORA accueille favorablement les contributions assistées par des outils modernes d'intelligence artificielle (tels que GitHub Copilot, Claude Code, Cursor, Codex, ChatGPT, Gemini, etc.). Nous reconnaissons que ces assistants accélèrent l'exploration du code, la rédaction de documentation, le débogage et l'écriture de tests.
+
+Cependant, **l'assistance par IA ne remplace en aucun cas la relecture, les tests et la compréhension humaine.** Chaque contributeur demeure entièrement responsable de chaque ligne de code, de test et de documentation qu'il soumet.
+
+### 1. Périmètre de Déclaration
+Nous distinguons une assistance ponctuelle d'une contribution substantielle :
+
+- **Aucune déclaration requise** :
+  - Autocomplétion de noms de variables, fonctions ou types
+  - Formatage de syntaxe ou corrections de linter
+  - Suggestions automatiques d'imports
+  - Corrections mineures d'orthographe ou de formulation
+- **Déclaration requise** :
+  - Implémentation complète d'une fonctionnalité ou d'un composant
+  - Correction significative de bug et algorithmes complexes
+  - Refactorisation d'architecture, de stores ou de référentiels
+  - Génération de suites de tests complètes
+  - Rédaction d'une part substantielle de la documentation
+
+Lors de la soumission d'une Pull Request impliquant une assistance IA significative, cochez simplement la case correspondante dans la section **AI Assistance** du modèle de PR et décrivez brièvement l'outil employé et son rôle.
+
+> ℹ️ **Confidentialité & Prompts** : FINORA ne vous demandera **jamais** de partager vos prompts privés, historiques de discussion, clés API ou conversations personnelles. Une brève description honnête d'une phrase suffit amplement.
+
+### 2. Responsabilités du Contributeur
+Avant de soumettre du code assisté par IA, vous devez vous assurer des points suivants :
+
+1. **Compréhension Complète** : Vous devez comprendre personnellement chaque modification soumise. Ne soumettez jamais de code que vous ne seriez pas en mesure d'expliquer, de déboguer ou de maintenir lors de la revue de code.
+2. **Vérification des APIs (Anti-Hallucination)** : Vérifiez que toutes les APIs, méthodes SDK, options et endpoints Jellyfin référencés existent réellement. Les mainteneurs ne perdront pas de temps à déboguer des fonctions inexistantes ou des bibliothèques inventées.
+3. **Tests Obligatoires** : Toute contribution doit impérativement passer les vérifications locales :
+   ```bash
+   npm test
+   npm run typecheck
+   ```
+   *Affirmer « Je n'ai pas testé parce que l'IA l'a généré » est inacceptable et entraînera la fermeture immédiate de la PR.*
+4. **Validation Visuelle de l'Interface** : Pour toute modification graphique, testez le rendu sur appareil physique ou émulateur. Fournissez des captures d'écran ou vidéos avant/après, et précisez les plateformes réellement testées.
+5. **Contrôle des Dépendances Suggérées par l'IA** : Si un assistant IA recommande un nouveau paquet npm, vérifiez que :
+   - Le paquet est activement maintenu avec une licence open-source compatible.
+   - Il est compatible avec React Native 0.86+ (Nouvelle Architecture Fabric / TurboModules) et Expo SDK 57.
+   - Une dépendance existante dans `package.json` ne remplit pas déjà ce rôle.
+6. **Sécurité & Confidentialité Stricte** :
+   - **Ne jamais transmettre de données sensibles aux IA** : Les jetons d'accès Jellyfin, identifiants, mots de passe de serveur, clés de signature Android ou secrets `.env` ne doivent **jamais** être transmis à une IA ni commités dans le dépôt.
+   - Les logs internes et requêtes réseau doivent être rigoureusement sanitizés (`[REDACTED]`).
+
+> [!IMPORTANT]
+> Le code généré par IA doit être consciencieusement relu et testé par le contributeur avant toute soumission. Déposer en masse du code généré par IA non vérifié ou non testé entraînera la fermeture de la Pull Request.
+
+---
+
 ## 🔀 Workflow de Contribution
  
 ```text

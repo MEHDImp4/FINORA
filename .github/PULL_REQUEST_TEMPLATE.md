@@ -43,6 +43,27 @@ Describe the tests performed (manual steps or automated tests executed):
 
 ---
 
+## 🤖 AI Assistance
+
+Was AI used to create this contribution?
+
+- [ ] No
+- [ ] Yes — autocomplete or minor assistance
+- [ ] Yes — documentation / writing assistance
+- [ ] Yes — code generation
+- [ ] Yes — significant implementation assistance
+
+If AI was used, briefly indicate the tool and how it was used:
+<!--
+Example:
+Claude Code was used to generate the initial implementation of the
+download queue. I reviewed, modified and tested the resulting code manually.
+-->
+
+By submitting this Pull Request, I confirm that I personally reviewed, understand and tested the submitted changes and remain responsible for them.
+
+---
+
 ## ✅ Checklist
 
 Please review and check the applicable items:

@@ -126,6 +126,56 @@ Screen (UI / Animations)
 
 ---
 
+## 🤖 AI-Assisted Contributions
+
+FINORA welcomes contributions assisted by modern AI development tools (such as GitHub Copilot, Claude Code, Cursor, Codex, ChatGPT, Gemini, and others). We recognize that AI assistants can accelerate codebase exploration, documentation drafting, debugging, and test creation.
+
+However, **AI assistance is never a substitute for human review, testing, and understanding.** Every contributor remains entirely responsible for every line of code, test, and documentation they submit.
+
+### 1. Scope of Disclosure
+We distinguish between minor inline assistance and significant implementation work:
+
+- **No disclosure needed**:
+  - Variable, function, or type name autocompletion
+  - Syntax formatting and lint fixes
+  - Inline import and boilerplate suggestions
+  - Minor spelling or grammatical edits
+- **Disclosure required**:
+  - Full feature or component implementations
+  - Non-trivial bug fixes and core algorithms
+  - Architecture, state management, or repository refactorings
+  - Generated test suites
+  - Substantial documentation sections
+
+When submitting a Pull Request where AI was used for substantive work, check the applicable box in the **AI Assistance** section of the PR template and briefly describe the tool and how it was utilized.
+
+> ℹ️ **Privacy & Prompts**: FINORA will **never** ask you to share your private prompts, chat logs, API keys, or personal conversation histories. A brief, honest one-sentence summary is all that is required.
+
+### 2. Contributor Responsibilities
+Before submitting any AI-assisted contribution, you must ensure:
+
+1. **Thorough Understanding**: You must personally understand all submitted changes. Never submit code that you cannot explain, debug, or maintain during code review.
+2. **API & Method Verification (Anti-Hallucination)**: Verify that all referenced APIs, SDK methods, options, and Jellyfin endpoints actually exist. Maintainers will not spend time debugging hallucinated libraries or invented function signatures.
+3. **Mandatory Testing**: All contributions must pass local validation:
+   ```bash
+   npm test
+   npm run typecheck
+   ```
+   *Claiming "I didn't test this because the AI generated it" is unacceptable and will result in the PR being closed.*
+4. **Visual UI Validation**: For any visual changes, test the UI on an emulator or physical device. Provide before/after screenshots or screen recordings, and clearly indicate which platforms were physically tested.
+5. **Vetting AI-Suggested Dependencies**: If an AI assistant recommends installing a new npm package, verify that:
+   - The package is actively maintained and has a compatible open-source license.
+   - It is compatible with React Native 0.86+ New Architecture (Fabric / TurboModules) and Expo SDK 57.
+   - An existing dependency in `package.json` does not already provide the required functionality.
+6. **Strict Security & Secrets**:
+   - **Never input sensitive data into AI tools**: Jellyfin access tokens, user credentials, server passwords, signing keys, private URLs, or `.env` secrets must **never** be supplied to AI assistants or included in PRs.
+   - Internal logs and network requests must be strictly sanitized (`[REDACTED]`).
+
+> [!IMPORTANT]
+> AI-generated code must be reviewed and tested by the contributor before submission. Submitting large amounts of unreviewed or untested AI-generated code may result in the Pull Request being closed.
+
+---
+
 ## 🔀 Contribution Workflow
 
 ```text

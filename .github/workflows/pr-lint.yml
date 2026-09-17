@@ -68,6 +68,18 @@ jobs:
               errors.push("⚠️ **Incomplete checklist**: Please check at least the applicable boxes in the quality & security checklist.");
             }
 
+            // 4. Check AI assistance section if present in the body
+            if (body.includes("AI Assistance")) {
+              const aiSectionMatch = body.match(/## 🤖 AI Assistance[\s\S]*?(?=##|---|$)/i);
+              if (aiSectionMatch) {
+                const aiSection = aiSectionMatch[0];
+                const aiChecked = (aiSection.match(/-\s*\[x\]/gi) || []).length;
+                if (aiChecked === 0) {
+                  errors.push("🤖 **AI Assistance incomplete**: Please indicate whether AI assistance was used (check 'No' or the applicable 'Yes' option).");
+                }
+              }
+            }
+
             if (errors.length > 0) {
               const commentBody = [
                 `👋 Hello @${pr.user.login}! Thank you for contributing to **FINORA** 🎬.`,
