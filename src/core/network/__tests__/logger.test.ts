@@ -54,4 +54,58 @@ describe("Sanitized Logger", () => {
     expect(sanitizeData(42)).toBe(42);
     expect(sanitizeData(true)).toBe(true);
   });
+
+  describe("SEC-02 credential coverage", () => {
+    it("redacts api_key inside a Jellyfin image URL", () => {
+      const sanitized = sanitizeData("https://server/image?api_key=SECRET");
+      expect(sanitized).toBe("https://server/image?api_key=[REDACTED]");
+      expect(sanitized).not.toContain("SECRET");
+    });
+
+    it("redacts X-MediaBrowser-Token headers", () => {
+      const sanitized = sanitizeData("X-MediaBrowser-Token: SECRET");
+      expect(sanitized).toContain("X-MediaBrowser-Token: [REDACTED]");
+      expect(sanitized).not.toContain("SECRET");
+    });
+
+    it.each([
+      "access_token=SECRET",
+      "refresh_token=SECRET",
+      "api-key=SECRET",
+      "pwd=SECRET",
+      "passwd=SECRET",
+      "credential=SECRET",
+      "credentials=SECRET",
+      "?api_key=SECRET&x=1"
+    ])("redacts %s", (input) => {
+      const sanitized = sanitizeData(input);
+      expect(sanitized).not.toContain("SECRET");
+      expect(sanitized).toContain("[REDACTED]");
+    });
+
+    it("redacts new credential object keys", () => {
+      const sanitized = sanitizeData({
+        access_token: "a",
+        refreshToken: "b",
+        "X-MediaBrowser-Token": "c",
+        "api-key": "d",
+        credentials: "e",
+        passwd: "f",
+        safe: "keep"
+      });
+      expect(sanitized.access_token).toBe("[REDACTED]");
+      expect(sanitized.refreshToken).toBe("[REDACTED]");
+      expect((sanitized as any)["X-MediaBrowser-Token"]).toBe("[REDACTED]");
+      expect((sanitized as any)["api-key"]).toBe("[REDACTED]");
+      expect(sanitized.credentials).toBe("[REDACTED]");
+      expect(sanitized.passwd).toBe("[REDACTED]");
+      expect(sanitized.safe).toBe("keep");
+    });
+
+    it("redacts quoted and unquoted credential pairs", () => {
+      expect(sanitizeData('{"password":"SECRET"}')).not.toContain("SECRET");
+      expect(sanitizeData("password: SECRET")).not.toContain("SECRET");
+      expect(sanitizeData("apiKey = SECRET")).not.toContain("SECRET");
+    });
+  });
 });

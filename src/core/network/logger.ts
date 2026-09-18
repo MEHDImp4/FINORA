@@ -1,23 +1,47 @@
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
+/**
+ * SEC-02 — credential names redacted everywhere.
+ * Keys are compared lower-cased, so both camelCase and snake_case are covered.
+ */
 const SENSITIVE_KEYS = new Set([
   "authorization",
   "token",
   "accesstoken",
+  "access_token",
+  "refreshtoken",
+  "refresh_token",
   "x-emby-token",
+  "x-mediabrowser-token",
   "password",
+  "passwd",
   "pwd",
   "secret",
   "apikey",
   "api_key",
+  "api-key",
+  "credential",
+  "credentials",
   "cookie"
 ]);
+
+/**
+ * Credential names that can appear in a `key=value` / `key: value` / JSON form.
+ * Ordered longest-first so `api_key` is not partially matched by `token`.
+ */
+const CREDENTIAL_NAMES =
+  "authorization|x-mediabrowser-token|x-emby-token|refresh_token|access_token|credential(?:s)?|api[_-]?key|password|passwd|pwd|secret|token";
 
 const SENSITIVE_REGEXES = [
   /(Authorization:\s*)([^\r\n]+)/gi,
   /(X-Emby-Token:\s*)([^\r\n]+)/gi,
-  /((?:token|api_key|password|secret)=)([^&\s]+)/gi,
-  /("?(?:token|accessToken|password|secret|apiKey|x-emby-token)"?\s*[:=]\s*)"([^"]+)"/gi
+  /(X-MediaBrowser-Token:\s*)([^\r\n]+)/gi,
+  // Query strings and free-form key=value (api_key=..., access_token=..., pwd=...)
+  new RegExp(`((?:${CREDENTIAL_NAMES})=)([^&\\s]+)`, "gi"),
+  // Quoted JSON/JS object values: "password":"...", 'api_key': '...'
+  new RegExp(`("?(?:${CREDENTIAL_NAMES})"?\\s*[:=]\\s*)"([^"]*)"`, "gi"),
+  // Unquoted object values: password: secret, api_key=secret
+  new RegExp(`("?(?:${CREDENTIAL_NAMES})"?\\s*[:=]\\s*)([^\\s,;&"')}]+)`, "gi")
 ];
 
 /**
