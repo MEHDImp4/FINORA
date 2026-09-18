@@ -37,7 +37,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -109,7 +109,7 @@ jobs:
       GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -196,7 +196,7 @@ jobs:
       GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -284,7 +284,7 @@ jobs:
       GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
