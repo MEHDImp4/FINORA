@@ -7,6 +7,7 @@ import {
   Platform
 } from "react-native";
 import * as ScreenOrientation from "expo-screen-orientation";
+import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { VideoView } from "expo-video";
 import { MediaItem } from "../../../types/media";
 import { useFinoraPlayer } from "../useFinoraPlayer";
@@ -32,6 +33,8 @@ import { SubtitleStyleModal } from "./SubtitleStyleModal";
 import { NextEpisodeOverlay } from "./NextEpisodeOverlay";
 import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
 import { useSubtitleCues } from "../useSubtitleCues";
+import { useTranslation } from "../../../i18n";
+import { hapticService } from "../../../core/feedback/hapticService";
 
 const SPEED_OPTIONS = [1.0, 1.25, 1.5, 2.0];
 
@@ -66,6 +69,7 @@ export function PlayerScreen({
   playbackRepository: customPlaybackRepo,
   overlayAutoHideMs = 4000
 }: PlayerScreenProps) {
+  const { t } = useTranslation();
   // Modal & Overlay states
   const [controlsVisible, setControlsVisible] = useState(true);
   const [tracksModalVisible, setTracksModalVisible] = useState(false);
@@ -177,6 +181,23 @@ export function PlayerScreen({
       }
     } catch {
       // Ignored
+    }
+  };
+
+  // VideoView ref & Picture-in-Picture (PiP) state
+  const videoViewRef = useRef<any>(null);
+  const [isInPiP, setIsInPiP] = useState(false);
+
+  const handleTogglePiP = () => {
+    try {
+      hapticService.impactLight();
+      setControlsVisible(false);
+      setIsInPiP(true);
+      setTimeout(() => {
+        videoViewRef.current?.startPictureInPicture?.();
+      }, 50);
+    } catch (e) {
+      logger.warn("Failed to start Picture-in-Picture:", e);
     }
   };
 
@@ -527,7 +548,8 @@ export function PlayerScreen({
 
   return (
     <View style={styles.container} testID="player-screen">
-      <StatusBar hidden />
+      <StatusBar hidden translucent backgroundColor="#000000" barStyle="light-content" />
+      <ExpoStatusBar hidden style="light" />
 
       {/* Video Gestures Wrapper */}
       <PlayerGestures
@@ -540,18 +562,29 @@ export function PlayerScreen({
         onBrightnessChange={handleBrightnessChange}
         volume={volume}
         onVolumeChange={handleVolumeChange}
+        disabled={isInPiP}
       >
         {/* Native Video Surface */}
         <VideoView
+          ref={videoViewRef}
           player={player}
-          style={styles.videoSurface}
+          style={[styles.videoSurface, { backgroundColor: "#000000" }]}
+          contentFit="contain"
           allowsPictureInPicture
+          startsPictureInPictureAutomatically
+          onPictureInPictureStart={() => {
+            setIsInPiP(true);
+            setControlsVisible(false);
+          }}
+          onPictureInPictureStop={() => {
+            setIsInPiP(false);
+          }}
           nativeControls={false}
         />
       </PlayerGestures>
 
       {/* Custom High-Fidelity Netflix-Style Subtitles */}
-      {isCustomSubtitleActive && (
+      {!isInPiP && isCustomSubtitleActive && (
         <FinoraSubtitleOverlay
           cues={cues}
           currentTimeSeconds={snapshot.currentTimeSeconds}
@@ -560,67 +593,75 @@ export function PlayerScreen({
       )}
 
       {/* Buffering Indicator */}
-      {isBufferingOrLoading && (
+      {!isInPiP && isBufferingOrLoading && (
         <View style={styles.loaderOverlay} pointerEvents="none" testID="player-loading">
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       )}
 
       {/* Trickplay Thumbnail Preview during timeline scrubbing */}
-      <TrickplayPreview
-        serverUrl={serverUrl}
-        itemId={item.id}
-        previewSeconds={scrubPositionSeconds}
-        scrubPositionPercent={scrubPositionPercent}
-        visible={!localPath && isScrubbing}
-      />
+      {!isInPiP && (
+        <TrickplayPreview
+          serverUrl={serverUrl}
+          itemId={item.id}
+          previewSeconds={scrubPositionSeconds}
+          scrubPositionPercent={scrubPositionPercent}
+          visible={!localPath && isScrubbing}
+          chapters={item.chapters}
+        />
+      )}
 
       {/* Skip Intro & Skip Credits dynamic markers */}
-      <SkipMarkerButton
-        chapters={item.chapters}
-        currentTimeSeconds={snapshot.currentTimeSeconds}
-        durationSeconds={snapshot.durationSeconds}
-        onSeek={(seconds) => controls.seekTo(seconds)}
-      />
+      {!isInPiP && (
+        <SkipMarkerButton
+          chapters={item.chapters}
+          currentTimeSeconds={snapshot.currentTimeSeconds}
+          durationSeconds={snapshot.durationSeconds}
+          onSeek={(seconds) => controls.seekTo(seconds)}
+        />
+      )}
 
       {/* Cinematic Auto-Fading Overlay Controls */}
-      <CinematicOverlay
-        visible={controlsVisible}
-        onToggleVisible={handleToggleControls}
-        title={item.name}
-        seriesTitle={item.seriesName ? `${item.seriesName} · S${item.seasonIndex || 1} E${item.episodeIndex || 1}` : undefined}
-        isPlaying={snapshot.state === "playing"}
-        currentTimeSeconds={snapshot.currentTimeSeconds}
-        durationSeconds={snapshot.durationSeconds > 0 ? snapshot.durationSeconds : initialDurationSeconds}
-        bufferedSeconds={localPath ? (snapshot.durationSeconds || initialDurationSeconds) : snapshot.bufferedPositionSeconds}
-        onPlayPause={() => {
-          if (snapshot.state === "playing") {
-            controls.pause();
-          } else {
-            controls.play();
-          }
-        }}
-        onSeekBy={(delta) => controls.seekBy(delta)}
-        onSeekTo={(pos) => controls.seekTo(pos)}
-        onBack={handleBack}
-        onOpenTracks={() => setTracksModalVisible(true)}
-        onOpenStats={() => setStatsModalVisible(true)}
-        onToggleOrientation={handleToggleOrientation}
-        isLandscape={isLandscape}
-        onScrubbingChange={setIsScrubbing}
-        onScrubMove={(seconds, percent) => {
-          setScrubPositionSeconds(seconds);
-          setScrubPositionPercent(percent);
-        }}
-        brightness={brightness}
-        onBrightnessChange={handleBrightnessChange}
-        volume={volume}
-        onVolumeChange={handleVolumeChange}
-        autoHideMs={overlayAutoHideMs}
-        playbackMode={plan.mode}
-        playbackRate={currentSpeed}
-        onCycleSpeed={handleCycleSpeed}
-      />
+      {!isInPiP && (
+        <CinematicOverlay
+          visible={controlsVisible}
+          onToggleVisible={handleToggleControls}
+          title={item.name}
+          seriesTitle={item.seriesName ? `${item.seriesName} · S${item.seasonIndex || 1} E${item.episodeIndex || 1}` : undefined}
+          isPlaying={snapshot.state === "playing"}
+          currentTimeSeconds={snapshot.currentTimeSeconds}
+          durationSeconds={snapshot.durationSeconds > 0 ? snapshot.durationSeconds : initialDurationSeconds}
+          bufferedSeconds={localPath ? (snapshot.durationSeconds || initialDurationSeconds) : snapshot.bufferedPositionSeconds}
+          onPlayPause={() => {
+            if (snapshot.state === "playing") {
+              controls.pause();
+            } else {
+              controls.play();
+            }
+          }}
+          onSeekBy={(delta) => controls.seekBy(delta)}
+          onSeekTo={(pos) => controls.seekTo(pos)}
+          onBack={handleBack}
+          onOpenTracks={() => setTracksModalVisible(true)}
+          onOpenStats={() => setStatsModalVisible(true)}
+          onToggleOrientation={handleToggleOrientation}
+          isLandscape={isLandscape}
+          onScrubbingChange={setIsScrubbing}
+          onScrubMove={(seconds, percent) => {
+            setScrubPositionSeconds(seconds);
+            setScrubPositionPercent(percent);
+          }}
+          brightness={brightness}
+          onBrightnessChange={handleBrightnessChange}
+          volume={volume}
+          onVolumeChange={handleVolumeChange}
+          autoHideMs={overlayAutoHideMs}
+          playbackMode={plan.mode}
+          playbackRate={currentSpeed}
+          onCycleSpeed={handleCycleSpeed}
+          onTogglePiP={handleTogglePiP}
+        />
+      )}
 
       {/* Audio / Subtitle / Quality Track Selection Bottom Sheet */}
       <TrackSelectionModal
@@ -747,17 +788,17 @@ export function PlayerScreen({
             style={{ marginBottom: spacing.sm }}
           />
           <FinoraText variant="title" style={styles.errorText}>
-            Lecture impossible
+            {t("player.cantPlayMedia")}
           </FinoraText>
           <FinoraText variant="caption" style={styles.errorSubtext}>
             {localPath
-              ? "Le fichier téléchargé ne peut pas être lu ou est endommagé."
+              ? t("player.corruptedFile")
               : snapshot.errorMessage?.includes("500") || snapshot.errorMessage?.includes("source")
-              ? "Ce média n'est plus accessible sur le serveur Jellyfin."
-              : snapshot.errorMessage || "Impossible de lire ce flux vidéo."}
+              ? t("player.serverLostMedia")
+              : snapshot.errorMessage || t("player.playbackError")}
           </FinoraText>
           <FinoraButton
-            label="Retour"
+            label={t("common.back")}
             variant="secondary"
             onPress={handleBack}
             style={{ marginTop: spacing.md }}
@@ -774,7 +815,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#000000"
   },
   videoSurface: {
-    ...StyleSheet.absoluteFill
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "#000000"
   },
   loaderOverlay: {
     ...StyleSheet.absoluteFill,

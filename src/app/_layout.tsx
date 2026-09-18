@@ -172,6 +172,20 @@ export default function RootLayout() {
               }}
             >
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="player/[id]"
+                options={{
+                  headerShown: false,
+                  presentation: "fullScreenModal",
+                  contentStyle: { backgroundColor: "#000000" },
+                  statusBarHidden: true,
+                  statusBarStyle: "light",
+                  statusBarTranslucent: true,
+                  navigationBarColor: "#000000",
+                  navigationBarHidden: true,
+                  animation: "fade"
+                }}
+              />
             </Stack>
           )}
         </View>

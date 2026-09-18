@@ -23,6 +23,7 @@ module.exports = function withPiP(config) {
     if (mainActivity) {
       // Enable PiP support
       mainActivity.$["android:supportsPictureInPicture"] = "true";
+      mainActivity.$["android:resizeableActivity"] = "true";
 
       // Ensure configChanges includes PiP-required values so activity is not recreated
       const existing = mainActivity.$["android:configChanges"] || "";

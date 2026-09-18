@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useAuthStore } from "../../stores/authStore";
 import { useItemDetails } from "../../hooks/useMediaQueries";
 import { PlayerScreen } from "../../features/player/components/PlayerScreen";
@@ -13,8 +13,10 @@ import { MediaItem } from "../../types/media";
 import { jellyfinClient } from "../../core/jellyfin/jellyfinClient";
 import { useQueryClient } from "@tanstack/react-query";
 import { mediaKeys } from "../../hooks/useMediaQueries";
+import { useTranslation } from "../../i18n";
 
 export default function PlayerRoute() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const rawId = Array.isArray(id) ? id[0] : (id ?? "");
   const router = useRouter();
@@ -92,9 +94,26 @@ export default function PlayerRoute() {
     }
   }, [shouldFetchOnline, isError, item, rawId, queryClient]);
 
+  const playerScreenOptions = (
+    <Stack.Screen
+      options={{
+        headerShown: false,
+        contentStyle: { backgroundColor: "#000000" },
+        statusBarHidden: true,
+        statusBarStyle: "light",
+        statusBarTranslucent: true,
+        navigationBarColor: "#000000",
+        navigationBarHidden: true,
+        gestureEnabled: false,
+        animation: "fade"
+      }}
+    />
+  );
+
   if (checkingOffline) {
     return (
       <View style={styles.centerContainer} testID="player-route-loading">
+        {playerScreenOptions}
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -104,6 +123,7 @@ export default function PlayerRoute() {
   if (!isOfflineMode && (isLoading || authStatus === "restoring" || authStatus === "authenticating")) {
     return (
       <View style={styles.centerContainer} testID="player-route-loading">
+        {playerScreenOptions}
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -112,13 +132,14 @@ export default function PlayerRoute() {
   if (!token && !offlineRecord) {
     return (
       <View style={styles.centerContainer} testID="player-route-auth-error">
+        {playerScreenOptions}
         <FinoraText variant="title" style={styles.errorTitle}>
-          Authentication required
+          {t("player.authRequiredTitle")}
         </FinoraText>
         <FinoraText variant="caption" style={{ color: colors.textSecondary, marginBottom: spacing.md }}>
-          Please sign in to stream content.
+          {t("player.authRequiredDesc")}
         </FinoraText>
-        <FinoraButton label="Go Back" variant="secondary" onPress={() => router.back()} />
+        <FinoraButton label={t("common.back")} variant="secondary" onPress={() => router.back()} />
       </View>
     );
   }
@@ -158,33 +179,37 @@ export default function PlayerRoute() {
   ) {
     return (
       <View style={styles.centerContainer} testID="player-route-error">
+        {playerScreenOptions}
         <FinoraText variant="title" style={styles.errorTitle}>
-          {isOfflineMode ? "Fichier introuvable" : "Video unavailable"}
+          {isOfflineMode ? t("downloads.missingFile") : t("player.mediaNotFoundTitle")}
         </FinoraText>
         <FinoraText
           variant="caption"
           style={{ color: colors.textSecondary, marginBottom: spacing.md, textAlign: "center" }}
         >
           {isOfflineMode
-            ? "Le fichier téléchargé ne se trouve plus sur l'appareil."
-            : "This media file is not present on the server."}
+            ? t("downloads.orphanDesc")
+            : t("player.mediaNotFoundDesc")}
         </FinoraText>
-        <FinoraButton label="Go Back" variant="secondary" onPress={() => router.back()} />
+        <FinoraButton label={t("common.back")} variant="secondary" onPress={() => router.back()} />
       </View>
     );
   }
 
   return (
-    <PlayerScreen
-      item={effectiveItem}
-      serverUrl={serverUrl}
-      token={token}
-      localPath={offlineRecord?.localPath}
-      onBack={() => router.back()}
-      onNextEpisode={(episodeId) => {
-        router.replace({ pathname: "/player/[id]", params: { id: episodeId } });
-      }}
-    />
+    <>
+      {playerScreenOptions}
+      <PlayerScreen
+        item={effectiveItem}
+        serverUrl={serverUrl}
+        token={token}
+        localPath={offlineRecord?.localPath}
+        onBack={() => router.back()}
+        onNextEpisode={(episodeId) => {
+          router.replace({ pathname: "/player/[id]", params: { id: episodeId } });
+        }}
+      />
+    </>
   );
 }
 

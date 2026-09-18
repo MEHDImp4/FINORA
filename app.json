@@ -27,7 +27,13 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-video",
+      [
+        "expo-video",
+        {
+          "supportsPictureInPicture": true,
+          "supportsBackgroundPlayback": true
+        }
+      ],
       "expo-asset",
       [
         "expo-splash-screen",

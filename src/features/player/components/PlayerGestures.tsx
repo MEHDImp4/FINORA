@@ -12,6 +12,7 @@ import {
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../../../design-system/tokens";
+import { useTranslation } from "../../../i18n";
 
 // Minimum vertical movement (px) before a swipe gesture is recognized
 const SWIPE_THRESHOLD_PX = 10;
@@ -30,6 +31,7 @@ export interface PlayerGesturesProps {
   onBrightnessChange?: (brightness: number) => void;
   volume?: number;
   onVolumeChange?: (volume: number) => void;
+  disabled?: boolean;
   children: React.ReactNode;
 }
 
@@ -45,8 +47,10 @@ export function PlayerGestures({
   onBrightnessChange,
   volume,
   onVolumeChange,
+  disabled = false,
   children
 }: PlayerGesturesProps) {
+  const { t } = useTranslation();
   const [containerWidth, setContainerWidth] = useState(0);
   const [rippleSide, setRippleSide] = useState<"left" | "right" | null>(null);
   const [is2xActive, setIs2xActive] = useState(false);
@@ -245,6 +249,14 @@ export function PlayerGestures({
 
   const hudPercentage = Math.round(swipeValue * 100);
 
+  if (disabled) {
+    return (
+      <View style={styles.container} testID="player-gestures">
+        {children}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container} onLayout={handleLayout} testID="player-gestures">
       {children}
@@ -298,7 +310,7 @@ export function PlayerGestures({
               style={{ marginBottom: 6 }}
             />
             <FinoraText variant="caption" style={styles.swipeHUDLabel}>
-              Volume
+              {t("player.volume")}
             </FinoraText>
             <FinoraText variant="title" style={styles.swipeHUDValue}>
               {hudPercentage}%
@@ -319,7 +331,7 @@ export function PlayerGestures({
               style={{ marginBottom: 6 }}
             />
             <FinoraText variant="caption" style={styles.swipeHUDLabel}>
-              Luminosité
+              {t("player.brightness")}
             </FinoraText>
             <FinoraText variant="title" style={styles.swipeHUDValue}>
               {hudPercentage}%
@@ -336,10 +348,12 @@ export function PlayerGestures({
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFill
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "#000000"
   },
   gestureOverlay: {
     ...StyleSheet.absoluteFill,
+    backgroundColor: "transparent",
     zIndex: 15
   },
   seekRipple: {
