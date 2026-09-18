@@ -16,6 +16,7 @@ import {
   removePersistedNotificationScope,
   useNotificationStore
 } from "./notificationStore";
+import { downloadManager } from "../features/offline/downloadManager";
 
 export interface ServerState {
   savedAccounts: SavedAccount[];
@@ -84,6 +85,12 @@ export const useServerStore = create<ServerState>((set, get) => ({
   removeServer: async (serverId: string) => {
     set({ isLoading: true, errorMessage: null });
     try {
+      const active = useAuthStore.getState().session;
+      if (active?.serverId === serverId) {
+        // Removing the active server: stop its downloads first.
+        await downloadManager.handleIdentityChange().catch(() => {});
+      }
+
       await serverManager.removeServer(serverId);
       const [servers, accounts] = await Promise.all([
         serverManager.getSavedServers(),
@@ -111,10 +118,17 @@ export const useServerStore = create<ServerState>((set, get) => ({
       queryClient.clear();
       useNotificationStore.getState().resetActiveScope();
 
+      // Stop and detach the previous account's downloads before the singleton
+      // Jellyfin client changes identity.
+      await downloadManager.handleIdentityChange().catch(() => {});
+
       const session = await serverManager.switchAccount(serverId, userId);
       await useNotificationStore.getState().loadPersisted(session.serverId, session.userId);
 
       useAuthStore.getState().adoptSession(session);
+
+      // Load the new account's own download queue (never the previous one).
+      await downloadManager.initialize().catch(() => {});
 
       const accounts = await serverManager.getSavedAccounts();
       const isLocal = isLocalNetworkHost(new URL(session.serverUrl).hostname);
@@ -152,6 +166,12 @@ export const useServerStore = create<ServerState>((set, get) => ({
   removeAccount: async (serverId, userId) => {
     set({ isLoading: true, errorMessage: null });
     try {
+      const active = useAuthStore.getState().session;
+      if (active?.serverId === serverId && active?.userId === userId) {
+        // Removing the signed-in account: stop its downloads first.
+        await downloadManager.handleIdentityChange().catch(() => {});
+      }
+
       await serverManager.removeAccount(serverId, userId);
       await removePersistedNotificationScope(serverId, userId).catch(() => {});
       const accounts = await serverManager.getSavedAccounts();

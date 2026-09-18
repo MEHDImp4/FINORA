@@ -41,21 +41,8 @@ export default function RootLayout() {
       setMinSplashDone(true);
     });
 
-    downloadManager
-      .initialize()
-      .then(() => {
-        const trackedPaths = downloadManager.getTrackedLocalPaths();
-        offlineStorageService
-          .cleanupExpiredWatchedMedia(48)
-          .then(() => {
-            offlineStorageService.cleanupOrphanDiskFiles(trackedPaths).catch(() => {});
-          })
-          .catch(() => {});
-      })
-      .catch(() => {});
-
-    // Only initialize handlers here. Permission requests and OS task registration
-    // happen after the persisted user preference has been loaded for the session.
+    // Only initialize handlers here. Download restoration, permission requests
+    // and OS task registration happen once the session/preferences are known.
     notificationService.init().catch(() => {});
   }, [restoreSession, loadOnboardingStatus]);
 
@@ -67,14 +54,27 @@ export default function RootLayout() {
         .loadPersisted(session.serverId, session.userId)
         .catch(() => {});
 
+      // Restore THIS account's downloads, then reconcile disk usage only after
+      // the manager knows which partial files are still active.
+      downloadManager
+        .initialize()
+        .then(() => {
+          const trackedPaths = downloadManager.getTrackedLocalPaths();
+          return offlineStorageService
+            .cleanupExpiredWatchedMedia(48)
+            .then(() => offlineStorageService.cleanupOrphanDiskFiles(trackedPaths));
+        })
+        .catch(() => {});
+
       offlineSyncManager.syncPendingProgress(session.userId).catch(() => {});
-      offlineStorageService.cleanupExpiredWatchedMedia(48).catch(() => {});
       return;
     }
 
     if (status === "unauthenticated") {
       useNotificationStore.getState().resetActiveScope();
       unregisterBackgroundFetch().catch(() => {});
+      // Detach any in-flight downloads so the old token is never reused.
+      downloadManager.handleIdentityChange().catch(() => {});
     }
   }, [status, session?.serverId, session?.userId]);
 

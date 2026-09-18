@@ -6,6 +6,7 @@ import {
 } from "../core/jellyfin/authRepository";
 import { queryClient } from "../providers/QueryProvider";
 import { useNotificationStore } from "./notificationStore";
+import { downloadManager } from "../features/offline/downloadManager";
 
 export type AuthStatus = "idle" | "restoring" | "authenticating" | "authenticated" | "unauthenticated";
 
@@ -63,6 +64,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: async () => {
     const { session } = get();
+
+    // Stop and detach the outgoing account's downloads BEFORE the token is
+    // revoked, so no transfer can keep running authenticated as the old user.
+    await downloadManager.handleIdentityChange().catch(() => {});
+
     if (session) {
       await authRepository.logout(session.serverId, session.userId);
     }
