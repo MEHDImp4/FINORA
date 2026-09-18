@@ -19,7 +19,7 @@ export interface GetItemsOptions {
 }
 
 const MEDIA_FIELDS =
-  "Overview,Genres,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ParentBackdropImageTags,ParentBackdropItemId,SeriesPrimaryImageTag,ParentPrimaryImageTag,ParentThumbImageTag,ParentThumbItemId,ParentId,PrimaryImageAspectRatio,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber,SeriesId,SeriesName,SeasonId,LocationType,MediaSources,ChildCount,RecursiveItemCount,MediaSourceCount,ItemCounts,Chapters";
+  "Overview,Genres,GenreItems,Tags,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ParentBackdropImageTags,ParentBackdropItemId,SeriesPrimaryImageTag,ParentPrimaryImageTag,ParentThumbImageTag,ParentThumbItemId,ParentId,PrimaryImageAspectRatio,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber,SeriesId,SeriesName,SeasonId,LocationType,MediaSources,ChildCount,RecursiveItemCount,MediaSourceCount,ItemCounts,Chapters,Trickplay";
 
 export function isValidMediaDto(dto: any): boolean {
   if (!dto) return false;
@@ -382,14 +382,26 @@ export class MediaRepository {
     }
 
     const http = this.getHttp(customClient);
-    const params: Record<string, string | undefined> = {
+    const params: Record<string, string | boolean | undefined> = {
       UserId: userId,
-      ParentId: parentId
+      ParentId: parentId,
+      Recursive: true,
+      SortBy: "SortName"
     };
 
-    const response = await http.request<{ Items?: Array<{ Name?: string }> }>(`/Genres`, {
+    let response = await http.request<{ Items?: Array<{ Name?: string }> }>(`/Genres`, {
       params
     });
+
+    if ((!response?.Items || response.Items.length === 0) && parentId) {
+      response = await http.request<{ Items?: Array<{ Name?: string }> }>(`/Genres`, {
+        params: {
+          UserId: userId,
+          Recursive: true,
+          SortBy: "SortName"
+        }
+      });
+    }
 
     const items = response?.Items || [];
     return items.map((g) => g.Name || "").filter(Boolean);

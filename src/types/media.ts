@@ -37,6 +37,16 @@ export interface ChapterMarker {
   markerType?: "IntroStart" | "IntroEnd" | "CreditsStart" | "Chapter";
 }
 
+export interface TrickplayManifest {
+  width: number;
+  height: number;
+  tileWidth: number;
+  tileHeight: number;
+  thumbnailCount: number;
+  intervalMs: number;
+  bandwidth?: number;
+}
+
 export interface MediaItem {
   id: string;
   name: string;
@@ -73,6 +83,7 @@ export interface MediaItem {
   people?: Person[];
   mediaStreams?: MediaStreamInfo[];
   chapters?: ChapterMarker[];
+  trickplay?: TrickplayManifest;
   container?: string;
   bitRate?: number;
   mediaSourceId?: string;

@@ -1,4 +1,4 @@
-import { MediaItem, MediaLibrary, MediaType } from "../../types/media";
+import { MediaItem, MediaLibrary, MediaType, TrickplayManifest } from "../../types/media";
 
 export function mapJellyfinType(typeString?: string): MediaType {
   switch (typeString) {
@@ -80,9 +80,9 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
   const parentThumbImageTag = dto.ParentThumbImageTag || undefined;
   const parentThumbItemId = dto.ParentThumbItemId || dto.SeriesId || undefined;
   const parentId = dto.ParentId || undefined;
-  const primaryImageTag = dto.ImageTags?.Primary;
+  const primaryImageTag = dto.ImageTags?.Primary || dto.PrimaryImageTag || undefined;
   const logoImageTag = dto.ImageTags?.Logo || dto.ParentLogoImageTag || undefined;
-  const thumbImageTag = dto.ImageTags?.Thumb || dto.ParentThumbImageTag || undefined;
+  const thumbImageTag = dto.ImageTags?.Thumb || dto.ThumbImageTag || dto.ParentThumbImageTag || undefined;
 
   let tagline: string | undefined = undefined;
   if (Array.isArray(dto.Taglines) && dto.Taglines.length > 0) {
@@ -145,6 +145,51 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
       }))
     : undefined;
 
+  let trickplay: TrickplayManifest | undefined = undefined;
+  if (dto.Trickplay && typeof dto.Trickplay === "object") {
+    const mediaSourceObj =
+      (mediaSourceId && dto.Trickplay[mediaSourceId]) ||
+      dto.Trickplay[dto.Id] ||
+      Object.values(dto.Trickplay)[0];
+
+    if (mediaSourceObj && typeof mediaSourceObj === "object") {
+      const widthInfo: any = (mediaSourceObj as any)["320"] || Object.values(mediaSourceObj)[0];
+      if (widthInfo && typeof widthInfo === "object") {
+        trickplay = {
+          width: widthInfo.Width || 320,
+          height: widthInfo.Height || 180,
+          tileWidth: widthInfo.TileWidth || 10,
+          tileHeight: widthInfo.TileHeight || 10,
+          thumbnailCount: widthInfo.ThumbnailCount || 0,
+          intervalMs: widthInfo.Interval || 10000,
+          bandwidth: widthInfo.Bandwidth
+        };
+      }
+    }
+  }
+
+  const rawGenres: string[] = [];
+  if (Array.isArray(dto.Genres)) {
+    for (const g of dto.Genres) {
+      if (typeof g === "string" && g.trim()) rawGenres.push(g.trim());
+    }
+  }
+  if (Array.isArray(dto.GenreItems)) {
+    for (const gi of dto.GenreItems) {
+      const name = typeof gi === "string" ? gi : gi?.Name;
+      if (name && typeof name === "string" && name.trim() && !rawGenres.includes(name.trim())) {
+        rawGenres.push(name.trim());
+      }
+    }
+  }
+  if (Array.isArray(dto.Tags)) {
+    for (const t of dto.Tags) {
+      if (typeof t === "string" && t.trim() && !rawGenres.includes(t.trim())) {
+        rawGenres.push(t.trim());
+      }
+    }
+  }
+
   return {
     id: String(dto.Id || ""),
     name: String(dto.Name || "Untitled"),
@@ -156,7 +201,7 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
       typeof dto.CommunityRating === "number" ? Math.round(dto.CommunityRating * 10) / 10 : undefined,
     officialRating: dto.OfficialRating || undefined,
     tagline,
-    genres: Array.isArray(dto.Genres) ? dto.Genres : [],
+    genres: rawGenres,
     backdropImageTag,
     primaryImageTag,
     seriesPrimaryImageTag,
@@ -182,6 +227,7 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
     people,
     mediaStreams,
     chapters,
+    trickplay,
     container,
     mediaSourceId,
     locationType: dto.LocationType || undefined,

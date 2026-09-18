@@ -599,18 +599,6 @@ export function PlayerScreen({
         </View>
       )}
 
-      {/* Trickplay Thumbnail Preview during timeline scrubbing */}
-      {!isInPiP && (
-        <TrickplayPreview
-          serverUrl={serverUrl}
-          itemId={item.id}
-          previewSeconds={scrubPositionSeconds}
-          scrubPositionPercent={scrubPositionPercent}
-          visible={!localPath && isScrubbing}
-          chapters={item.chapters}
-        />
-      )}
-
       {/* Skip Intro & Skip Credits dynamic markers */}
       {!isInPiP && (
         <SkipMarkerButton
@@ -660,6 +648,20 @@ export function PlayerScreen({
           playbackRate={currentSpeed}
           onCycleSpeed={handleCycleSpeed}
           onTogglePiP={handleTogglePiP}
+        />
+      )}
+
+      {/* Trickplay Thumbnail Preview during timeline scrubbing (rendered on topmost layer) */}
+      {!isInPiP && (
+        <TrickplayPreview
+          serverUrl={serverUrl}
+          itemId={item.id}
+          token={token}
+          previewSeconds={scrubPositionSeconds}
+          scrubPositionPercent={scrubPositionPercent}
+          visible={isScrubbing}
+          chapters={item.chapters}
+          trickplayManifest={item.trickplay}
         />
       )}
 
