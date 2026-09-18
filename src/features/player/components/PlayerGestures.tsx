@@ -148,7 +148,7 @@ export function PlayerGestures({
 
         // Upward drag = increase value (negative dy)
         const delta = -gestureState.dy * SWIPE_SENSITIVITY;
-        const newValue = Math.min(1, Math.max(0, swipeStartValueRef.current + delta));
+        const newValue = Math.round(Math.min(1, Math.max(0, swipeStartValueRef.current + delta)) * 100) / 100;
 
         if (swipeSideRef.current === "left") {
           brightnessRef.current = newValue;

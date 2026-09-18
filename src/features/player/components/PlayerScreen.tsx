@@ -264,6 +264,9 @@ export function PlayerScreen({
     }
   }, [preferredPlaybackSpeed, controls]);
 
+  const lastBrightnessNativeCallRef = useRef(0);
+  const pendingBrightnessNativeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Seed the brightness slider from the current screen brightness, and hand the
   // screen back on exit so the player's override doesn't linger after leaving.
   useEffect(() => {
@@ -273,9 +276,9 @@ export function PlayerScreen({
     if (BrightnessModule?.getBrightnessAsync) {
       BrightnessModule.getBrightnessAsync()
         .then((value) => {
-          if (active) {
+          if (active && typeof value === "number" && !isNaN(value) && value >= 0 && value <= 1) {
             originalBrightness = value;
-            setBrightness(value);
+            setBrightness(Math.round(value * 100) / 100);
           }
         })
         .catch(() => {});
@@ -283,6 +286,9 @@ export function PlayerScreen({
 
     return () => {
       active = false;
+      if (pendingBrightnessNativeTimerRef.current) {
+        clearTimeout(pendingBrightnessNativeTimerRef.current);
+      }
       if (!BrightnessModule) return;
 
       // Android keeps the activity brightness override after the player closes, so
@@ -516,8 +522,23 @@ export function PlayerScreen({
   const handleBrightnessChange = (value: number) => {
     const clamped = Math.min(1, Math.max(0, value));
     setBrightness(clamped);
-    if (BrightnessModule) {
-      BrightnessModule.setBrightnessAsync(clamped).catch(() => {});
+
+    if (BrightnessModule?.setBrightnessAsync) {
+      // Prevent screen blackout on Android OLED devices where 0.0 turns off backlight completely
+      const safeBrightness = Math.max(0.01, clamped);
+      const now = Date.now();
+
+      if (now - lastBrightnessNativeCallRef.current > 40) {
+        lastBrightnessNativeCallRef.current = now;
+        BrightnessModule.setBrightnessAsync(safeBrightness).catch(() => {});
+      }
+
+      if (pendingBrightnessNativeTimerRef.current) {
+        clearTimeout(pendingBrightnessNativeTimerRef.current);
+      }
+      pendingBrightnessNativeTimerRef.current = setTimeout(() => {
+        BrightnessModule?.setBrightnessAsync?.(safeBrightness).catch(() => {});
+      }, 50);
     }
   };
 

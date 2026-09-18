@@ -17,6 +17,7 @@ const THUMB_SIZE = 14;
 export interface VerticalSliderProps {
   value: number;
   onValueChange: (value: number) => void;
+  onSlidingChange?: (isSliding: boolean) => void;
   iconName: keyof typeof Ionicons.glyphMap;
   label: string;
   accessibilityLabel: string;
@@ -27,9 +28,17 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
+function calculateValueFromY(y: number, height: number): number {
+  if (height <= 0) return 0;
+  const clampedY = Math.max(0, Math.min(height, y));
+  const raw = (height - clampedY) / height;
+  return Math.round(clamp01(raw) * 100) / 100;
+}
+
 export function VerticalSlider({
   value,
   onValueChange,
+  onSlidingChange,
   iconName,
   label,
   accessibilityLabel,
@@ -37,12 +46,17 @@ export function VerticalSlider({
 }: VerticalSliderProps) {
   const trackHeightRef = useRef(DEFAULT_TRACK_HEIGHT);
   const currentValueRef = useRef(clamp01(value));
-  const dragStartValueRef = useRef(clamp01(value));
+  const dragStartYRef = useRef(0);
 
   const onValueChangeRef = useRef(onValueChange);
   useEffect(() => {
     onValueChangeRef.current = onValueChange;
   }, [onValueChange]);
+
+  const onSlidingChangeRef = useRef(onSlidingChange);
+  useEffect(() => {
+    onSlidingChangeRef.current = onSlidingChange;
+  }, [onSlidingChange]);
 
   useEffect(() => {
     currentValueRef.current = clamp01(value);
@@ -59,15 +73,38 @@ export function VerticalSlider({
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        // Grab semantics: adjust relative to the current value instead of jumping
-        // to the touch position, so a light touch can't slam the value to 0.
-        dragStartValueRef.current = currentValueRef.current;
+      onPanResponderGrant: (evt: GestureResponderEvent) => {
+        onSlidingChangeRef.current?.(true);
+        const height = trackHeightRef.current || DEFAULT_TRACK_HEIGHT;
+        const touchY =
+          typeof evt.nativeEvent?.locationY === "number"
+            ? evt.nativeEvent.locationY
+            : height * (1 - currentValueRef.current);
+
+        dragStartYRef.current = touchY;
+        const next = calculateValueFromY(touchY, height);
+        currentValueRef.current = next;
+        onValueChangeRef.current(next);
       },
       onPanResponderMove: (_evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
         const height = trackHeightRef.current || DEFAULT_TRACK_HEIGHT;
-        const next = clamp01(dragStartValueRef.current - gestureState.dy / height);
+        const currentY = dragStartYRef.current + gestureState.dy;
+        const next = calculateValueFromY(currentY, height);
+        if (next !== currentValueRef.current) {
+          currentValueRef.current = next;
+          onValueChangeRef.current(next);
+        }
+      },
+      onPanResponderRelease: (_evt: GestureResponderEvent, gestureState: PanResponderGestureState) => {
+        const height = trackHeightRef.current || DEFAULT_TRACK_HEIGHT;
+        const currentY = dragStartYRef.current + gestureState.dy;
+        const next = calculateValueFromY(currentY, height);
+        currentValueRef.current = next;
         onValueChangeRef.current(next);
+        onSlidingChangeRef.current?.(false);
+      },
+      onPanResponderTerminate: () => {
+        onSlidingChangeRef.current?.(false);
       }
     })
   ).current;
@@ -87,6 +124,7 @@ export function VerticalSlider({
       <View
         style={styles.trackTouchArea}
         onLayout={handleTrackLayout}
+        hitSlop={{ top: 12, bottom: 12, left: 14, right: 14 }}
         {...panResponder.panHandlers}
         testID={testID ? `${testID}-track` : undefined}
       >

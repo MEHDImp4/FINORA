@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { TimelineScrubber } from "./TimelineScrubber";
 import { VerticalSlider } from "./VerticalSlider";
 import { colors, spacing } from "../../../design-system/tokens";
+import { useTranslation } from "../../../i18n";
 
 export type PlaybackModeLabel = "direct-play" | "direct-stream" | "transcode";
 
@@ -41,18 +42,19 @@ export interface CinematicOverlayProps {
   playbackMode?: PlaybackModeLabel;
   playbackRate?: number;
   onCycleSpeed?: () => void;
+  onTogglePiP?: () => void;
 }
 
-function playbackModeLabel(mode?: PlaybackModeLabel): string {
+function getPlaybackModeLabel(mode: PlaybackModeLabel | undefined, t: (key: string) => string): string {
   switch (mode) {
     case "direct-play":
-      return "Lecture directe";
+      return t("player.playbackModeDirectPlay");
     case "direct-stream":
-      return "Flux direct";
+      return t("player.playbackModeDirectStream");
     case "transcode":
-      return "Transcodage";
+      return t("player.playbackModeTranscode");
     default:
-      return "Lecture";
+      return t("player.directPlay");
   }
 }
 
@@ -82,18 +84,21 @@ export function CinematicOverlay({
   autoHideMs = 4000,
   playbackMode,
   playbackRate,
-  onCycleSpeed
+  onCycleSpeed,
+  onTogglePiP
 }: CinematicOverlayProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const isAdjustingSliderRef = useRef(false);
 
   const resetTimer = () => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (isPlaying && visible && !moreOpen && autoHideMs > 0) {
+    if (isPlaying && visible && !moreOpen && !isAdjustingSliderRef.current && autoHideMs > 0) {
       timerRef.current = setTimeout(() => {
         onToggleVisible();
       }, autoHideMs);
@@ -111,6 +116,18 @@ export function CinematicOverlay({
       }
     };
   }, [visible, isPlaying, moreOpen]);
+
+  const handleSlidingChange = (isSliding: boolean) => {
+    isAdjustingSliderRef.current = isSliding;
+    if (isSliding) {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    } else {
+      resetTimer();
+    }
+  };
 
   const handleBrightnessChange = (value: number) => {
     resetTimer();
@@ -142,7 +159,7 @@ export function CinematicOverlay({
     >
       <View style={styles.topBar} pointerEvents="box-none" testID="overlay-top-bar">
         <FinoraIconButton
-          accessibilityLabel="Retour"
+          accessibilityLabel={t("player.backA11y")}
           onPress={onBack}
           size={40}
           backgroundColor="rgba(20, 20, 26, 0.68)"
@@ -165,7 +182,7 @@ export function CinematicOverlay({
         <View style={styles.headerActions} pointerEvents="box-none">
           {Boolean(onCycleSpeed) && (
             <FinoraIconButton
-              accessibilityLabel={`Vitesse de lecture ${playbackRate || 1}x`}
+              accessibilityLabel={t("player.playbackSpeedA11y", { speed: `${playbackRate || 1}x` })}
               onPress={() => {
                 resetTimer();
                 onCycleSpeed?.();
@@ -181,7 +198,7 @@ export function CinematicOverlay({
           )}
 
           <FinoraIconButton
-            accessibilityLabel="Audio, sous-titres et qualité"
+            accessibilityLabel={t("player.tracksA11y")}
             onPress={() => {
               resetTimer();
               setMoreOpen(false);
@@ -194,9 +211,25 @@ export function CinematicOverlay({
             <Ionicons name="chatbubble-ellipses-outline" size={19} color="#FFFFFF" />
           </FinoraIconButton>
 
+          {Boolean(onTogglePiP) && (
+            <FinoraIconButton
+              accessibilityLabel={t("player.pipA11y")}
+              onPress={() => {
+                resetTimer();
+                setMoreOpen(false);
+                onTogglePiP?.();
+              }}
+              size={40}
+              backgroundColor="rgba(20, 20, 26, 0.68)"
+              testID="overlay-pip-button"
+            >
+              <Ionicons name="copy-outline" size={19} color="#FFFFFF" />
+            </FinoraIconButton>
+          )}
+
           {(onOpenStats || onToggleOrientation) && (
             <FinoraIconButton
-              accessibilityLabel="Plus d'options"
+              accessibilityLabel={t("player.moreOptionsA11y")}
               accessibilityState={{ expanded: moreOpen }}
               onPress={() => {
                 if (timerRef.current) clearTimeout(timerRef.current);
@@ -220,7 +253,7 @@ export function CinematicOverlay({
                   ]}
                 />
                 <FinoraText variant="caption" style={styles.modeText} numberOfLines={1}>
-                  {playbackModeLabel(playbackMode)}
+                  {getPlaybackModeLabel(playbackMode, t)}
                 </FinoraText>
               </View>
 
@@ -232,7 +265,7 @@ export function CinematicOverlay({
                     onToggleOrientation?.();
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel={isLandscape ? "Passer en portrait" : "Passer en paysage"}
+                  accessibilityLabel={isLandscape ? t("player.portraitMode") : t("player.landscapeMode")}
                   testID="overlay-orientation-button"
                 >
                   <Ionicons
@@ -241,7 +274,7 @@ export function CinematicOverlay({
                     color="#FFFFFF"
                   />
                   <FinoraText variant="body" style={styles.moreMenuLabel}>
-                    {isLandscape ? "Mode portrait" : "Mode paysage"}
+                    {isLandscape ? t("player.portraitMode") : t("player.landscapeMode")}
                   </FinoraText>
                 </Pressable>
               )}
@@ -254,12 +287,12 @@ export function CinematicOverlay({
                     onOpenStats?.();
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel="Informations techniques"
+                  accessibilityLabel={t("player.technicalInfo")}
                   testID="overlay-stats-button"
                 >
                   <Ionicons name="information-circle-outline" size={20} color="#FFFFFF" />
                   <FinoraText variant="body" style={styles.moreMenuLabel}>
-                    Infos techniques
+                    {t("player.technicalInfo")}
                   </FinoraText>
                 </Pressable>
               )}
@@ -270,7 +303,7 @@ export function CinematicOverlay({
 
       <View style={styles.centerControls} pointerEvents="box-none" testID="overlay-center-controls">
         <FinoraIconButton
-          accessibilityLabel="Reculer de 10 secondes"
+          accessibilityLabel={t("player.seekBackA11y")}
           onPress={() => {
             resetTimer();
             onSeekBy(-10);
@@ -288,7 +321,7 @@ export function CinematicOverlay({
         </FinoraIconButton>
 
         <FinoraIconButton
-          accessibilityLabel={isPlaying ? "Pause" : "Lire"}
+          accessibilityLabel={isPlaying ? t("player.pauseA11y") : t("player.playA11y")}
           onPress={() => {
             resetTimer();
             onPlayPause();
@@ -307,7 +340,7 @@ export function CinematicOverlay({
         </FinoraIconButton>
 
         <FinoraIconButton
-          accessibilityLabel="Avancer de 10 secondes"
+          accessibilityLabel={t("player.seekForwardA11y")}
           onPress={() => {
             resetTimer();
             onSeekBy(10);
@@ -353,9 +386,10 @@ export function CinematicOverlay({
         <VerticalSlider
           value={brightness}
           onValueChange={handleBrightnessChange}
+          onSlidingChange={handleSlidingChange}
           iconName={brightness < 0.3 ? "sunny-outline" : "sunny"}
-          label="Luminosité"
-          accessibilityLabel="Luminosité"
+          label={t("player.brightness")}
+          accessibilityLabel={t("player.brightnessA11y")}
           testID="brightness-slider"
         />
       </View>
@@ -367,9 +401,10 @@ export function CinematicOverlay({
         <VerticalSlider
           value={volume}
           onValueChange={handleVolumeChange}
+          onSlidingChange={handleSlidingChange}
           iconName={volume === 0 ? "volume-mute" : volume < 0.5 ? "volume-low" : "volume-high"}
-          label="Son"
-          accessibilityLabel="Volume"
+          label={t("player.volume")}
+          accessibilityLabel={t("player.volumeA11y")}
           testID="volume-slider"
         />
       </View>
