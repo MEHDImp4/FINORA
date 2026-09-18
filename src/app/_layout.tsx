@@ -20,6 +20,7 @@ import { downloadManager } from "../features/offline/downloadManager";
 import { useOnboardingStore } from "../stores/onboardingStore";
 import { useLanguageStore } from "../stores/languageStore";
 import { OnboardingScreen } from "../features/onboarding/components/OnboardingScreen";
+import { ErrorBoundary } from "../core/errors/ErrorBoundary";
 
 export default function RootLayout() {
   const status = useAuthStore((state) => state.status);
@@ -141,10 +142,15 @@ export default function RootLayout() {
     !isOnboardingLoaded;
   const showOnboarding = !showSplash && !isOnboardingCompleted;
 
+  const handleReturnHome = React.useCallback(() => {
+    router.replace("/");
+  }, [router]);
+
   return (
     <SafeAreaProvider>
-      <QueryProvider>
-        <View style={styles.container}>
+      <ErrorBoundary onReturnHome={handleReturnHome}>
+        <QueryProvider>
+          <View style={styles.container}>
           <StatusBar style="light" />
           {showSplash ? (
             <View style={styles.loadingContainer}>
@@ -188,8 +194,9 @@ export default function RootLayout() {
               />
             </Stack>
           )}
-        </View>
-      </QueryProvider>
+          </View>
+        </QueryProvider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }
