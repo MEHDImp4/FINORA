@@ -15,14 +15,16 @@
           "NSAllowsLocalNetworking": true,
           "NSAllowsArbitraryLoads": false
         }
-      }
+      },
+      "buildNumber": "1000000"
     },
     "android": {
       "package": "com.finora.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/finora-icon-f.png",
         "backgroundColor": "#0A0A0C"
-      }
+      },
+      "versionCode": 1000000
     },
     "plugins": [
       "expo-router",

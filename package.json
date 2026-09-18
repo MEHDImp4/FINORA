@@ -9,7 +9,9 @@
     "web": "expo start --web",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "i18n:check": "node scripts/check-i18n.js"
+    "i18n:check": "node scripts/check-i18n.js",
+    "version:check": "node scripts/version.js --check",
+    "version:sync": "node scripts/version.js --sync"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
