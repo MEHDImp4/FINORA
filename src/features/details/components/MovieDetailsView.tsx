@@ -24,7 +24,10 @@ import { DownloadQualityModal } from "./DownloadQualityModal";
 import { DownloadQuality } from "../../offline/downloadQuality";
 import { hapticService } from "../../../core/feedback/hapticService";
 import { MediaCarousel } from "../../home/components/MediaCarousel";
+import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
 import { useSimilarItems } from "../../../hooks/useMediaQueries";
+import { useTranslation } from "../../../i18n";
+import { getLocalizedGenre } from "../../library/libraryLocalization";
 
 export interface MovieDetailsViewProps {
   item: MediaItem;
@@ -58,8 +61,11 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
     isDownloading
   }) => {
     const insets = useSafeAreaInsets();
+    const { t, language } = useTranslation();
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
     const [isQualityModalOpen, setIsQualityModalOpen] = useState(false);
+    const defaultDownloadQuality =
+      usePlaybackPreferencesStore((s) => s.preferences.defaultDownloadQuality) || "1080p";
     const { data: similarItems = [] } = useSimilarItems(userId, item.id, 12);
 
     const backdropUri = item.backdropImageTag
@@ -92,11 +98,18 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
     if (audioStream?.channels) {
       if (audioStream.channels >= 8) audioBadge = "7.1";
       else if (audioStream.channels >= 6) audioBadge = "5.1";
-      else if (audioStream.channels >= 2) audioBadge = "Stéréo";
+      else if (audioStream.channels >= 2) audioBadge = t("common.stereo");
     }
 
     const isResume = item.playedPercentage > 0 && !item.isPlayed;
-    const playLabel = isResume ? `Reprendre (${Math.round(item.playedPercentage)} %)` : "Lire";
+    const playLabel = isResume ? t("details.resume") : t("details.play");
+    const resumeBadge = isResume ? `${Math.round(item.playedPercentage)}%` : undefined;
+    const playA11yLabel = isResume
+      ? t("details.resumeWithProgress", {
+          percent: Math.round(item.playedPercentage),
+          progress: Math.round(item.playedPercentage),
+        })
+      : t("details.play");
 
     return (
       <ScrollView
@@ -131,7 +144,7 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
 
           <View style={[styles.topBar, { top: Math.max(insets.top, 16) + 8 }]}>
             <FinoraIconButton
-              accessibilityLabel="Retour"
+              accessibilityLabel={t("common.back")}
               onPress={onBack}
               size={40}
               backgroundColor="rgba(10, 10, 12, 0.6)"
@@ -208,16 +221,18 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
         <View style={styles.actionRow}>
           <FinoraButton
             label={playLabel}
+            badge={resumeBadge}
+            accessibilityLabel={playA11yLabel}
             variant="primary"
-            size="lg"
+            size="md"
             style={styles.playButton}
             onPress={() => onPlay(item)}
-            leftIcon={<Ionicons name="play" size={20} color="#FFFFFF" />}
+            leftIcon={<Ionicons name="play" size={18} color="#FFFFFF" />}
           />
 
           {onToggleFavorite ? (
             <FinoraIconButton
-              accessibilityLabel={item.isFavorite ? "Retirer de ma liste" : "Ajouter à ma liste"}
+              accessibilityLabel={item.isFavorite ? t("details.removeFromMyList") : t("details.addToMyList")}
               onPress={() => onToggleFavorite(item)}
               size={48}
               backgroundColor={item.isFavorite ? colors.primary : colors.surface}
@@ -232,7 +247,7 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
 
           {onTogglePlayed ? (
             <FinoraIconButton
-              accessibilityLabel={item.isPlayed ? "Marquer comme non vu" : "Marquer comme vu"}
+              accessibilityLabel={item.isPlayed ? t("details.markUnwatched") : t("details.markWatched")}
               onPress={() => onTogglePlayed(item)}
               size={48}
               backgroundColor={item.isPlayed ? colors.primary : colors.surface}
@@ -249,13 +264,19 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
             <FinoraIconButton
               accessibilityLabel={
                 isDownloaded
-                  ? "Film téléchargé"
+                  ? t("details.downloaded")
                   : isDownloading
-                  ? "Téléchargement en cours"
-                  : "Télécharger le film"
+                  ? t("details.downloading")
+                  : t("details.download")
               }
               onPress={() => {
-                hapticService.impactLight();
+                hapticService.impactMedium();
+                if (onDownload) {
+                  onDownload(item, defaultDownloadQuality);
+                }
+              }}
+              onLongPress={() => {
+                hapticService.impactHeavy();
                 setIsQualityModalOpen(true);
               }}
               size={48}
@@ -293,7 +314,7 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
             onPress={() => setIsOverviewExpanded(!isOverviewExpanded)}
             style={styles.overviewContainer}
             accessibilityRole="button"
-            accessibilityLabel={isOverviewExpanded ? "Réduire le synopsis" : "Développer le synopsis"}
+            accessibilityLabel={isOverviewExpanded ? t("common.seeLess") : t("common.seeMore")}
           >
             <FinoraText
               variant="body"
@@ -304,7 +325,7 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
             </FinoraText>
             {item.overview.length > 150 ? (
               <FinoraText variant="caption" color={colors.primary} style={styles.expandText}>
-                {isOverviewExpanded ? "Voir moins" : "Voir plus"}
+                {isOverviewExpanded ? t("common.seeLess") : t("common.seeMore")}
               </FinoraText>
             ) : null}
           </Pressable>
@@ -314,8 +335,8 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
           <View style={styles.genresRow}>
             {item.genres.map((genre, idx) => (
               <View key={`${genre}-${idx}`} style={styles.genreChip}>
-                <FinoraText variant="caption" color="textSecondary">
-                  {genre}
+                <FinoraText variant="caption" color="textSecondary" numberOfLines={1}>
+                  {getLocalizedGenre(genre, language)}
                 </FinoraText>
               </View>
             ))}
@@ -329,7 +350,7 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
         {similarItems && similarItems.length > 0 ? (
           <View style={{ marginTop: spacing.md }}>
             <MediaCarousel
-              title="Titres similaires"
+              title={t("details.similar")}
               items={similarItems}
               serverUrl={serverUrl}
               variant="poster"
@@ -413,6 +434,8 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   ratingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "rgba(255, 184, 0, 0.15)",
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -441,7 +464,9 @@ const styles = StyleSheet.create({
   },
   playButton: {
     flex: 1,
-    minWidth: 0
+    minWidth: 0,
+    height: 48,
+    minHeight: 48
   },
   taglineText: {
     fontStyle: "italic",

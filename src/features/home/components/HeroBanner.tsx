@@ -8,6 +8,8 @@ import { getHeroBannerUrls, getLogoUrl } from "../../../core/repositories/imageU
 import { FinoraButton } from "../../../design-system/components/FinoraButton";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
+import { useTranslation } from "../../../i18n";
+import { getLocalizedGenre } from "../../library/libraryLocalization";
 
 interface HeroBannerProps {
   item: MediaItem | null;
@@ -24,6 +26,7 @@ export const HeroBanner = React.memo(function HeroBanner({
   onToggleFavorite,
   onPressDetails
 }: HeroBannerProps) {
+  const { t, language } = useTranslation();
   const { width: screenWidth } = useWindowDimensions();
   const heroHeight = Math.round(Math.max(340, Math.min(430, screenWidth * 1.02)));
   const candidateUrls = useMemo(
@@ -61,7 +64,7 @@ export const HeroBanner = React.memo(function HeroBanner({
     return (
       <View style={[styles.container, styles.emptyContainer]}>
         <FinoraText variant="caption" color="textMuted">
-          Aucun média à mettre en avant
+          {t("home.noHeroMedia")}
         </FinoraText>
       </View>
     );
@@ -82,18 +85,18 @@ export const HeroBanner = React.memo(function HeroBanner({
   };
 
   const runtimeString = formatRuntime(item.runtimeMinutes);
-  const primaryGenre = item.genres && item.genres.length > 0 ? item.genres[0] : null;
+  const bannerGenres = item.genres && item.genres.length > 0 ? item.genres.slice(0, 3) : [];
   const typeLabel =
     item.type === "Movie"
-      ? "Film"
+      ? t("common.movie")
       : item.type === "Series"
-      ? "Série"
+      ? t("common.series")
       : item.type === "Episode"
-      ? "Épisode"
+      ? t("common.episode")
       : null;
 
   const hasRating = Boolean(item.communityRating);
-  const hasGenre = Boolean(primaryGenre);
+  const hasGenre = bannerGenres.length > 0;
   const hasRuntime = Boolean(runtimeString);
   const isHD = Boolean(item.mediaStreams?.some((s) => s.type === "Video" && (s.height || 0) >= 720));
 
@@ -102,7 +105,7 @@ export const HeroBanner = React.memo(function HeroBanner({
       style={[styles.container, { height: heroHeight }]}
       onPress={() => onPressDetails && onPressDetails(item)}
       accessibilityRole="imagebutton"
-      accessibilityLabel={`À la une : ${displayTitle}`}
+      accessibilityLabel={t("home.featured", { title: displayTitle })}
     >
       {currentUri && candidateIndex < candidateUrls.length ? (
         <Image
@@ -149,7 +152,7 @@ export const HeroBanner = React.memo(function HeroBanner({
             {item.communityRating ? (
               <View style={[styles.badge, styles.ratingBadge]}>
                 <Ionicons name="star" size={14} color="#FFD700" style={styles.starIcon} />
-                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                <FinoraText variant="body" color="textPrimary" weight="700" numberOfLines={1} style={styles.badgeText}>
                   {typeof item.communityRating === "number"
                     ? item.communityRating.toFixed(1)
                     : item.communityRating}
@@ -159,7 +162,7 @@ export const HeroBanner = React.memo(function HeroBanner({
 
             {item.officialRating ? (
               <View style={styles.badge}>
-                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                <FinoraText variant="body" color="textPrimary" weight="700" numberOfLines={1} style={styles.badgeText}>
                   {item.officialRating}
                 </FinoraText>
               </View>
@@ -167,7 +170,7 @@ export const HeroBanner = React.memo(function HeroBanner({
 
             {item.year ? (
               <View style={styles.badge}>
-                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                <FinoraText variant="body" color="textPrimary" weight="700" numberOfLines={1} style={styles.badgeText}>
                   {item.year}
                 </FinoraText>
               </View>
@@ -175,23 +178,26 @@ export const HeroBanner = React.memo(function HeroBanner({
 
             {runtimeString ? (
               <View style={styles.badge}>
-                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                <FinoraText variant="body" color="textPrimary" weight="700" numberOfLines={1} style={styles.badgeText}>
                   {runtimeString}
                 </FinoraText>
               </View>
             ) : null}
 
-            {primaryGenre ? (
-              <View style={styles.badge}>
-                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
-                  {primaryGenre}
-                </FinoraText>
-              </View>
-            ) : null}
+            {bannerGenres.map((genre) => {
+              const localized = getLocalizedGenre(genre, language);
+              return (
+                <View key={genre} style={styles.badge}>
+                  <FinoraText variant="body" color="textPrimary" weight="700" numberOfLines={1} style={styles.badgeText}>
+                    {localized}
+                  </FinoraText>
+                </View>
+              );
+            })}
 
             {(!hasRating || !hasGenre) && typeLabel ? (
               <View style={styles.badge}>
-                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                <FinoraText variant="body" color="textPrimary" weight="700" numberOfLines={1} style={styles.badgeText}>
                   {typeLabel}
                 </FinoraText>
               </View>
@@ -199,7 +205,7 @@ export const HeroBanner = React.memo(function HeroBanner({
 
             {(!hasRating || !hasRuntime) && isHD ? (
               <View style={styles.badge}>
-                <FinoraText variant="body" color="textPrimary" weight="700" style={styles.badgeText}>
+                <FinoraText variant="body" color="textPrimary" weight="700" numberOfLines={1} style={styles.badgeText}>
                   HD
                 </FinoraText>
               </View>
@@ -209,7 +215,7 @@ export const HeroBanner = React.memo(function HeroBanner({
 
         <View style={styles.actionsRow}>
           <FinoraButton
-            label="Lire"
+            label={t("home.playHero")}
             variant="primary"
             size="md"
             leftIcon={<Ionicons name="play" size={16} color="#FFFFFF" />}
@@ -218,7 +224,7 @@ export const HeroBanner = React.memo(function HeroBanner({
           />
 
           <FinoraButton
-            label={item.isFavorite ? "Dans ma liste" : "Ma liste"}
+            label={item.isFavorite ? t("home.inMyList") : t("home.myList")}
             leftIcon={
               <Ionicons
                 name={item.isFavorite ? "bookmark" : "add"}
@@ -299,31 +305,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(22, 22, 30, 0.72)",
-    borderColor: "rgba(255, 255, 255, 0.20)",
-    borderTopColor: "rgba(255, 255, 255, 0.35)",
+    backgroundColor: "rgba(20, 20, 26, 0.85)",
+    borderColor: "#2A2A38",
     borderWidth: 1,
     paddingVertical: 4,
     paddingHorizontal: 9,
-    borderRadius: 8,
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 4
+    borderRadius: 6,
+    flexShrink: 0
   },
   ratingBadge: {
-    backgroundColor: "rgba(45, 35, 10, 0.85)",
-    borderColor: "rgba(255, 184, 0, 0.85)",
-    borderTopColor: "rgba(255, 215, 0, 0.95)",
-    borderWidth: 1.2
+    backgroundColor: "rgba(255, 184, 0, 0.15)",
+    borderColor: "rgba(255, 184, 0, 0.45)",
+    borderWidth: 1
   },
   starIcon: {
     marginRight: 5
   },
   badgeText: {
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: "700"
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700",
+    includeFontPadding: false
   },
   actionsRow: {
     flexDirection: "row",
@@ -335,26 +337,14 @@ const styles = StyleSheet.create({
   playButton: {
     flex: 1,
     minWidth: 0,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.28)",
-    borderTopColor: "rgba(255, 255, 255, 0.45)",
-    shadowColor: "#E50914",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10
+    paddingHorizontal: 12
   },
   watchlistButton: {
     flex: 1,
     minWidth: 0,
     paddingHorizontal: 10,
-    backgroundColor: "rgba(30, 30, 42, 0.75)",
+    backgroundColor: "rgba(32, 32, 44, 0.85)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.18)",
-    borderTopColor: "rgba(255, 255, 255, 0.32)",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8
+    borderColor: "#2E2E3E"
   }
 });
