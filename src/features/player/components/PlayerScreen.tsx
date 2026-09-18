@@ -503,10 +503,13 @@ export function PlayerScreen({
           const endpoint = item.seasonId
             ? `/Shows/${item.seriesId}/Episodes?seasonId=${item.seasonId}&fields=IndexNumber,ParentIndexNumber,Name,Id`
             : `/Shows/${item.seriesId}/Episodes?fields=IndexNumber,ParentIndexNumber,Name,Id`;
-          const url = `${serverUrl}${endpoint}${token ? `&api_key=${encodeURIComponent(token)}` : ""}`;
+          // SEC-01: authenticate with headers only — never put the token in the
+          // URL (and never both at once). URLs leak through logs and proxies.
+          const url = `${serverUrl}${endpoint}`;
           const res = await fetch(url, {
             headers: {
-              Authorization: formatAuthorizationHeader("finora-mobile", token)
+              Authorization: formatAuthorizationHeader("finora-mobile", token),
+              ...(token ? { "X-Emby-Token": token } : {})
             }
           });
           if (!res.ok || !active) return;
@@ -530,10 +533,11 @@ export function PlayerScreen({
 
           // 3. Si on était au dernier épisode de la saison, interroger la série complète pour la saison d'après
           if (!next && item.seasonId) {
-            const seriesUrl = `${serverUrl}/Shows/${item.seriesId}/Episodes?fields=IndexNumber,ParentIndexNumber,Name,Id${token ? `&api_key=${encodeURIComponent(token)}` : ""}`;
+            const seriesUrl = `${serverUrl}/Shows/${item.seriesId}/Episodes?fields=IndexNumber,ParentIndexNumber,Name,Id`;
             const seriesRes = await fetch(seriesUrl, {
               headers: {
-                Authorization: formatAuthorizationHeader("finora-mobile", token)
+                Authorization: formatAuthorizationHeader("finora-mobile", token),
+                ...(token ? { "X-Emby-Token": token } : {})
               }
             });
             if (seriesRes.ok && active) {
