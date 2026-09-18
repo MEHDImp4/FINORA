@@ -42,6 +42,8 @@ export interface CommonTranslations {
   seriesPlural: string;
   closeA11y: string;
   loadingContentA11y: string;
+  play: string;
+  resume: string;
 }
 
 export interface TabsTranslations {
@@ -201,6 +203,10 @@ export interface LibraryTranslations {
   sortRating: string;
   emptyTitle: string;
   emptyDesc: string;
+  offlineUnavailableTitle: string;
+  offlineUnavailableDesc: string;
+  serverUnreachableTitle: string;
+  serverUnreachableDesc: string;
   searchLibrary: string;
   myList: string;
   collections: string;
@@ -746,6 +752,9 @@ export interface ErrorTranslations {
   watchOffline: string;
   checkingConnection: string;
   retryConnection: string;
+  boundaryTitle: string;
+  boundaryDesc: string;
+  boundaryReturnHome: string;
 }
 
 export interface AuthTranslations {

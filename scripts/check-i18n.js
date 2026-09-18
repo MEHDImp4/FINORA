@@ -36,6 +36,55 @@ function extractPlaceholders(text) {
   return matches.map(m => m.replace(/[\{\}]/g, '')).sort();
 }
 
+/**
+ * Recursively lists every .ts/.tsx file under src/.
+ */
+function listSourceFiles(dir) {
+  const results = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      // Tests intentionally reference keys that do not exist.
+      if (entry.name === '__tests__') continue;
+      results.push(...listSourceFiles(full));
+    } else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
+      results.push(full);
+    }
+  }
+  return results;
+}
+
+/**
+ * Finds statically referenced translation keys: t("a.b"), translate('a.b').
+ * Dynamic keys (template literals, concatenation, variables) are intentionally
+ * not resolved — this catches the BLK-07 class of bug where a literal key is
+ * used in code but never defined in the dictionaries.
+ */
+function scanReferencedKeys(targetDir) {
+  const references = new Map(); // key -> first "relative/file:line"
+  const srcDir = targetDir || path.resolve(__dirname, '../src');
+
+  const pattern = /\b(?:t|translate)\s*\(\s*(["'])([^"'\\]+)\1/g;
+
+  for (const file of listSourceFiles(srcDir)) {
+    const content = fs.readFileSync(file, 'utf8');
+    const lines = content.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      pattern.lastIndex = 0;
+      let match;
+      while ((match = pattern.exec(lines[i])) !== null) {
+        const key = match[2];
+        if (!key || key.includes(' ') || key.includes('://') || key.startsWith('data:')) continue;
+        if (!references.has(key)) {
+          references.set(key, `${path.relative(path.resolve(__dirname, '..'), file)}:${i + 1}`);
+        }
+      }
+    }
+  }
+
+  return references;
+}
+
 function main() {
   const enPath = path.resolve(__dirname, '../src/i18n/locales/en.ts');
   const frPath = path.resolve(__dirname, '../src/i18n/locales/fr.ts');
@@ -103,7 +152,17 @@ function main() {
     }
   }
 
+  // Every key literally referenced in code must exist in the dictionary.
+  const referencedKeys = scanReferencedKeys();
+  const undefinedKeys = [...referencedKeys.entries()].filter(([key]) => !enKeys.has(key));
+
   let hasErrors = false;
+
+  if (undefinedKeys.length > 0) {
+    hasErrors = true;
+    console.error(`\n❌ Referenced but undefined keys (${undefinedKeys.length}):`);
+    undefinedKeys.forEach(([key, location]) => console.error(`  - ${key}  (${location})`));
+  }
 
   if (missingInFr.length > 0) {
     hasErrors = true;
@@ -141,4 +200,9 @@ function main() {
   process.exit(0);
 }
 
-main();
+// Exported for the checker's own unit tests.
+module.exports = { flattenKeys, extractPlaceholders, scanReferencedKeys };
+
+if (require.main === module) {
+  main();
+}

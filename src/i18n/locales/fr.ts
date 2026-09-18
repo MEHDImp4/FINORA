@@ -35,7 +35,9 @@ export const fr: Translations = {
     movies: "Films",
     seriesPlural: "Séries",
     closeA11y: "Fermer",
-    loadingContentA11y: "Chargement du contenu"
+    loadingContentA11y: "Chargement du contenu",
+    play: "Lecture",
+    resume: "Reprendre"
   },
   tabs: {
     home: "Accueil",
@@ -190,6 +192,10 @@ export const fr: Translations = {
     sortRating: "Note communauté",
     emptyTitle: "Bibliothèque vide",
     emptyDesc: "Aucun média trouvé dans cette section.",
+    offlineUnavailableTitle: "Vous êtes hors ligne",
+    offlineUnavailableDesc: "Aucune connexion Internet. Reconnectez-vous pour parcourir votre bibliothèque.",
+    serverUnreachableTitle: "Serveur injoignable",
+    serverUnreachableDesc: "Impossible de joindre le serveur Jellyfin. Vérifiez l'adresse et son état.",
     searchLibrary: "Rechercher dans la bibliothèque...",
     myList: "Ma liste",
     collections: "Collections",
@@ -727,7 +733,10 @@ export const fr: Translations = {
     badgeConnectionLost: "CONNEXION INTERROMPUE",
     watchOffline: "Regarder hors-ligne",
     checkingConnection: "Vérification...",
-    retryConnection: "Réessayer la connexion"
+    retryConnection: "Réessayer la connexion",
+    boundaryTitle: "Une erreur est survenue",
+    boundaryDesc: "FINORA a rencontré une erreur inattendue. Vous pouvez réessayer ou revenir à l'accueil.",
+    boundaryReturnHome: "Retour à l'accueil"
   },
   auth: {
     unencryptedHttpTitle: "Connexion HTTP non chiffrée",
