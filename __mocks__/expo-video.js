@@ -13,6 +13,8 @@ class MockVideoPlayer {
     this._muted = false;
     this._status = "idle";
     this._listeners = new Map();
+    /** Number of source replacements applied — used by ownership tests. */
+    this._replaceCount = 0;
   }
 
   get playing() {
@@ -94,7 +96,23 @@ class MockVideoPlayer {
 
   replace(source) {
     this._source = source;
+    this._replaceCount += 1;
     this._emit("sourceChange", { source });
+  }
+
+  /**
+   * Mirrors expo-video's streaming replacement: loads the new source and reports
+   * readyToPlay. The real player is asynchronous; the manager must only act on
+   * readyToPlay.
+   */
+  replaceAsync(source) {
+    this._source = source;
+    this._replaceCount += 1;
+    this._emit("sourceChange", { source });
+    const oldStatus = this._status;
+    this._status = "readyToPlay";
+    this._emit("statusChange", { status: "readyToPlay", oldStatus });
+    return Promise.resolve();
   }
 
   addListener(event, listener) {

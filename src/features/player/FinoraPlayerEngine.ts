@@ -358,6 +358,27 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
     return this.snapshot;
   }
 
+  /**
+   * Resets the engine for a newly loaded content item. Used by the single-player
+   * source-replacement flow so stale time/duration/error values from the previous
+   * item can never leak into the new session (BLK-10).
+   */
+  public reset(positionSeconds: number = 0, durationSeconds: number = 0): void {
+    if (this.isDestroyed) return;
+    this.stopPlayheadTimer();
+    this.lastNativeTimeUpdateAt = 0;
+    this.snapshot = {
+      state: "loading",
+      currentTimeSeconds: Math.max(0, positionSeconds),
+      durationSeconds: durationSeconds > 0 ? durationSeconds : 0,
+      bufferedPositionSeconds: 0,
+      volume: this.snapshot.volume,
+      playbackRate: this.snapshot.playbackRate,
+      isMuted: this.snapshot.isMuted
+    };
+    this.notifyListeners();
+  }
+
   public subscribe(listener: (snapshot: FinoraPlayerSnapshot) => void): () => void {
     this.listeners.add(listener);
 

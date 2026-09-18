@@ -36,6 +36,8 @@ export interface IFinoraPlayerEngine {
   setVolume(volume: number): void;
   setRate(rate: number): void;
   setMuted(muted: boolean): void;
+  /** Resets engine state for a newly loaded content item (BLK-10). */
+  reset?(positionSeconds?: number, durationSeconds?: number): void;
   destroy(): void;
   getSnapshot(): FinoraPlayerSnapshot;
   subscribe(listener: (snapshot: FinoraPlayerSnapshot) => void): () => void;
