@@ -33,7 +33,7 @@
         "expo-video",
         {
           "supportsPictureInPicture": true,
-          "supportsBackgroundPlayback": true
+          "supportsBackgroundPlayback": false
         }
       ],
       "expo-asset",
