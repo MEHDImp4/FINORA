@@ -34,10 +34,67 @@ export interface PlaybackPlanOptions {
   localPath?: string;
   audioStreamIndex?: number;
   subtitleStreamIndex?: number | null;
+  /**
+   * Forces a specific transport. Used by the controlled Direct Play -> Transcode
+   * fallback (PLR-01) so a decode failure can be recovered deterministically.
+   */
+  forceMode?: PlaybackMode;
 }
 
 export function getSanitizedPlaybackUrl(url: string): string {
   return sanitizeData(url);
+}
+
+interface ForcedPlanContext {
+  cleanServerUrl: string;
+  itemId: string;
+  mediaSourceId?: string;
+  mediaSourceParam: string;
+  hlsMediaSourceParam: string;
+  audioIndexParam: string;
+  subtitleIndexParam: string;
+  normVideoCodec?: string;
+  normAudioCodec?: string;
+  mediaContainer: string;
+}
+
+/** Builds a transport plan for a mode that has been explicitly forced by the caller. */
+function buildForcedPlan(mode: PlaybackMode, ctx: ForcedPlanContext): PlaybackPlan {
+  if (mode === "direct-play") {
+    return {
+      mode: "direct-play",
+      url: `${ctx.cleanServerUrl}/Videos/${ctx.itemId}/stream?static=true${ctx.mediaSourceParam}`,
+      mediaSourceId: ctx.mediaSourceId,
+      videoCodec: ctx.normVideoCodec,
+      audioCodec: ctx.normAudioCodec,
+      container: ctx.mediaContainer,
+      reason: "Forced direct play."
+    };
+  }
+
+  if (mode === "direct-stream") {
+    return {
+      mode: "direct-stream",
+      url: `${ctx.cleanServerUrl}/Videos/${ctx.itemId}/stream?videoCodec=copy&audioCodec=copy${ctx.mediaSourceParam}${ctx.audioIndexParam}${ctx.subtitleIndexParam}`,
+      mediaSourceId: ctx.mediaSourceId,
+      videoCodec: ctx.normVideoCodec,
+      audioCodec: ctx.normAudioCodec,
+      container: ctx.mediaContainer,
+      reason: "Forced direct stream (remux)."
+    };
+  }
+
+  // Forced transcode re-encodes video to H.264 and audio to AAC: this is the safe
+  // recovery from a decode/container failure, so video must never be copied here.
+  return {
+    mode: "transcode",
+    url: `${ctx.cleanServerUrl}/Videos/${ctx.itemId}/master.m3u8?videoCodec=h264&audioCodec=aac&audioChannels=2${ctx.hlsMediaSourceParam}${ctx.audioIndexParam}${ctx.subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`,
+    mediaSourceId: ctx.mediaSourceId,
+    videoCodec: "h264",
+    audioCodec: "aac",
+    container: "m3u8",
+    reason: "Forced transcode fallback after a direct playback failure."
+  };
 }
 
 export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
@@ -50,7 +107,8 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     container,
     localPath,
     audioStreamIndex,
-    subtitleStreamIndex
+    subtitleStreamIndex,
+    forceMode
   } = options;
 
   if (localPath) {
@@ -98,6 +156,22 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   // Normalize codecs (e.g. h265 -> hevc, dca -> dts)
   const normVideoCodec = videoCodec === "h265" ? "hevc" : videoCodec;
   const normAudioCodec = audioCodec;
+
+  // A forced transport (PLR-01 fallback) bypasses negotiation entirely.
+  if (forceMode) {
+    return buildForcedPlan(forceMode, {
+      cleanServerUrl,
+      itemId: item.id,
+      mediaSourceId,
+      mediaSourceParam,
+      hlsMediaSourceParam,
+      audioIndexParam,
+      subtitleIndexParam,
+      normVideoCodec,
+      normAudioCodec,
+      mediaContainer
+    });
+  }
 
   const isContainerSupported = deviceProfile.supportedContainers.includes(mediaContainer);
   const isVideoSupported =

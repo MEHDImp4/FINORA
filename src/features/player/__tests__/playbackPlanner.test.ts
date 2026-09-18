@@ -355,4 +355,64 @@ describe("PlaybackPlanner", () => {
       expect(plan.reason).toContain("Offline local file playback");
     });
   });
+
+  describe("Forced transport (PLR-01 fallback)", () => {
+    const compatItem: MediaItem = {
+      ...baseItem,
+      mediaStreams: [
+        { type: "Video", codec: "h264" },
+        { type: "Audio", codec: "aac" }
+      ]
+    };
+
+    it("forces a full transcode even when direct play would be chosen", () => {
+      const plan = createPlaybackPlan({
+        item: compatItem,
+        serverUrl,
+        token,
+        container: "mp4",
+        forceMode: "transcode"
+      });
+
+      expect(plan.mode).toBe("transcode");
+      expect(plan.url).toContain("master.m3u8");
+      expect(plan.url).toContain("videoCodec=h264&audioCodec=aac");
+      expect(plan.reason).toContain("Forced transcode fallback");
+    });
+
+    it("forces direct stream and direct play when requested", () => {
+      const directStream = createPlaybackPlan({
+        item: compatItem,
+        serverUrl,
+        token,
+        container: "mp4",
+        forceMode: "direct-stream"
+      });
+      expect(directStream.mode).toBe("direct-stream");
+      expect(directStream.url).toContain("videoCodec=copy&audioCodec=copy");
+
+      const directPlay = createPlaybackPlan({
+        item: compatItem,
+        serverUrl,
+        token,
+        container: "mp4",
+        forceMode: "direct-play"
+      });
+      expect(directPlay.mode).toBe("direct-play");
+      expect(directPlay.url).toContain("static=true");
+    });
+
+    it("still uses the local file for offline playback regardless of a forced mode", () => {
+      const plan = createPlaybackPlan({
+        item: compatItem,
+        serverUrl,
+        token,
+        localPath: "file:///data/finora/video.mp4",
+        forceMode: "transcode"
+      });
+
+      expect(plan.mode).toBe("direct-play");
+      expect(plan.url).toBe("file:///data/finora/video.mp4");
+    });
+  });
 });

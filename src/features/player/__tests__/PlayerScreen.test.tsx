@@ -206,4 +206,94 @@ describe("PlayerScreen", () => {
 
     global.fetch = originalFetch;
   });
+
+  it("falls back from direct play to transcode exactly once, then surfaces a terminal error (PLR-01)", () => {
+    const mockRepo = createMockRepo();
+    let root: any;
+    act(() => {
+      root = renderer.create(
+        <QueryClientProvider client={queryClient}>
+          <PlayerScreen
+            item={mockItem}
+            serverUrl="https://demo.jellyfin.org"
+            token="test-token"
+            onBack={jest.fn()}
+            playbackRepository={mockRepo}
+            overlayAutoHideMs={0}
+          />
+        </QueryClientProvider>
+      );
+    });
+
+    const player = root.root.findByProps({ testID: "expo-video-view" }).props.player;
+    expect(player._source.uri).toContain("static=true");
+    expect(player._replaceCount).toBe(1);
+
+    // Direct play fails to decode.
+    act(() => {
+      player.status = "error";
+    });
+
+    // Exactly one fallback: the source is rebuilt as an HLS transcode.
+    expect(player._source.uri).toContain("master.m3u8");
+    expect(player._replaceCount).toBe(2);
+
+    // The transcode stream also fails: terminal error is shown, no further retry.
+    act(() => {
+      player.status = "error";
+    });
+
+    expect(root.root.findByProps({ testID: "player-error" })).toBeTruthy();
+    expect(player._replaceCount).toBe(2);
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  it("unlocks the UI when starting Picture-in-Picture fails (PLR-05)", async () => {
+    const expoVideo = require("expo-video");
+    const originalVideoView = expoVideo.VideoView;
+    const React = require("react");
+    expoVideo.VideoView = React.forwardRef((props: any, ref: any) => {
+      React.useImperativeHandle(ref, () => ({
+        startPictureInPicture: () => Promise.reject(new Error("pip unavailable")),
+        stopPictureInPicture: jest.fn()
+      }));
+      return React.createElement("View", { testID: "expo-video-view", ...props });
+    });
+
+    const mockRepo = createMockRepo();
+    let root: any;
+    try {
+      act(() => {
+        root = renderer.create(
+          <QueryClientProvider client={queryClient}>
+            <PlayerScreen
+              item={mockItem}
+              serverUrl="https://demo.jellyfin.org"
+              token="test-token"
+              onBack={jest.fn()}
+              playbackRepository={mockRepo}
+              overlayAutoHideMs={0}
+            />
+          </QueryClientProvider>
+        );
+      });
+
+      const pipButton = root.root.findByProps({ testID: "overlay-pip-button" });
+      await act(async () => {
+        pipButton.props.onPress();
+        await new Promise((resolve) => setTimeout(resolve, 90));
+      });
+
+      // The controls are visible again, proving the UI is no longer stuck in PiP.
+      expect(root.root.findByProps({ testID: "overlay-top-bar" })).toBeTruthy();
+    } finally {
+      act(() => {
+        root?.unmount();
+      });
+      expoVideo.VideoView = originalVideoView;
+    }
+  });
 });

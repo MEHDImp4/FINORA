@@ -38,6 +38,23 @@ describe("deviceProfile", () => {
     expect(androidProfile.supportedContainers).toContain("mkv");
   });
 
+  it("stays conservative on codecs with inconsistent hardware decode support (PLR-01)", () => {
+    const iosProfile = getDefaultDeviceProfile("ios");
+    const androidProfile = getDefaultDeviceProfile("android");
+
+    // AV1 hardware decode is not universal on either platform baseline.
+    expect(iosProfile.supportedVideoCodecs).not.toContain("av1");
+    expect(androidProfile.supportedVideoCodecs).not.toContain("av1");
+
+    // FLAC container support is inconsistent on iOS.
+    expect(iosProfile.supportedAudioCodecs).not.toContain("flac");
+
+    // Broadly-supported formats stay.
+    expect(androidProfile.supportedVideoCodecs).toContain("hevc");
+    expect(androidProfile.supportedAudioCodecs).toContain("flac");
+    expect(iosProfile.supportedVideoCodecs).toContain("hevc");
+  });
+
   it("falls back to Platform.OS when platform argument is 'default'", () => {
     (Platform as any).OS = "ios";
     const iosProfile = getDefaultDeviceProfile("default");

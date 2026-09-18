@@ -12,7 +12,7 @@ import { VideoView } from "expo-video";
 import { MediaItem } from "../../../types/media";
 import { useFinoraPlayer } from "../useFinoraPlayer";
 import { usePlaybackSession } from "../usePlaybackSession";
-import { createPlaybackPlan } from "../playbackPlanner";
+import { createPlaybackPlan, PlaybackMode } from "../playbackPlanner";
 import { offlineStorageService } from "../../offline/offlineStorage";
 import { CinematicOverlay } from "./CinematicOverlay";
 import { PlayerGestures } from "./PlayerGestures";
@@ -97,6 +97,14 @@ export function PlayerScreen({
   const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | undefined>(bestAudioIndex);
   const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState<number | null>(bestSubtitleIndex);
   const [selectedQuality, setSelectedQuality] = useState<string>("auto");
+  // Controlled Direct Play -> Transcode fallback (PLR-01). Keyed by content id so a
+  // new item never inherits a forced transport from the previous one.
+  const [playbackFallback, setPlaybackFallback] = useState<{
+    contentId: string;
+    mode: PlaybackMode;
+  } | null>(null);
+  const playbackFallbackAttemptedRef = useRef<string | null>(null);
+  const forcedMode = playbackFallback?.contentId === item.id ? playbackFallback.mode : undefined;
   const [isLandscape, setIsLandscape] = useState(false);
   const [showSubtitleStyleModal, setShowSubtitleStyleModal] = useState(false);
   const [currentSpeed, setCurrentSpeed] = useState(preferredPlaybackSpeed);
@@ -188,18 +196,43 @@ export function PlayerScreen({
   // VideoView ref & Picture-in-Picture (PiP) state
   const videoViewRef = useRef<any>(null);
   const [isInPiP, setIsInPiP] = useState(false);
+  const pipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pipTimerRef.current) {
+        clearTimeout(pipTimerRef.current);
+        pipTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const handleTogglePiP = () => {
-    try {
-      hapticService.impactLight();
-      setControlsVisible(false);
-      setIsInPiP(true);
-      setTimeout(() => {
-        videoViewRef.current?.startPictureInPicture?.();
-      }, 50);
-    } catch (e) {
-      logger.warn("Failed to start Picture-in-Picture:", e);
+    hapticService.impactLight();
+    setControlsVisible(false);
+    setIsInPiP(true);
+    if (pipTimerRef.current) {
+      clearTimeout(pipTimerRef.current);
     }
+    pipTimerRef.current = setTimeout(() => {
+      pipTimerRef.current = null;
+      try {
+        const result = videoViewRef.current?.startPictureInPicture?.();
+        // Some implementations return a promise that can reject (PLR-05): on any
+        // failure the UI must be unlocked again rather than staying stuck in PiP.
+        if (result && typeof result.catch === "function") {
+          result.catch((error: unknown) => {
+            logger.warn("Failed to start Picture-in-Picture:", error);
+            setIsInPiP(false);
+            setControlsVisible(true);
+          });
+        }
+      } catch (error) {
+        logger.warn("Failed to start Picture-in-Picture:", error);
+        setIsInPiP(false);
+        setControlsVisible(true);
+      }
+    }, 50);
   };
 
   // Scrubbing & Trickplay state
@@ -217,9 +250,10 @@ export function PlayerScreen({
       quality: selectedQuality,
       localPath,
       audioStreamIndex: serverAudioIndex,
-      subtitleStreamIndex: serverSubtitleIndex
+      subtitleStreamIndex: serverSubtitleIndex,
+      forceMode: forcedMode
     });
-  }, [item, serverUrl, token, selectedQuality, localPath, serverAudioIndex, serverSubtitleIndex]);
+  }, [item, serverUrl, token, selectedQuality, localPath, serverAudioIndex, serverSubtitleIndex, forcedMode]);
 
   // Initial resume position in seconds
   const initialPositionSeconds = useMemo(() => {
@@ -255,7 +289,8 @@ export function PlayerScreen({
     initialPositionSeconds,
     initialDurationSeconds,
     autoPlay: true,
-    initialPlaybackRate: preferredPlaybackSpeed
+    initialPlaybackRate: preferredPlaybackSpeed,
+    contentId: item.id
   });
 
   // Sync preferred speed if changed
@@ -311,7 +346,10 @@ export function PlayerScreen({
     engine,
     snapshot,
     repository: customPlaybackRepo,
-    isOffline: Boolean(localPath)
+    isOffline: Boolean(localPath),
+    audioStreamIndex: selectedAudioIndex,
+    subtitleStreamIndex: selectedSubtitleIndex,
+    allowBackground: isInPiP
   });
 
   // Track and synchronize native audio tracks from expo-video
@@ -639,22 +677,36 @@ export function PlayerScreen({
 
   const isBufferingOrLoading = snapshot.state === "loading" || snapshot.state === "buffering";
 
+  // Controlled fallback (PLR-01): a direct-play/direct-stream decode error retries
+  // once through a full transcode. A transcode error is terminal (no loop).
   useEffect(() => {
-    // Only invalidate online library queries if an error occurs while streaming from server
-    if (!localPath && snapshot.state === "error") {
-      try {
-        queryClient.setQueriesData({ queryKey: mediaKeys.all }, (oldData: any) => {
-          if (Array.isArray(oldData)) {
-            return oldData.filter((i: any) => i?.id !== item.id && i?.seriesId !== item.id);
-          }
-          return oldData;
-        });
-        queryClient.invalidateQueries({ queryKey: mediaKeys.all });
-      } catch {
-        // Ignored
-      }
+    if (localPath || snapshot.state !== "error") return;
+    if (plan.mode === "transcode") return;
+    if (playbackFallbackAttemptedRef.current === item.id) return;
+
+    playbackFallbackAttemptedRef.current = item.id;
+    logger.warn(
+      `[PlayerScreen] ${plan.mode} playback failed for ${item.id}; falling back to transcode.`
+    );
+    setPlaybackFallback({ contentId: item.id, mode: "transcode" });
+  }, [localPath, snapshot.state, plan.mode, item.id]);
+
+  // Only surface a terminal failure: drop the item from library caches when the
+  // transcode fallback itself failed — never on a transient, recoverable error.
+  useEffect(() => {
+    if (localPath || snapshot.state !== "error" || plan.mode !== "transcode") return;
+    try {
+      queryClient.setQueriesData({ queryKey: mediaKeys.all }, (oldData: any) => {
+        if (Array.isArray(oldData)) {
+          return oldData.filter((i: any) => i?.id !== item.id && i?.seriesId !== item.id);
+        }
+        return oldData;
+      });
+      queryClient.invalidateQueries({ queryKey: mediaKeys.all });
+    } catch {
+      // Ignored
     }
-  }, [localPath, snapshot.state, item.id, queryClient]);
+  }, [localPath, snapshot.state, plan.mode, item.id, queryClient]);
 
   return (
     <View style={styles.container} testID="player-screen">
@@ -896,8 +948,8 @@ export function PlayerScreen({
         snapshot={snapshot}
       />
 
-      {/* Error Banner if error occurs */}
-      {snapshot.state === "error" && (
+      {/* Error Banner if a TERMINAL error occurs (fallback exhausted or local file) */}
+      {snapshot.state === "error" && (Boolean(localPath) || plan.mode === "transcode") && (
         <View style={styles.errorOverlay} testID="player-error">
           <View style={styles.errorCard}>
             <View style={styles.errorIconBadge}>
