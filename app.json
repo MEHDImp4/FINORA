@@ -64,6 +64,7 @@
       "./plugins/withBackgroundService",
       "./plugins/withSplashBackgroundColor",
       "./plugins/withPiP",
+      "./plugins/withRemoveDevPermissions",
       "expo-font",
       "expo-background-task"
     ],
