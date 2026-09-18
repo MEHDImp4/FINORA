@@ -1,0 +1,223 @@
+name: RC Android Build Validation
+
+# Dry-run release pipeline for the Android Release Candidate.
+#
+# It runs the EXACT production build path (quality -> expo prebuild -> Gradle
+# assembleRelease -> production signing -> apksigner verify -> checksum) but
+# NEVER publishes a GitHub Release, NEVER creates a tag and NEVER marks Latest.
+#
+# - Push to `rc/v1.0.0-build-validation`, or run it manually.
+# - If the four ANDROID_* signing secrets are present, the APK is signed with the
+#   release keystore and verified; otherwise the job still builds and uploads the
+#   base APK, but clearly reports SIGNING: NOT VERIFIED.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - rc/v1.0.0-build-validation
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rc-build-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Version consistency
+        run: npm run version:check
+
+      - name: Check i18n parity
+        run: npm run i18n:check
+
+      - name: Run tests
+        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --maxWorkers=2
+
+  build:
+    name: Build + sign (dry-run, no publish)
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Toolchain versions
+        run: |
+          set -euo pipefail
+          node -v
+          java -version
+          node -p "require('expo/package.json').version"
+          node -p "require('react-native/package.json').version"
+          node -p "require('@react-native/gradle-plugin/package.json').version"
+
+      - name: Generate Android native project (Expo Prebuild)
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Gradle wrapper + version
+        run: |
+          set -euo pipefail
+          cat android/gradle/wrapper/gradle-wrapper.properties
+          cd android
+          ./gradlew --version
+
+      - name: Ensure gradlew is executable
+        run: chmod +x android/gradlew
+
+      - name: Build Stable APK (base)
+        run: |
+          cd android
+          ./gradlew assembleRelease -PreactNativeReleaseLevel=stable
+
+      - name: Locate built APK
+        id: apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)
+          if [ -z "$RELEASE_APK" ]; then echo "::error::Release APK not found"; exit 1; fi
+          echo "raw=$RELEASE_APK" >> "$GITHUB_OUTPUT"
+
+      - name: Detect release signing secrets
+        id: secrets
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${KEYSTORE_BASE64:-}" ] && [ -n "${KEYSTORE_PASSWORD:-}" ] && [ -n "${KEY_ALIAS:-}" ] && [ -n "${KEY_PASSWORD:-}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Signing secrets present — production signing WILL be validated."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::SIGNING: NOT VERIFIED — one or more ANDROID_* signing secrets are missing. The APK will retain its default (debug) signature."
+          fi
+
+      - name: Sign APK with release keystore
+        if: steps.secrets.outputs.available == 'true'
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}/build-tools"
+          APKSIGNER=$(find "$BUILD_TOOLS" -name apksigner 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$APKSIGNER" ]; then echo "::error::apksigner not found"; exit 1; fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > release.keystore
+          "$APKSIGNER" sign \
+            --ks release.keystore \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass "pass:$KEYSTORE_PASSWORD" \
+            --key-pass "pass:$KEY_PASSWORD" \
+            --out FINORA-v1.0.0-rc.apk \
+            "${{ steps.apk.outputs.raw }}"
+          rm -f release.keystore
+
+      - name: Stage unsigned validation APK
+        if: steps.secrets.outputs.available != 'true'
+        shell: bash
+        run: cp "${{ steps.apk.outputs.raw }}" FINORA-v1.0.0-rc-UNSIGNED.apk
+
+      - name: Verify APK signature (fail on debug certificate)
+        if: steps.secrets.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}/build-tools"
+          APKSIGNER=$(find "$BUILD_TOOLS" -name apksigner 2>/dev/null | sort -V | tail -n 1)
+          "$APKSIGNER" verify --verbose --print-certs FINORA-v1.0.0-rc.apk | tee apksigner-verify.txt
+          if grep -qiE 'CN=Android Debug' apksigner-verify.txt; then
+            echo "::error::APK is signed with the Android debug certificate."
+            exit 1
+          fi
+
+      - name: Inspect APK manifest and permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=$(ls FINORA-v1.0.0-rc*.apk | head -n 1)
+          BUILD_TOOLS="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}/build-tools"
+          AAPT=$(find "$BUILD_TOOLS" -name aapt 2>/dev/null | sort -V | tail -n 1)
+          AAPT2=$(find "$BUILD_TOOLS" -name aapt2 2>/dev/null | sort -V | tail -n 1)
+          {
+            echo "### APK: $APK"
+            echo "## aapt dump badging"
+            "$AAPT" dump badging "$APK" | grep -E "package:|versionCode|versionName|sdkVersion|targetSdkVersion|uses-permission|application-label|application-debuggable" || true
+            echo ""
+            echo "## Manifest flags (aapt2 xmltree)"
+            "$AAPT2" dump xmltree "$APK" --file AndroidManifest.xml | grep -iE "debuggable|usesCleartextTraffic|supportsPictureInPicture|foregroundServiceType|allowBackup" || true
+          } | tee apk-inspection.txt
+
+      - name: Compute SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum FINORA-v1.0.0-rc*.apk | tee FINORA-v1.0.0-rc.apk.sha256
+
+      - name: Upload RC validation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: finora-rc-validation
+          path: |
+            FINORA-v1.0.0-rc*.apk
+            FINORA-v1.0.0-rc.apk.sha256
+            apk-inspection.txt
+            apksigner-verify.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## FINORA RC Android dry-run"
+            echo ""
+            echo "- Signing secrets available: \`${{ steps.secrets.outputs.available }}\`"
+            echo "- RC APK artifact: see the \`finora-rc-validation\` artifact (no GitHub Release was created)."
+          } >> "$GITHUB_STEP_SUMMARY"
