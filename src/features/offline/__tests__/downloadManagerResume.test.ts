@@ -4,7 +4,8 @@ import {
   DownloadManager,
   DOWNLOAD_QUEUE_STORAGE_KEY,
   DOWNLOAD_QUEUE_ORDER_STORAGE_KEY,
-  AUTH_REQUIRED_ERROR
+  AUTH_REQUIRED_ERROR,
+  getScopedDownloadQueueKey
 } from "../downloadManager";
 import { offlineStorageService } from "../offlineStorage";
 import { getDownloadHeaders } from "../downloadQuality";
@@ -27,7 +28,10 @@ const fileSystem = FileSystem as any;
 const restoreSessionMock = authRepository.restoreSession as jest.Mock;
 
 const DOCUMENTS_DIR = "file:///mock-documents/";
-const localPathFor = (itemId: string) => `${DOCUMENTS_DIR}finora_downloads/${itemId}.mp4`;
+/** Files are namespaced per server + user. These entries belong to SERVER_A/user-A. */
+const SCOPE_DIR = "server-A/user-A";
+const localPathFor = (itemId: string) =>
+  `${DOCUMENTS_DIR}finora_downloads/${SCOPE_DIR}/${itemId}.mp4`;
 
 const SERVER_A = {
   serverId: "server-A",
@@ -151,7 +155,9 @@ describe("DownloadManager — true resume after process death", () => {
     );
     await manager.flushPersist();
 
-    const raw = (await AsyncStorage.getItem(DOWNLOAD_QUEUE_STORAGE_KEY)) as string;
+    const raw = (await AsyncStorage.getItem(
+      getScopedDownloadQueueKey(SERVER_A)
+    )) as string;
     expect(raw).toBeTruthy();
 
     const serialized = raw.toLowerCase();
@@ -274,9 +280,7 @@ describe("DownloadManager — true resume after process death", () => {
     // FIFO order was restored: transfers were started in the persisted order.
     const startedOrder = fileSystem
       .__getDownloadTasks()
-      .map((task: any) =>
-        String(task.fileUri).replace(/^.*finora_downloads\//, "").replace(/\.mp4$/, "")
-      );
+      .map((task: any) => String(task.fileUri).split("/").pop()!.replace(/\.mp4$/, ""));
     expect(startedOrder).toEqual(["movie-c3", "movie-c1", "movie-c5"]);
     // The cap holds: no fourth transfer was ever started.
     expect(fileSystem.__getDownloadTasks().length).toBeLessThanOrEqual(3);
@@ -299,9 +303,11 @@ describe("DownloadManager — true resume after process death", () => {
     await manager.initialize();
     await settle();
 
-    const item = manager.getDownload("movie-other-user");
-    expect(item?.status).toBe("paused");
-    expect(item?.error).toBe(AUTH_REQUIRED_ERROR);
+    // The entry belongs to another user and must never be loaded into this
+    // session's queue — not even as a paused/visible item.
+    expect(manager.getDownload("movie-other-user")).toBeUndefined();
+    expect(manager.getAllDownloads()).toHaveLength(0);
+    expect(manager.getQueueLength()).toBe(0);
     expect(fileSystem.__getDownloadTasks()).toHaveLength(0);
     expect(fileSystem.deleteAsync).not.toHaveBeenCalled();
   });
@@ -325,9 +331,9 @@ describe("DownloadManager — true resume after process death", () => {
     await manager.initialize();
     await settle();
 
-    const item = manager.getDownload("movie-other-server");
-    expect(item?.status).toBe("paused");
-    expect(item?.error).toBe(AUTH_REQUIRED_ERROR);
+    // The entry belongs to another server and must never be loaded here.
+    expect(manager.getDownload("movie-other-server")).toBeUndefined();
+    expect(manager.getAllDownloads()).toHaveLength(0);
     expect(fileSystem.__getDownloadTasks()).toHaveLength(0);
   });
 

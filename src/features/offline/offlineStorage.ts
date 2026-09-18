@@ -407,8 +407,42 @@ export class OfflineStorageService {
   }
 
   /**
-   * Scans the shared finora_downloads directory and removes only files that do
-   * not belong to ANY saved account catalog.
+   * Recursively lists every file under a directory (bounded depth), so
+   * server/user-namespaced download folders are fully covered.
+   */
+  private async listFilesRecursively(dir: string, depth: number = 0): Promise<string[]> {
+    if (depth > 6 || typeof FileSystem.readDirectoryAsync !== "function") return [];
+
+    const results: string[] = [];
+    let names: string[] = [];
+    try {
+      names = await FileSystem.readDirectoryAsync(dir);
+    } catch {
+      return results;
+    }
+
+    for (const name of names) {
+      const full = `${dir}${name}`;
+      let isDirectory = false;
+      try {
+        const info = await FileSystem.getInfoAsync(full);
+        isDirectory = Boolean(info && "isDirectory" in info && (info as { isDirectory?: boolean }).isDirectory);
+      } catch {
+        isDirectory = false;
+      }
+      if (isDirectory) {
+        results.push(...(await this.listFilesRecursively(`${full}/`, depth + 1)));
+      } else {
+        results.push(full);
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Scans the shared finora_downloads directory tree and removes only files that
+   * do not belong to ANY saved account catalog.
    */
   public async cleanupOrphanDiskFiles(excludePaths?: string[]): Promise<number> {
     let deletedCount = 0;
@@ -418,7 +452,7 @@ export class OfflineStorageService {
         const dirInfo = await FileSystem.getInfoAsync(mediaDir);
         if (!dirInfo || !dirInfo.exists) return 0;
 
-        const files = await FileSystem.readDirectoryAsync(mediaDir);
+        const files = await this.listFilesRecursively(mediaDir);
         const catalog = await this.getAllKnownCatalogRecords();
         const activePaths = new Set(
           catalog
@@ -433,8 +467,7 @@ export class OfflineStorageService {
           }
         }
 
-        for (const file of files) {
-          const filePath = `${mediaDir}${file}`;
+        for (const filePath of files) {
           const normalized = filePath.replace(/\\/g, "/");
           if (!activePaths.has(filePath) && !activePaths.has(normalized)) {
             if (typeof FileSystem.deleteAsync === "function") {
@@ -643,6 +676,19 @@ export class OfflineStorageService {
       ];
 
       if (record.localPath) {
+        // Reconstruct the path from its stable portion after "finora_downloads/".
+        // This survives the sandbox GUID changing across app reinstalls and keeps
+        // the server/user namespace intact.
+        const normalizedStored = record.localPath.replace(/\\/g, "/");
+        const marker = "finora_downloads/";
+        const markerIndex = normalizedStored.indexOf(marker);
+        if (markerIndex >= 0) {
+          const relative = normalizedStored.slice(markerIndex + marker.length);
+          if (relative) {
+            candidates.unshift(`${FileSystem.documentDirectory}${marker}${relative}`);
+          }
+        }
+
         const filename = record.localPath.split("/").pop();
         if (filename) {
           candidates.unshift(`${FileSystem.documentDirectory}finora_downloads/${filename}`);

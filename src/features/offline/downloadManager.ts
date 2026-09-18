@@ -19,6 +19,11 @@ import {
   matchesDownloadIdentity,
   normalizeServerUrl
 } from "./downloadAuthContext";
+import {
+  DownloadScope,
+  buildDownloadRelativePath,
+  getDownloadScopeKey
+} from "./downloadPaths";
 import { AppState, AppStateStatus, Platform } from "react-native";
 import {
   startDownloadForeground,
@@ -100,8 +105,24 @@ export interface PersistedDownloadEntry {
 }
 
 export const MAX_CONCURRENT_DOWNLOADS = 3;
+
+/**
+ * Legacy global keys. They are read once for migration only; every write for an
+ * identified download now goes to a per-(server,user) scoped key so one account
+ * can never observe another account's queue.
+ */
 export const DOWNLOAD_QUEUE_STORAGE_KEY = "@finora_download_queue";
 export const DOWNLOAD_QUEUE_ORDER_STORAGE_KEY = "@finora_download_order";
+
+/** Per-scope queue key, so queues are never shared between accounts. */
+export function getScopedDownloadQueueKey(scope: DownloadScope): string {
+  return `${DOWNLOAD_QUEUE_STORAGE_KEY}:${getDownloadScopeKey(scope)}`;
+}
+
+/** Per-scope FIFO order key. */
+export function getScopedDownloadOrderKey(scope: DownloadScope): string {
+  return `${DOWNLOAD_QUEUE_ORDER_STORAGE_KEY}:${getDownloadScopeKey(scope)}`;
+}
 
 /** Controlled, recoverable failure used when no usable Jellyfin session exists. */
 export const AUTH_REQUIRED_ERROR = "AUTH_REQUIRED";
@@ -163,7 +184,11 @@ export class DownloadManager {
   private progressPersistMarkers: Map<string, { at: number; progress: number }> = new Map();
   /** Freshly resolved secure session, refreshed on auth failure. */
   private authContext: DownloadAuthContext | null = null;
+  /** Server+user the in-memory working set currently belongs to. */
+  private activeScope: DownloadScope | null = null;
   private initialized = false;
+  /** In-flight initialize() call, so concurrent callers share one run. */
+  private initPromise: Promise<void> | null = null;
   private appStateSubscription: { remove: () => void } | null = null;
   private static activeInstances: Set<DownloadManager> = new Set();
 
@@ -205,6 +230,16 @@ export class DownloadManager {
     try {
       const entries: PersistedDownloadEntry[] = [];
 
+      const scope =
+        this.activeScope ??
+        (this.authContext
+          ? { serverId: this.authContext.serverId, userId: this.authContext.userId }
+          : null);
+      const queueKey = scope ? getScopedDownloadQueueKey(scope) : DOWNLOAD_QUEUE_STORAGE_KEY;
+      const orderKey = scope
+        ? getScopedDownloadOrderKey(scope)
+        : DOWNLOAD_QUEUE_ORDER_STORAGE_KEY;
+
       for (const [itemId, item] of this.downloads.entries()) {
         // Skip completed and canceled — they don't need restoration
         if (item.status === "completed" || item.status === "canceled") continue;
@@ -234,8 +269,8 @@ export class DownloadManager {
           posterPath: item.posterPath,
           posterLocalPath: item.posterLocalPath,
           quality: config?.quality,
-          serverId: config?.identity?.serverId,
-          userId: config?.identity?.userId,
+          serverId: config?.identity?.serverId ?? scope?.serverId,
+          userId: config?.identity?.userId ?? scope?.userId,
           serverUrl: config?.identity?.serverUrl,
           resumeOffset: this.resumeOffsets.get(itemId),
           expectedBytes: item.expectedBytes,
@@ -243,11 +278,8 @@ export class DownloadManager {
         });
       }
 
-      await AsyncStorage.setItem(DOWNLOAD_QUEUE_STORAGE_KEY, JSON.stringify(entries));
-      await AsyncStorage.setItem(
-        DOWNLOAD_QUEUE_ORDER_STORAGE_KEY,
-        JSON.stringify(this.queue.slice())
-      );
+      await AsyncStorage.setItem(queueKey, JSON.stringify(entries));
+      await AsyncStorage.setItem(orderKey, JSON.stringify(this.queue.slice()));
     } catch (err: any) {
       logger.warn("[DownloadManager] Failed to persist queue:", err?.message ?? err);
     }
@@ -285,14 +317,60 @@ export class DownloadManager {
    * Reads the persisted queue order (FIFO position of queued item ids).
    * Tolerant of missing/corrupt data — order then falls back to file order.
    */
-  private async readPersistedQueueOrder(): Promise<string[]> {
+  private async readPersistedQueueOrder(scope?: DownloadScope | null): Promise<string[]> {
+    const keys = scope
+      ? [getScopedDownloadOrderKey(scope), DOWNLOAD_QUEUE_ORDER_STORAGE_KEY]
+      : [DOWNLOAD_QUEUE_ORDER_STORAGE_KEY];
+
+    for (const key of keys) {
+      try {
+        const raw = await AsyncStorage.getItem(key);
+        if (typeof raw !== "string") continue;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((id) => typeof id === "string");
+        }
+      } catch {
+        // Try the next key
+      }
+    }
+    return [];
+  }
+
+  /** Parses a persisted queue payload, returning null when it is absent/corrupt. */
+  private parsePersistedEntries(raw: string | null): PersistedDownloadEntry[] | null {
+    if (typeof raw !== "string") return null;
     try {
-      const raw = await AsyncStorage.getItem(DOWNLOAD_QUEUE_ORDER_STORAGE_KEY);
-      if (typeof raw !== "string") return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
+      return Array.isArray(parsed) ? (parsed as PersistedDownloadEntry[]) : null;
     } catch {
-      return [];
+      return null;
+    }
+  }
+
+  /**
+   * Removes entries owned by `scope` from the legacy global queue after they
+   * have been migrated to the scoped key. Entries belonging to other accounts
+   * are left untouched so they can be migrated when that account signs in.
+   */
+  private async removeMigratedLegacyEntries(scope: DownloadScope): Promise<void> {
+    try {
+      const legacy = this.parsePersistedEntries(
+        await AsyncStorage.getItem(DOWNLOAD_QUEUE_STORAGE_KEY)
+      );
+      if (!legacy) return;
+
+      const remaining = legacy.filter(
+        (entry) => !(entry.serverId === scope.serverId && entry.userId === scope.userId)
+      );
+
+      if (remaining.length === 0) {
+        await AsyncStorage.removeItem(DOWNLOAD_QUEUE_STORAGE_KEY);
+      } else if (remaining.length !== legacy.length) {
+        await AsyncStorage.setItem(DOWNLOAD_QUEUE_STORAGE_KEY, JSON.stringify(remaining));
+      }
+    } catch {
+      // Migration cleanup is best effort; the scoped copy is already written.
     }
   }
 
@@ -350,25 +428,33 @@ export class DownloadManager {
     size: number
   ): Promise<boolean> {
     try {
-      await offlineStorageService.saveOfflineMedia({
-        itemId: entry.itemId,
-        title: entry.title,
-        type: entry.type,
-        year: entry.year,
-        localPath: entry.localPath,
-        fileSizeBytes: size,
-        totalTicks: entry.metadata?.totalTicks || 0,
-        playbackPositionTicks: entry.metadata?.playbackPositionTicks || 0,
-        overview: entry.metadata?.overview,
-        posterPath: entry.metadata?.posterPath || entry.posterPath,
-        seriesPosterPath: entry.metadata?.seriesPosterPath || entry.seriesPosterPath,
-        posterLocalPath: entry.metadata?.posterLocalPath || entry.posterLocalPath,
-        seriesId: entry.seriesId,
-        seriesName: entry.seriesName,
-        seasonIndex: entry.seasonIndex,
-        episodeIndex: entry.episodeIndex,
-        savedAt: Date.now()
-      });
+      const scope =
+        entry.serverId && entry.userId
+          ? { serverId: entry.serverId, userId: entry.userId }
+          : undefined;
+
+      await offlineStorageService.saveOfflineMedia(
+        {
+          itemId: entry.itemId,
+          title: entry.title,
+          type: entry.type,
+          year: entry.year,
+          localPath: entry.localPath,
+          fileSizeBytes: size,
+          totalTicks: entry.metadata?.totalTicks || 0,
+          playbackPositionTicks: entry.metadata?.playbackPositionTicks || 0,
+          overview: entry.metadata?.overview,
+          posterPath: entry.metadata?.posterPath || entry.posterPath,
+          seriesPosterPath: entry.metadata?.seriesPosterPath || entry.seriesPosterPath,
+          posterLocalPath: entry.metadata?.posterLocalPath || entry.posterLocalPath,
+          seriesId: entry.seriesId,
+          seriesName: entry.seriesName,
+          seasonIndex: entry.seasonIndex,
+          episodeIndex: entry.episodeIndex,
+          savedAt: Date.now()
+        },
+        scope
+      );
       logger.info(
         `[DownloadManager] Reconciled already-complete file for ${entry.itemId} (${size} bytes).`
       );
@@ -417,20 +503,40 @@ export class DownloadManager {
    * This method never starts network work — `initialize()` does, once it has a
    * fresh secure session. Tokens are never read from storage.
    */
-  public async restorePersistedDownloads(): Promise<void> {
+  public async restorePersistedDownloads(scope?: DownloadScope): Promise<void> {
     try {
-      const raw = await AsyncStorage.getItem(DOWNLOAD_QUEUE_STORAGE_KEY);
-      if (!raw) return;
+      const effectiveScope = scope ?? this.activeScope ?? undefined;
+      const scopedKey = effectiveScope ? getScopedDownloadQueueKey(effectiveScope) : null;
 
-      let entries: PersistedDownloadEntry[];
-      try {
-        entries = JSON.parse(raw);
-        if (!Array.isArray(entries)) return;
-      } catch {
-        return;
+      let entries: PersistedDownloadEntry[] | null = null;
+      let usedLegacyKey = false;
+
+      if (scopedKey) {
+        entries = this.parsePersistedEntries(await AsyncStorage.getItem(scopedKey));
       }
 
-      const persistedOrder = await this.readPersistedQueueOrder();
+      if (!entries || entries.length === 0) {
+        entries =
+          this.parsePersistedEntries(await AsyncStorage.getItem(DOWNLOAD_QUEUE_STORAGE_KEY)) ?? [];
+        usedLegacyKey = true;
+
+        // A legacy/global entry may only be adopted when it proves it belongs to
+        // the active server AND user. Anything else fails closed and is ignored,
+        // so another account's queue is never loaded into this session.
+        if (effectiveScope) {
+          entries = entries.filter(
+            (entry) =>
+              entry.serverId === effectiveScope.serverId &&
+              entry.userId === effectiveScope.userId
+          );
+        }
+      }
+
+      if (entries.length === 0) return;
+
+      if (effectiveScope) this.activeScope = effectiveScope;
+
+      const persistedOrder = await this.readPersistedQueueOrder(effectiveScope ?? null);
       let restoredCount = 0;
 
       for (const entry of entries) {
@@ -574,6 +680,14 @@ export class DownloadManager {
         logger.info(
           `[DownloadManager] Restored ${restoredCount} download(s) from persistent storage.`
         );
+
+        if (usedLegacyKey && effectiveScope) {
+          // Persist the migrated entries to the scoped key and remove only this
+          // account's entries from the legacy global queue.
+          await this.persistQueue();
+          await this.removeMigratedLegacyEntries(effectiveScope);
+        }
+
         this.notify();
       }
     } catch (err: any) {
@@ -590,15 +704,30 @@ export class DownloadManager {
    * Restored items are requeued and promoted through `processQueue()` so the
    * MAX_CONCURRENT_DOWNLOADS cap is enforced by the existing scheduler.
    */
-  public async initialize(): Promise<void> {
+  public initialize(): Promise<void> {
+    if (this.initialized) return Promise.resolve();
+    if (this.initPromise) return this.initPromise;
+    this.initPromise = this.doInitialize().finally(() => {
+      this.initPromise = null;
+    });
+    return this.initPromise;
+  }
+
+  private async doInitialize(): Promise<void> {
     if (this.initialized) return;
 
-    await this.restorePersistedDownloads();
+    const context = await getDownloadAuthContext();
+    this.authContext = context;
+    this.activeScope = context
+      ? { serverId: context.serverId, userId: context.userId }
+      : null;
 
-    this.authContext = await getDownloadAuthContext();
+    await this.restorePersistedDownloads(this.activeScope ?? undefined);
+
     const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
     logger.info(
-      `[DownloadManager] initialize(): auth=${this.authContext ? "ok" : "null"}, ` +
+      `[DownloadManager] initialize(): auth=${context ? "ok" : "null"}, ` +
+      `scope=${this.activeScope ? getDownloadScopeKey(this.activeScope) : "none"}, ` +
       `wifiOnly=${wifiOnly}, tracked=${this.downloads.size}`
     );
 
@@ -611,7 +740,7 @@ export class DownloadManager {
       if (!onWifi) continue;
 
       const config = this.downloadConfigs.get(item.itemId);
-      if (!this.authContext || !config || !this.isIdentityCompatible(config, this.authContext)) {
+      if (!context || !config || !this.isIdentityCompatible(config, context)) {
         // Keep the partial file and metadata; the user can resume after signing
         // back into the same server.
         item.status = "paused";
@@ -632,6 +761,66 @@ export class DownloadManager {
     this.syncForegroundService();
 
     logger.info(`[DownloadManager] Initialized (${this.downloads.size} tracked download(s)).`);
+  }
+
+  /**
+   * Called when the authenticated identity is about to change or end (logout,
+   * account switch, account/server removal).
+   *
+   * Stops every in-flight transfer, persists the previous scope's work as
+   * `paused` to ITS OWN scoped queue, then drops all in-memory state and the
+   * cached session. After this call no request can be issued with the previous
+   * account's token, and the next account can never observe the previous one's
+   * downloads.
+   */
+  public async handleIdentityChange(): Promise<void> {
+    // Let any in-flight initialization settle first, otherwise it could repopulate
+    // the old scope after we have cleared it.
+    if (this.initPromise) {
+      await this.initPromise.catch(() => {});
+    }
+
+    // Persist the outgoing scope's queue before clearing anything.
+    for (const item of this.downloads.values()) {
+      if (
+        item.status === "downloading" ||
+        item.status === "queued" ||
+        item.status === "finalizing"
+      ) {
+        item.status = "paused";
+      }
+    }
+    this.queue = [];
+
+    await this.flushPersist().catch(() => {});
+
+    // Stop native transfers so no further bytes are written or requested.
+    const tasks = Array.from(this.activeTasks.values());
+    this.activeTasks.clear();
+    for (const task of tasks) {
+      try {
+        if (task && typeof task.cancelAsync === "function") {
+          await task.cancelAsync();
+        }
+      } catch {
+        // Non-fatal — the in-memory state is cleared regardless.
+      }
+    }
+
+    this.downloads.clear();
+    this.downloadConfigs.clear();
+    this.resumeOffsets.clear();
+    this.authRetried.clear();
+    this.corruptionRestarted.clear();
+    this.speedTrackers.clear();
+    this.progressPersistMarkers.clear();
+    this.authContext = null;
+    this.activeScope = null;
+    this.initialized = false;
+    this.initPromise = null;
+
+    this.notify();
+    await stopDownloadForeground().catch(() => {});
   }
 
   /**
@@ -729,6 +918,10 @@ export class DownloadManager {
     return this.queue.length;
   }
 
+  public getActiveScope(): DownloadScope | null {
+    return this.activeScope;
+  }
+
   public async startDownload(
     item: Omit<
       DownloadItem,
@@ -737,6 +930,22 @@ export class DownloadManager {
     metadata?: Partial<OfflineMediaRecord>,
     options?: DownloadOptions
   ): Promise<DownloadItem> {
+    const identityScope: DownloadScope | null = options?.identity
+      ? { serverId: options.identity.serverId, userId: options.identity.userId }
+      : null;
+
+    if (identityScope) {
+      this.activeScope = identityScope;
+      if (
+        this.authContext &&
+        (this.authContext.serverId !== identityScope.serverId ||
+          this.authContext.userId !== identityScope.userId)
+      ) {
+        // The cached session belongs to a different account — never reuse it.
+        this.authContext = null;
+      }
+    }
+
     this.downloadConfigs.set(item.itemId, {
       item,
       metadata,
@@ -753,10 +962,15 @@ export class DownloadManager {
     let localPath = item.localPath;
     if (!localPath || !localPath.includes("://")) {
       if (FileSystem.documentDirectory) {
-        const mediaDir = `${FileSystem.documentDirectory}finora_downloads/`;
+        const pathScope = identityScope ?? this.activeScope;
+        const absolute = `${FileSystem.documentDirectory}${buildDownloadRelativePath(
+          pathScope,
+          item.itemId
+        )}`;
+        const directory = absolute.substring(0, absolute.lastIndexOf("/") + 1);
         try {
-          await FileSystem.makeDirectoryAsync(mediaDir, { intermediates: true });
-          localPath = `${mediaDir}${item.itemId}.mp4`;
+          await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+          localPath = absolute;
         } catch {
           // Fallback to provided path
         }
@@ -984,10 +1198,23 @@ export class DownloadManager {
       `resumeOffset=${resumeOffset}, uri=${result.uri ? "present" : "absent"}`
     );
 
-    // Bounded authorization recovery: refresh once, retry once, never loop.
+    // Bounded authorization recovery: refresh once, rebuild the request from the
+    // fresh session, retry once, never loop.
     if ((status === 401 || status === 403) && !this.authRetried.has(itemId)) {
       this.authRetried.add(itemId);
       logger.warn(`[DownloadManager] HTTP ${status} for ${itemId} — refreshing session once.`);
+
+      // Drop any caller-supplied headers (now stale) so resolveRequest rebuilds
+      // the request from the refreshed secure session instead of resending the
+      // token that was just rejected.
+      const config = this.downloadConfigs.get(itemId);
+      if (config) {
+        config.options = config.options
+          ? { ...config.options, headers: undefined }
+          : config.options;
+        config.restored = true;
+      }
+
       this.authContext = await getDownloadAuthContext();
       this.executeDownload(itemId);
       return;
@@ -1456,8 +1683,13 @@ export class DownloadManager {
       savedAt: Date.now()
     };
 
+    const configIdentity = this.downloadConfigs.get(itemId)?.identity;
+    const offlineScope = configIdentity
+      ? { serverId: configIdentity.serverId, userId: configIdentity.userId }
+      : this.activeScope ?? undefined;
+
     try {
-      await offlineStorageService.saveOfflineMedia(record);
+      await offlineStorageService.saveOfflineMedia(record, offlineScope);
     } catch (err: any) {
       logger.error(
         `[DownloadManager] Failed to save offline media for ${itemId}:`,
