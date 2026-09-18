@@ -311,7 +311,7 @@ FINORA/
 | Command | Action |
 |---|---|
 | `npm start` | Start Metro development bundler |
-| `npm test` | Run complete automated Jest test suite (79 suites, 489 tests) |
+| `npm test` | Run complete automated Jest test suite (87 suites, 575 tests) |
 | `npm run typecheck` | Run TypeScript compiler in strict mode without emitting files |
 | `npm run android` | Compile and launch native Android development build |
 | `npm run ios` | Compile and launch native iOS development build |
@@ -332,7 +332,7 @@ npm run typecheck
 
 Continuous Integration runs on every push and pull request to `master` via GitHub Actions:
 - **Linting & TypeScript Strict Validation** (0 strict errors)
-- **Jest Unit & Integration Test Execution** (79 suites, 489 tests passing)
+- **Jest Unit & Integration Test Execution** (87 suites, 575 tests passing)
 - **Dependency Security Audit** (`npm audit`)
 - **Expo Doctor Health Checks**
 - **Automated Standalone APK Packaging** via GitHub Actions (`build-apk.yml`)

@@ -6,18 +6,24 @@ This checklist documents the mandatory end-to-end manual and automated verificat
 
 ## 1. Automated Verification Gates (Pre-Release)
 
-- [ ] **Dependency Alignment (`expo-doctor`)**
-  - Run `npx expo-doctor`
-  - Ensure 21/21 checks pass with 0 errors.
+These gates run in CI (`.github/workflows/ci.yml`) and again, before any release build,
+in the mandatory `quality` job of `.github/workflows/build-apk.yml`. No APK is built
+unless `quality` passes.
+
+- [ ] **Install (reproducible)**
+  - `npm ci`
 - [ ] **Strict Type-Checking**
-  - Run `npm run typecheck`
-  - Ensure TypeScript compiler exits with code 0 (`tsc --noEmit`).
+  - `npm run typecheck` — must exit 0.
+- [ ] **Version Consistency**
+  - `npm run version:check` — `app.json` must match `package.json` (`version`, `android.versionCode`, `ios.buildNumber`).
+- [ ] **i18n Parity**
+  - `npm run i18n:check` — EN/FR keys and placeholders must match.
 - [ ] **Full Automated Test Suite**
-  - Run `npm test -- --ci --no-coverage --passWithNoTests`
-  - Ensure 77/77 test suites and all 478 tests pass without timeouts or `--forceExit`.
+  - `npm test -- --ci --no-coverage --passWithNoTests --forceExit --maxWorkers=2`
+- [ ] **Expo Doctor (advisory)**
+  - `npx expo-doctor` — known SDK patch-version mismatches are tracked separately and do **not** block a release. All other checks must pass.
 - [ ] **Production Dependency Audit**
-  - Run `npm audit --omit=dev --audit-level=high`
-  - Verify 0 high or critical vulnerabilities. Document known build-tool advisories.
+  - `npm audit --omit=dev --audit-level=high` — 0 high or critical vulnerabilities.
 
 ---
 
@@ -122,38 +128,70 @@ This checklist documents the mandatory end-to-end manual and automated verificat
 
 ---
 
-## 7. Production Release Build & Store Submission
+## 7. Production Release (Stable)
 
-- [ ] **Android App Bundle (AAB)**
-  - Build command: `eas build --platform android --profile production`
-  - Verify signing keystore configured in EAS credentials.
-  - Verify target SDK and minimum SDK versions meet Google Play requirements.
-- [ ] **iOS Archive (IPA)**
-  - Build command: `eas build --platform ios --profile production`
-  - Verify distribution certificate and provisioning profile in Apple Developer Portal.
-- [ ] **Foreground & Background Permissions**
-  - Verify `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_DATA_SYNC` permissions declared in AndroidManifest.xml.
-  - Verify background fetch capability declared in iOS Info.plist.
+Stable releases are produced by `.github/workflows/build-apk.yml` from a tag matching
+`vX.Y.Z`. The job is **fail-closed**: if any precondition is missing it fails instead of
+publishing a degraded artifact.
+
+- [ ] **Version bump**
+  - Update `"version"` in `package.json` (X.Y.Z), then run `npm run version:sync` to align
+    `app.json` (`expo.version`, `android.versionCode`, `ios.buildNumber`).
+  - Commit both files together.
+- [ ] **Tag**
+  - `git tag vX.Y.Z && git push origin vX.Y.Z` — the tag version MUST equal the `package.json` version.
+- [ ] **Signing secrets configured** (GitHub → Settings → Secrets and variables → Actions):
+  - `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+  - If any is missing, the stable job fails before building.
+- [ ] **Pipeline result**
+  - `quality` → `build-release` → sign → `apksigner verify --print-certs` → publish.
+  - Published release is `prerelease: false`, `make_latest: true`, and the APK carries the
+    release keystore signature (never `CN=Android Debug`).
+  - `/releases/latest` therefore always resolves to the newest stable.
+- [ ] **Foreground & Background permissions**
+  - Verify `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_DATA_SYNC` are present in the
+    generated AndroidManifest.xml (`plugins/withBackgroundService.js`).
+
+iOS is **not** built by CI yet (requires macOS/Xcode). iOS archives remain a manual step.
+`UNVERIFIED — macOS/Xcode unavailable`.
 
 ---
 
-## 8. GitHub Actions APK Builds (Preview, Beta, Release)
+## 8. GitHub Actions APK Builds (Preview, Beta, Stable)
 
-A standalone GitHub Actions workflow is provided in [`.github/workflows/build-apk.yml`](../.github/workflows/build-apk.yml).
+`.github/workflows/build-apk.yml` runs a mandatory `quality` gate, then classifies the
+event into exactly one channel. **At most one publication job is eligible per event.**
 
-### Available Jobs & Artifacts
-| Job | Output Artifact | Retention | Description / Trigger |
-|---|---|---|---|
-| `build-preview` | `finora-v<version>-preview-<sha>.apk` | 14 days | Debug/Internal build for rapid testing. Triggered on push tags `*-preview*` or via manual dispatch. |
-| `build-beta` | `finora-v<version>-beta-<sha>.apk` | 30 days | Staging/Release candidate build for beta testers. Triggered on tags `*-beta*`, tags `v*`, or via manual dispatch. |
-| `build-release` | `finora-v<version>-release.apk` | 90 days | Official production APK. Triggered on release tags `v*` or via manual dispatch. Automatically attached to GitHub Releases. |
+### Tag conventions
+| Channel | Trigger | Tag example | prerelease | make_latest | Signing |
+|---|---|---|---|---|---|
+| Preview | manual dispatch, or tag `vX.Y.Z-preview-<sha>` | `v1.0.0-preview-a1b2c3d` | `true` | `false` | build/default |
+| Beta | manual dispatch, or tag `vX.Y.Z-beta.N` | `v1.0.0-beta.1` | `true` | `false` | build/default |
+| Stable | manual dispatch, or tag `vX.Y.Z` | `v1.0.0` | `false` | `true` | **release keystore (required)** |
 
-### Optional Release Signing Secrets (GitHub Repository Secrets)
-If not configured, the workflow uses the default Android build signing (installable immediately on all devices for sideloading). To sign with an official release keystore:
-- `ANDROID_KEYSTORE_BASE64`: Base64 string of the `.keystore` or `.jks` file (`base64 -w 0 release.keystore`).
-- `ANDROID_KEYSTORE_PASSWORD`: Keystore password.
-- `ANDROID_KEY_ALIAS`: Key alias.
-- `ANDROID_KEY_PASSWORD`: Key password.
+Any other `v*` tag is rejected by the `classify` job (the workflow fails without building).
+
+### Artifacts
+| Channel | APK | Checksum |
+|---|---|---|
+| Preview | `FINORA-v<version>-preview-<sha>.apk` | `FINORA-v<version>-preview-<sha>.apk.sha256` |
+| Beta | `FINORA-v<version>-beta.N.apk` | `FINORA-v<version>-beta.N.apk.sha256` |
+| Stable | `FINORA-v<version>.apk` | `FINORA-v<version>.apk.sha256` |
+
+### Signing secrets (stable only, all four required)
+- `ANDROID_KEYSTORE_BASE64`: Base64 of the keystore (`base64 -w 0 release.keystore`).
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+
+A missing secret fails the stable job. The signed APK is verified with
+`apksigner verify --verbose --print-certs`; an invalid signature or the Android debug
+certificate (`CN=Android Debug`) fails the job before publishing.
+
+### Manual runs
+Actions → **Build Android APKs** → *Run workflow* → choose `preview`, `beta` or `release`.
+A manual run produces exactly one channel; `release` additionally requires the signing
+secrets above.
 
 ---
 
@@ -175,3 +213,31 @@ To guarantee code quality and prevent accidental breaking changes to FINORA v1.0
    - [x] **Require conversation resolution before merging**
    - [x] **Require linear history** (enforces clean rebase/squash commits).
    - [x] **Do not allow bypassing the above settings** (enforce for administrators).
+
+---
+
+## 10. Release Versioning (Single Source of Truth)
+
+`package.json` `"version"` is the source of truth (base SemVer `X.Y.Z`). `scripts/version.js`
+derives the rest deterministically:
+
+```text
+package.json version = 1.0.0
+        │
+        ├── app.json  expo.version          = 1.0.0
+        ├── app.json  android.versionCode   = 1000000   (= major*1_000_000 + minor*1_000 + patch)
+        ├── app.json  ios.buildNumber       = "1000000"
+        ├── git tag                         = v1.0.0
+        ├── APK                             = FINORA-v1.0.0.apk
+        └── GitHub Release                  = FINORA v1.0.0
+```
+
+Commands:
+- `npm run version:sync` — recompute and write `app.json` from `package.json` (after a bump).
+- `npm run version:check` — verify `app.json` matches `package.json` (runs in CI and in the build quality gate).
+- `node scripts/version.js --tag=v1.0.1` — validate a release tag format and its base version.
+
+Rules:
+- The `versionCode` is strictly increasing for increasing SemVer and is never a mutable counter.
+- A stable tag that does not equal the `package.json` version fails the release (`v1.1.0` while the app is `1.0.0` → FAIL).
+- Only these tag shapes are accepted: `vX.Y.Z`, `vX.Y.Z-beta.N`, `vX.Y.Z-preview-<sha>`.

@@ -311,7 +311,7 @@ FINORA/
 | Commande | Action |
 |---|---|
 | `npm start` | Démarre le bundler de développement Metro |
-| `npm test` | Exécute l'ensemble de la suite de tests Jest (79 suites, 489 tests) |
+| `npm test` | Exécute l'ensemble de la suite de tests Jest (87 suites, 575 tests) |
 | `npm run typecheck` | Vérifie le typage TypeScript en mode strict sans générer de fichiers |
 | `npm run android` | Compile et démarre le build de développement natif Android |
 | `npm run ios` | Compile et démarre le build de développement natif iOS |
@@ -332,7 +332,7 @@ npm run typecheck
 
 L'intégration continue est déclenchée sur chaque push et pull request vers la branche `master` via GitHub Actions :
 - **Validation TypeScript stricte** (0 erreur)
-- **Exécution des tests Jest** (79 suites, 489 tests validés)
+- **Exécution des tests Jest** (87 suites, 575 tests validés)
 - **Audit de sécurité des dépendances** (`npm audit`)
 - **Contrôle d'intégrité Expo Doctor**
 - **Génération automatisée des APK autonomes** via GitHub Actions (`build-apk.yml`)
