@@ -1,9 +1,17 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { AppState, AppStateStatus } from "react-native";
 import { FinoraPlayerSnapshot, IFinoraPlayerEngine } from "./types";
 import { PlaybackMode } from "./playbackPlanner";
 import { playbackRepository, PlaybackRepository } from "../../core/repositories/playbackRepository";
 import { offlineStorageService } from "../offline/offlineStorage";
+import {
+  PlaybackSessionTracker,
+  StopReport,
+  secondsToTicks
+} from "./sessionLifecycle";
+
+/** A position delta larger than this (between native ticks) is a seek, not playback. */
+const SEEK_REPORT_THRESHOLD_SECONDS = 2.5;
 
 export interface UsePlaybackSessionOptions {
   itemId: string;
@@ -14,10 +22,38 @@ export interface UsePlaybackSessionOptions {
   repository?: PlaybackRepository;
   throttleIntervalMs?: number;
   isOffline?: boolean;
+  audioStreamIndex?: number;
+  subtitleStreamIndex?: number | null;
+  /** When true (e.g. Picture-in-Picture), backgrounding must not pause the player. */
+  allowBackground?: boolean;
 }
 
 export interface UsePlaybackSessionResult {
   stopSession: (customTicks?: number) => void;
+}
+
+function mapPlayMethod(method: PlaybackMode): "DirectPlay" | "DirectStream" | "Transcode" {
+  switch (method) {
+    case "direct-stream":
+      return "DirectStream";
+    case "transcode":
+      return "Transcode";
+    case "direct-play":
+    default:
+      return "DirectPlay";
+  }
+}
+
+/** Fire-and-forget a reporting promise so a failed report can never affect playback. */
+function safeReport(promise: unknown): void {
+  try {
+    const maybe = promise as Promise<unknown> | undefined;
+    if (maybe && typeof maybe.catch === "function") {
+      maybe.catch(() => {});
+    }
+  } catch {
+    // Reporting must never throw into the render/effect layer.
+  }
 }
 
 export function usePlaybackSession({
@@ -28,131 +64,189 @@ export function usePlaybackSession({
   snapshot,
   repository = playbackRepository,
   throttleIntervalMs = 8000,
-  isOffline = false
+  isOffline = false,
+  audioStreamIndex,
+  subtitleStreamIndex,
+  allowBackground = false
 }: UsePlaybackSessionOptions): UsePlaybackSessionResult {
-  const hasStartedRef = useRef(false);
-  const hasStoppedRef = useRef(false);
+  const trackerRef = useRef<PlaybackSessionTracker | null>(null);
+  if (!trackerRef.current) {
+    trackerRef.current = new PlaybackSessionTracker();
+  }
+  const tracker = trackerRef.current;
+
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
 
-  const lastReportedPausedRef = useRef(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  // Mutable options read from effects without forcing session restarts.
+  const repositoryRef = useRef(repository);
+  repositoryRef.current = repository;
+  const isOfflineRef = useRef(isOffline);
+  isOfflineRef.current = isOffline;
+  const playMethodRef = useRef(playMethod);
+  playMethodRef.current = playMethod;
+  const allowBackgroundRef = useRef(allowBackground);
+  allowBackgroundRef.current = allowBackground;
 
-  // Convert seconds to Jellyfin ticks (10,000,000 ticks per second)
-  const secondsToTicks = (seconds: number): number => {
-    return Math.round(seconds * 10000000);
-  };
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastObservedPositionRef = useRef(snapshot.currentTimeSeconds);
+  const lastPausedRef = useRef<boolean | null>(null);
 
-  const mapPlayMethod = (method: PlaybackMode): "DirectPlay" | "DirectStream" | "Transcode" => {
-    switch (method) {
-      case "direct-stream":
-        return "DirectStream";
-      case "transcode":
-        return "Transcode";
-      case "direct-play":
-      default:
-        return "DirectPlay";
+  const sessionKey = `${itemId}::${mediaSourceId || itemId}`;
+
+  const emitStop = useCallback(
+    (report: StopReport) => {
+      const totalTicks = report.durationTicks;
+      const isPlayed = totalTicks > 0 && report.positionTicks / totalTicks >= 0.9;
+
+      if (!isOfflineRef.current) {
+        safeReport(
+          repositoryRef.current.reportPlaybackStopped({
+            itemId: report.itemId,
+            mediaSourceId: report.mediaSourceId,
+            playSessionId: report.playSessionId,
+            positionTicks: report.positionTicks
+          })
+        );
+      }
+
+      offlineStorageService
+        .updateLocalPlaybackPosition(report.itemId, report.positionTicks, totalTicks)
+        .catch(() => {});
+      offlineStorageService
+        .enqueueProgressSync(report.itemId, report.positionTicks, isPlayed)
+        .catch(() => {});
+      if (isPlayed) {
+        offlineStorageService.markAsWatched(report.itemId).catch(() => {});
+      }
+    },
+    []
+  );
+
+  const emitProgress = useCallback(
+    (eventName: "TimeUpdate" | "Pause" | "Unpause", isPaused: boolean) => {
+      const session = tracker.current;
+      if (!session || session.phase !== "started") return;
+
+      const posTicks = secondsToTicks(snapshotRef.current.currentTimeSeconds);
+      const totalTicks = secondsToTicks(snapshotRef.current.durationSeconds);
+      const isPlayed = totalTicks > 0 && posTicks / totalTicks >= 0.9;
+      tracker.updateProgress(posTicks, totalTicks);
+      lastPausedRef.current = isPaused;
+
+      if (!isOfflineRef.current) {
+        safeReport(
+          repositoryRef.current.reportPlaybackProgress({
+            itemId: session.itemId,
+            mediaSourceId: session.mediaSourceId,
+            playSessionId: session.playSessionId,
+            positionTicks: posTicks,
+            isPaused,
+            eventName,
+            audioStreamIndex: session.audioStreamIndex,
+            subtitleStreamIndex: session.subtitleStreamIndex
+          })
+        );
+      }
+
+      offlineStorageService
+        .updateLocalPlaybackPosition(session.itemId, posTicks, totalTicks)
+        .catch(() => {});
+      offlineStorageService
+        .enqueueProgressSync(session.itemId, posTicks, isPlayed)
+        .catch(() => {});
+      if (isPlayed) {
+        offlineStorageService.markAsWatched(session.itemId).catch(() => {});
+      }
+    },
+    [tracker]
+  );
+
+  // ── Session identity: exactly one session per (itemId, mediaSourceId) ───────
+  useEffect(() => {
+    const { replaced } = tracker.begin({
+      itemId,
+      mediaSourceId,
+      playMethod: playMethodRef.current,
+      initialPositionTicks: secondsToTicks(snapshotRef.current.currentTimeSeconds),
+      audioStreamIndex: audioStreamIndex ?? undefined,
+      subtitleStreamIndex: subtitleStreamIndex ?? undefined
+    });
+
+    // A previous session that was not explicitly stopped (e.g. a direct route
+    // replace) is finalized here, exactly once.
+    if (replaced) emitStop(replaced);
+
+    lastObservedPositionRef.current = snapshotRef.current.currentTimeSeconds;
+    lastPausedRef.current = null;
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      const payload = tracker.stop();
+      if (payload) emitStop(payload);
+    };
+    // audio/subtitle indices and playMethod are intentionally NOT deps: changing a
+    // track or falling back to transcode must not end the Jellyfin session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey, itemId, mediaSourceId, tracker, emitStop]);
+
+  // ── Start: at most once per session ─────────────────────────────────────────
+  useEffect(() => {
+    if (snapshot.state !== "playing") return;
+    // Only the idle -> started transition does work; index updates are handled by
+    // the dedicated track-change effect below.
+    if (!tracker.markStarted()) return;
+    tracker.updateStreamIndices(audioStreamIndex ?? undefined, subtitleStreamIndex ?? undefined);
+
+    const session = tracker.current;
+    if (!session) return;
+
+    if (!isOfflineRef.current) {
+      safeReport(
+        repositoryRef.current.reportPlaybackStart({
+          itemId: session.itemId,
+          mediaSourceId: session.mediaSourceId,
+          playSessionId: session.playSessionId,
+          positionTicks: secondsToTicks(snapshotRef.current.currentTimeSeconds),
+          playMethod: mapPlayMethod(session.playMethod),
+          audioStreamIndex: session.audioStreamIndex,
+          subtitleStreamIndex: session.subtitleStreamIndex
+        })
+      );
     }
-  };
+  }, [snapshot.state, sessionKey, tracker, audioStreamIndex, subtitleStreamIndex]);
 
-  const stopSession = (customTicks?: number) => {
-    if (hasStoppedRef.current) return;
-    hasStoppedRef.current = true;
+  // ── Progress: throttled interval + pause/unpause + end ──────────────────────
+  useEffect(() => {
+    if (!tracker.isStarted()) return;
+
+    if (snapshot.state === "ended") {
+      const totalTicks = secondsToTicks(snapshotRef.current.durationSeconds);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      const payload = tracker.stop(totalTicks);
+      if (payload) emitStop(payload);
+      return;
+    }
+
+    const isPaused = snapshot.state === "paused";
+    if (lastPausedRef.current === null) {
+      lastPausedRef.current = isPaused;
+    } else if (isPaused !== lastPausedRef.current) {
+      emitProgress(isPaused ? "Pause" : "Unpause", isPaused);
+    }
 
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-
-    if (hasStartedRef.current && itemId) {
-      const posTicks =
-        typeof customTicks === "number"
-          ? customTicks
-          : secondsToTicks(snapshotRef.current.currentTimeSeconds);
-      const totalTicks = secondsToTicks(snapshotRef.current.durationSeconds);
-      const isPlayed = totalTicks > 0 && posTicks / totalTicks >= 0.9;
-
-      if (!isOffline) {
-        repository.reportPlaybackStopped({
-          itemId,
-          mediaSourceId: mediaSourceId || itemId,
-          positionTicks: posTicks
-        });
-      }
-
-      offlineStorageService.updateLocalPlaybackPosition(itemId, posTicks, totalTicks).catch(() => {});
-      offlineStorageService.enqueueProgressSync(itemId, posTicks, isPlayed).catch(() => {});
-      if (isPlayed) {
-        offlineStorageService.markAsWatched(itemId).catch(() => {});
-      }
-    }
-  };
-
-  // Report start when player begins playing for the first time
-  useEffect(() => {
-    if (!itemId) return;
-
-    if (snapshot.state === "playing" && !hasStartedRef.current && !hasStoppedRef.current) {
-      hasStartedRef.current = true;
-      if (!isOffline) {
-        repository.reportPlaybackStart({
-          itemId,
-          mediaSourceId: mediaSourceId || itemId,
-          positionTicks: secondsToTicks(snapshot.currentTimeSeconds),
-          playMethod: mapPlayMethod(playMethod)
-        });
-      }
-    }
-  }, [snapshot.state, itemId, mediaSourceId, playMethod, repository, isOffline]);
-
-  // Periodic throttled progress reporting + state change reporting
-  useEffect(() => {
-    if (!itemId || !hasStartedRef.current || hasStoppedRef.current) return;
-
-    const reportProgress = (eventName: "TimeUpdate" | "Pause" | "Unpause", isPaused: boolean) => {
-      if (hasStoppedRef.current) return;
-      lastReportedPausedRef.current = isPaused;
-      const posTicks = secondsToTicks(snapshotRef.current.currentTimeSeconds);
-      const totalTicks = secondsToTicks(snapshotRef.current.durationSeconds);
-      const isPlayed = totalTicks > 0 && posTicks / totalTicks >= 0.9;
-
-      // Online Jellyfin session reporting
-      if (!isOffline) {
-        repository.reportPlaybackProgress({
-          itemId,
-          mediaSourceId: mediaSourceId || itemId,
-          positionTicks: posTicks,
-          isPaused,
-          eventName
-        });
-      }
-
-      // Offline persistent tracking & sync queue
-      offlineStorageService.updateLocalPlaybackPosition(itemId, posTicks, totalTicks).catch(() => {});
-      offlineStorageService.enqueueProgressSync(itemId, posTicks, isPlayed).catch(() => {});
-      if (isPlayed) {
-        offlineStorageService.markAsWatched(itemId).catch(() => {});
-      }
-    };
-
-    // If playback ended, immediately stop the session rather than emitting a progress update
-    if (snapshot.state === "ended") {
-      const totalTicks = secondsToTicks(snapshotRef.current.durationSeconds);
-      stopSession(totalTicks);
-      return;
-    }
-
-    // State transition pause/resume reporting
-    const isPaused = snapshot.state === "paused";
-    if (isPaused !== lastReportedPausedRef.current) {
-      reportProgress(isPaused ? "Pause" : "Unpause", isPaused);
-    }
-
-    // Interval ticker for active playback
     if (snapshot.state === "playing") {
-      timerRef.current = setInterval(() => {
-        reportProgress("TimeUpdate", false);
-      }, throttleIntervalMs);
+      timerRef.current = setInterval(() => emitProgress("TimeUpdate", false), throttleIntervalMs);
       if (typeof (timerRef.current as any)?.unref === "function") {
         (timerRef.current as any).unref();
       }
@@ -164,41 +258,69 @@ export function usePlaybackSession({
         timerRef.current = null;
       }
     };
-  }, [snapshot.state, itemId, mediaSourceId, repository, throttleIntervalMs, isOffline]);
+  }, [snapshot.state, sessionKey, throttleIntervalMs, tracker, emitProgress, emitStop]);
 
-  // Listen to AppState (background / active)
+  // ── Immediate (throttled) report after a seek ───────────────────────────────
   useEffect(() => {
-    if (!itemId) return;
+    const position = snapshot.currentTimeSeconds;
+    const previous = lastObservedPositionRef.current;
+    lastObservedPositionRef.current = position;
 
-    const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (nextAppState.match(/inactive|background/)) {
-        // App moving to background: send immediate progress if not already stopped
-        if (hasStartedRef.current && !hasStoppedRef.current && !isOffline) {
-          repository.reportPlaybackProgress({
-            itemId,
-            mediaSourceId: mediaSourceId || itemId,
-            positionTicks: secondsToTicks(snapshotRef.current.currentTimeSeconds),
-            isPaused: true,
-            eventName: "Pause"
-          });
-        }
+    if (!tracker.isStarted()) return;
+    if (Math.abs(position - previous) < SEEK_REPORT_THRESHOLD_SECONDS) return;
+
+    emitProgress("TimeUpdate", snapshot.state === "paused");
+  }, [snapshot.currentTimeSeconds, snapshot.state, tracker, emitProgress]);
+
+  // ── Track changes: refresh stream indices and report them promptly ──────────
+  useEffect(() => {
+    const session = tracker.current;
+    if (!session) return;
+
+    const nextAudio = audioStreamIndex ?? undefined;
+    const nextSubtitle = subtitleStreamIndex ?? undefined;
+    if (session.audioStreamIndex === nextAudio && session.subtitleStreamIndex === nextSubtitle) {
+      return;
+    }
+
+    tracker.updateStreamIndices(nextAudio, nextSubtitle);
+    if (tracker.isStarted()) {
+      emitProgress("TimeUpdate", snapshotRef.current.state === "paused");
+    }
+  }, [audioStreamIndex, subtitleStreamIndex, tracker, emitProgress]);
+
+  // ── App lifecycle: pause on background unless background playback is allowed ─
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      if (!nextState.match(/inactive|background/)) return;
+      const session = tracker.current;
+      if (!session || session.phase !== "started") return;
+      if (allowBackgroundRef.current) return;
+
+      emitProgress("Pause", true);
+      try {
+        engine.pause();
+      } catch {
+        // The engine may already be detached; the pause report still went out.
       }
-    };
+    });
 
-    const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => {
       subscription.remove();
     };
-  }, [itemId, mediaSourceId, repository, isOffline]);
+  }, [tracker, engine, emitProgress]);
 
-  // Report stopped on unmount if not already stopped
-  useEffect(() => {
-    return () => {
-      if (!hasStoppedRef.current) {
-        stopSession();
+  const stopSession = useCallback(
+    (customTicks?: number) => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
-    };
-  }, [itemId, mediaSourceId, repository, isOffline]);
+      const payload = tracker.stop(customTicks);
+      if (payload) emitStop(payload);
+    },
+    [tracker, emitStop]
+  );
 
   return { stopSession };
 }
