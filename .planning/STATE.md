@@ -121,6 +121,8 @@ Items acknowledged and carried forward from previous milestone close:
 | fix-server-change-and-profile-detection | 2026-09-17 | Fix Jellyfin profile detection via clean unauthenticated client + /Users fallback, separate server change from user login | Complete ✓ |
 | fix-server-connect-modal-scroll-layout | 2026-09-18 | Fix server connect modal cut-off layout, safe insets, and scroll touch responder conflicts | Complete ✓ |
 | add-github-community-feedback-settings | 2026-09-18 | Add GitHub repository, bug reporting, and feature suggestion links in Settings | Complete ✓ |
+| fix-hero-genre-badge-action-and-empty | 2026-09-18 | Prevent hero genre badge line-wrap glitch and localize genres | Complete ✓ |
+| interactive-question-driven-onboarding | 2026-09-18 | Revamp onboarding with question-driven interactive steps and fluid spring transitions | Complete ✓ |
 
 ## Session Continuity
  

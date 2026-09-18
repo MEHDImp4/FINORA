@@ -9,7 +9,9 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  Switch,
+  Animated
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,7 +22,14 @@ import { DEFAULT_JELLYFIN_SERVER, validateAndDiscoverServer } from "../../../cor
 import { useAuthStore } from "../../../stores/authStore";
 import { useOnboardingStore } from "../../../stores/onboardingStore";
 import { useServerStore } from "../../../stores/serverStore";
+import { usePlaybackPreferencesStore, SubtitleMode } from "../../../stores/playbackPreferencesStore";
+import { useNotificationStore } from "../../../stores/notificationStore";
+import { notificationService } from "../../../core/notifications/notificationService";
+import { DownloadQuality } from "../../offline/downloadQuality";
 import { serverManager } from "../../../core/jellyfin/serverManager";
+import { authRepository, PublicUser } from "../../../core/jellyfin/authRepository";
+import { ProfilePickerView } from "../../auth/components/ProfilePickerView";
+import { ProfilePasswordModal } from "../../auth/components/ProfilePasswordModal";
 import { hapticService } from "../../../core/feedback/hapticService";
 import { useTranslation, SupportedLanguage } from "../../../i18n";
 
@@ -39,6 +48,29 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
 
   const { t, language, setLanguage, languages } = useTranslation();
 
+  // Smooth slide transition animated values
+  const slideAnim = useRef(new Animated.Value(1)).current;
+  const slideTranslateY = useRef(new Animated.Value(0)).current;
+
+  // Animate content when current slide changes
+  const animateSlideChange = (toIndex: number) => {
+    slideAnim.setValue(0.3);
+    slideTranslateY.setValue(12);
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 1,
+        duration: 320,
+        useNativeDriver: true
+      }),
+      Animated.spring(slideTranslateY, {
+        toValue: 0,
+        friction: 8,
+        tension: 50,
+        useNativeDriver: true
+      })
+    ]).start();
+  };
+
   const [serverUrl, setServerUrl] = useState(DEFAULT_JELLYFIN_SERVER);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -46,6 +78,11 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
   const [serverStatus, setServerStatus] = useState<"idle" | "success" | "error">("idle");
   const [serverName, setServerName] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  const [publicUsers, setPublicUsers] = useState<PublicUser[]>([]);
+  const [selectedProfileForPassword, setSelectedProfileForPassword] = useState<PublicUser | null>(null);
+  const [showManualLogin, setShowManualLogin] = useState(false);
+  const [isLoadingPublicUsers, setIsLoadingPublicUsers] = useState(false);
 
   const status = useAuthStore((state) => state.status);
   const session = useAuthStore((state) => state.session);
@@ -56,11 +93,36 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
+  const playbackPreferences = usePlaybackPreferencesStore((s) => s.preferences);
+  const setPreferredAudioLanguage = usePlaybackPreferencesStore((s) => s.setPreferredAudioLanguage);
+  const setPreferredSubtitleLanguage = usePlaybackPreferencesStore((s) => s.setPreferredSubtitleLanguage);
+  const setSubtitleMode = usePlaybackPreferencesStore((s) => s.setSubtitleMode);
+  const setAutoSkipIntro = usePlaybackPreferencesStore((s) => s.setAutoSkipIntro);
+  const setDownloadWifiOnly = usePlaybackPreferencesStore((s) => s.setDownloadWifiOnly);
+  const defaultDownloadQuality = playbackPreferences.defaultDownloadQuality || "1080p";
+  const setDefaultDownloadQuality = usePlaybackPreferencesStore((s) => s.setDefaultDownloadQuality);
+
+  const notifPreferences = useNotificationStore((s) => s.preferences);
+  const updateNotifPreferences = useNotificationStore((s) => s.updatePreferences);
+
+  const handleToggleNotifications = async (enabled: boolean) => {
+    hapticService.impactLight();
+    if (enabled) {
+      const granted = await notificationService.requestPermissions();
+      if (!granted) {
+        updateNotifPreferences({ enabled: false });
+        return;
+      }
+    }
+    updateNotifPreferences({ enabled });
+  };
+
   const handleScroll = (event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const page = Math.round(offsetX / SCREEN_WIDTH);
     if (page !== currentSlide) {
       setCurrentSlide(page);
+      animateSlideChange(page);
     }
   };
 
@@ -71,6 +133,7 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
       animated: true
     });
     setCurrentSlide(slideIndex);
+    animateSlideChange(slideIndex);
   };
 
   const handleTestServer = async () => {
@@ -83,9 +146,26 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
       setServerStatus("success");
       setServerName(discovery.serverName);
       hapticService.impactMedium();
+
+      // Scan public user accounts on the validated server
+      const targetUrl = discovery.url || serverUrl.trim();
+      setServerUrl(targetUrl);
+      setIsLoadingPublicUsers(true);
+      try {
+        const users = await authRepository.getPublicUsers(targetUrl);
+        setPublicUsers(users);
+        if (users.length > 0) {
+          setShowManualLogin(false);
+        }
+      } catch {
+        setPublicUsers([]);
+      } finally {
+        setIsLoadingPublicUsers(false);
+      }
     } catch (err) {
       setServerStatus("error");
       setServerError((err as Error).message || t("onboarding.serverErrorFallback"));
+      setPublicUsers([]);
       hapticService.notificationError();
     } finally {
       setIsTestingServer(false);
@@ -151,6 +231,85 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
     }
   };
 
+  const handleSelectPublicProfile = async (user: PublicUser) => {
+    if (!user.hasPassword) {
+      setIsSubmitting(true);
+      setLoginError(null);
+      try {
+        const normalized = serverUrl.trim().replace(/\/+$/, "").replace(/\/web(\/.*)?$/i, "");
+        const success = await login({ username: user.name, password: "" }, normalized);
+        if (success) {
+          hapticService.notificationSuccess();
+          const currentSession = useAuthStore.getState().session;
+          if (currentSession) {
+            await serverManager.saveAccount({
+              serverId: currentSession.serverId,
+              serverName: serverName || "Jellyfin Server",
+              serverUrl: currentSession.serverUrl,
+              userId: currentSession.userId,
+              userName: currentSession.userName,
+              lastUsedAt: Date.now()
+            });
+          }
+          await loadSavedAccounts();
+          await completeOnboarding();
+          onCompleted?.();
+        } else {
+          const err = useAuthStore.getState().errorMessage;
+          setLoginError(err || t("onboarding.errorInvalidCredentials"));
+          hapticService.notificationError();
+        }
+      } catch (err) {
+        setLoginError((err as Error).message || t("onboarding.errorCannotConnect"));
+        hapticService.notificationError();
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      setSelectedProfileForPassword(user);
+    }
+  };
+
+  const handleProfilePasswordSubmit = async (password: string) => {
+    if (!selectedProfileForPassword) return;
+    setIsSubmitting(true);
+    setLoginError(null);
+    try {
+      const normalized = serverUrl.trim().replace(/\/+$/, "").replace(/\/web(\/.*)?$/i, "");
+      const success = await login(
+        { username: selectedProfileForPassword.name, password },
+        normalized
+      );
+      if (success) {
+        hapticService.notificationSuccess();
+        const currentSession = useAuthStore.getState().session;
+        if (currentSession) {
+          await serverManager.saveAccount({
+            serverId: currentSession.serverId,
+            serverName: serverName || "Jellyfin Server",
+            serverUrl: currentSession.serverUrl,
+            userId: currentSession.userId,
+            userName: currentSession.userName,
+            lastUsedAt: Date.now()
+          });
+        }
+        await loadSavedAccounts();
+        await completeOnboarding();
+        setSelectedProfileForPassword(null);
+        onCompleted?.();
+      } else {
+        const err = useAuthStore.getState().errorMessage;
+        setLoginError(err || t("onboarding.errorInvalidCredentials"));
+        hapticService.notificationError();
+      }
+    } catch (err) {
+      setLoginError((err as Error).message || t("onboarding.errorCannotConnect"));
+      hapticService.notificationError();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.glowTop} pointerEvents="none" />
@@ -184,9 +343,17 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
         scrollEventThrottle={16}
         style={styles.carousel}
       >
-        {/* Slide 0: Language Selection */}
+        {/* Slide 0: Question 1 — Language Selection */}
         <View style={styles.slide}>
-          <View style={styles.slideContent}>
+          <Animated.View
+            style={[
+              styles.slideContent,
+              currentSlide === 0 && {
+                opacity: slideAnim,
+                transform: [{ translateY: slideTranslateY }]
+              }
+            ]}
+          >
             <View style={styles.badgeContainer}>
               <Ionicons name="language-outline" size={15} color={colors.primary} />
               <Text style={styles.badgeText}>{t("onboarding.languageStepBadge")}</Text>
@@ -226,77 +393,310 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                 );
               })}
             </View>
-          </View>
+          </Animated.View>
         </View>
 
-        {/* Slide 1: Fast & Cinematic Intro */}
+        {/* Slide 1: Question 2 — Playback Style & Automation */}
         <View style={styles.slide}>
-          <View style={styles.slideContent}>
-            <View style={styles.badgeContainer}>
-              <Ionicons name="sparkles" size={14} color={colors.primary} />
-              <Text style={styles.badgeText}>{t("onboarding.slide1Badge")}</Text>
-            </View>
-
-            <Text style={styles.slideTitle}>
-              {t("onboarding.slide1TitlePrefix")}
-              <Text style={styles.highlightText}>{t("onboarding.slide1TitleHighlight")}</Text>
-            </Text>
-
-            <Text style={styles.slideDescription}>{t("onboarding.slide1Desc")}</Text>
-
-            <View style={styles.featuresPillsRow}>
-              <View style={styles.featureMiniPill}>
-                <Ionicons name="flash-outline" size={16} color="#FFB800" />
-                <Text style={styles.featureMiniText}>{t("onboarding.fastPill")}</Text>
+          <ScrollView
+            style={styles.slideScroll}
+            contentContainerStyle={styles.slideScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <Animated.View
+              style={
+                currentSlide === 1
+                  ? {
+                      opacity: slideAnim,
+                      transform: [{ translateY: slideTranslateY }]
+                    }
+                  : undefined
+              }
+            >
+              <View style={styles.badgeContainer}>
+                <Ionicons name="sparkles" size={14} color={colors.primary} />
+                <Text style={styles.badgeText}>{t("onboarding.slide1Badge")}</Text>
               </View>
-              <View style={styles.featureMiniPill}>
-                <Ionicons name="film-outline" size={16} color={colors.textSecondary} />
-                <Text style={styles.featureMiniText}>{t("onboarding.directPlayPill")}</Text>
-              </View>
-              <View style={styles.featureMiniPill}>
-                <Ionicons name="shield-checkmark-outline" size={16} color="#34C759" />
-                <Text style={styles.featureMiniText}>{t("onboarding.privatePill")}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
 
-        {/* Slide 2: Playback & Downloads */}
-        <View style={styles.slide}>
-          <View style={styles.slideContent}>
-            <View style={styles.badgeContainer}>
-              <Ionicons name="play-circle" size={14} color={colors.primary} />
-              <Text style={styles.badgeText}>{t("onboarding.slide2Badge")}</Text>
-            </View>
+              <Text style={styles.slideTitle}>
+                {t("onboarding.question1Title") || t("onboarding.slide1TitlePrefix")}
+              </Text>
 
-            <Text style={styles.slideTitle}>
-              {t("onboarding.slide2TitlePrefix")}
-              <Text style={styles.highlightText}>{t("onboarding.slide2TitleHighlight")}</Text>
-            </Text>
+              <Text style={styles.slideDescription}>
+                {t("onboarding.question1Subtitle") || t("onboarding.slide1Desc")}
+              </Text>
 
-            <Text style={styles.slideDescription}>{t("onboarding.slide2Desc")}</Text>
+              {/* Auto Skip Intro Choice Card */}
+              <Pressable
+                style={[
+                  styles.interactiveQuestionCard,
+                  playbackPreferences.autoSkipIntro && styles.interactiveQuestionCardActive
+                ]}
+                onPress={() => {
+                  hapticService.impactLight();
+                  setAutoSkipIntro(!playbackPreferences.autoSkipIntro);
+                }}
+                accessibilityRole="switch"
+                accessibilityLabel={t("onboarding.autoSkipIntroLabel")}
+                accessibilityState={{ checked: playbackPreferences.autoSkipIntro }}
+              >
+                <View style={styles.cardIconBox}>
+                  <Ionicons name="play-skip-forward-outline" size={20} color={colors.primary} />
+                </View>
+                <View style={styles.cardTexts}>
+                  <Text style={styles.cardTitle}>{t("onboarding.autoSkipIntroLabel")}</Text>
+                  <Text style={styles.cardSubtitle}>{t("onboarding.autoSkipIntroDesc")}</Text>
+                </View>
+                <Switch
+                  value={playbackPreferences.autoSkipIntro}
+                  onValueChange={(val) => {
+                    hapticService.impactLight();
+                    setAutoSkipIntro(val);
+                  }}
+                  trackColor={{ false: "#2A2A38", true: colors.primary }}
+                  thumbColor={Platform.OS === "android" ? "#FFFFFF" : undefined}
+                />
+              </Pressable>
 
-            <View style={styles.highlightCardsList}>
-              <View style={styles.featureHighlightCard}>
-                <Ionicons name="play-skip-forward-circle-outline" size={22} color={colors.primary} />
-                <View style={styles.featureHighlightTexts}>
-                  <Text style={styles.featureHighlightTitle}>{t("onboarding.introsTitle")}</Text>
-                  <Text style={styles.featureHighlightDesc}>{t("onboarding.introsDesc")}</Text>
+              {/* Instant Direct Play Feature Showcase */}
+              <View style={styles.featureShowcaseCard}>
+                <View style={styles.featureShowcaseRow}>
+                  <View style={[styles.cardIconBox, { backgroundColor: "rgba(255, 184, 0, 0.12)" }]}>
+                    <Ionicons name="flash-outline" size={20} color="#FFB800" />
+                  </View>
+                  <View style={styles.cardTexts}>
+                    <Text style={styles.cardTitle}>Direct Play Native 4K / HD</Text>
+                    <Text style={styles.cardSubtitle}>
+                      Lecture directe sans transcodage inutile avec décodage matériel sur puce.
+                    </Text>
+                  </View>
+                  <Ionicons name="checkmark-circle" size={22} color="#34C759" />
                 </View>
               </View>
 
-              <View style={styles.featureHighlightCard}>
-                <Ionicons name="cloud-download-outline" size={22} color={colors.textSecondary} />
-                <View style={styles.featureHighlightTexts}>
-                  <Text style={styles.featureHighlightTitle}>{t("onboarding.offlineTitle")}</Text>
-                  <Text style={styles.featureHighlightDesc}>{t("onboarding.offlineDesc")}</Text>
+              {/* Subtitles Behavior Question */}
+              <View style={styles.prefSection}>
+                <Text style={styles.prefSectionLabel}>{t("onboarding.subtitlesModeLabel")}</Text>
+                <View style={styles.chipsRow}>
+                  {[
+                    { id: "smart" as SubtitleMode, label: t("onboarding.subtitlesSmart"), icon: "flash-outline" },
+                    { id: "always" as SubtitleMode, label: t("onboarding.subtitlesAlways"), icon: "chatbubble-ellipses-outline" },
+                    { id: "off" as SubtitleMode, label: t("onboarding.subtitlesOff"), icon: "close-circle-outline" }
+                  ].map((item) => {
+                    const isSelected = (playbackPreferences.subtitleMode || "smart") === item.id;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        style={[styles.chip, isSelected && styles.chipActive]}
+                        onPress={() => {
+                          hapticService.selection();
+                          setSubtitleMode(item.id);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={item.label}
+                        accessibilityState={{ selected: isSelected }}
+                      >
+                        <Ionicons
+                          name={item.icon as any}
+                          size={14}
+                          color={isSelected ? colors.primary : "#8A8A9E"}
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
-            </View>
-          </View>
+            </Animated.View>
+          </ScrollView>
         </View>
 
-        {/* Slide 3: Server Connection */}
+        {/* Slide 2: Question 3 — Languages & Offline Downloads */}
+        <View style={styles.slide}>
+          <ScrollView
+            style={styles.slideScroll}
+            contentContainerStyle={styles.slideScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <Animated.View
+              style={
+                currentSlide === 2
+                  ? {
+                      opacity: slideAnim,
+                      transform: [{ translateY: slideTranslateY }]
+                    }
+                  : undefined
+              }
+            >
+              <View style={styles.badgeContainer}>
+                <Ionicons name="play-circle" size={14} color={colors.primary} />
+                <Text style={styles.badgeText}>{t("onboarding.slide2Badge")}</Text>
+              </View>
+
+              <Text style={styles.slideTitle}>
+                {t("onboarding.question3Title") || t("onboarding.slide2TitlePrefix")}
+              </Text>
+
+              <Text style={styles.slideDescription}>
+                {t("onboarding.question3Subtitle") || t("onboarding.playbackPreferencesSubtitle")}
+              </Text>
+
+              {/* Preferred Audio Language Chips */}
+              <View style={styles.prefSection}>
+                <Text style={styles.prefSectionLabel}>{t("onboarding.audioLanguageLabel")}</Text>
+                <View style={styles.chipsRow}>
+                  {[
+                    { id: "fr", label: "Français", flag: "🇫🇷" },
+                    { id: "en", label: "English", flag: "🇬🇧" },
+                    { id: "ja", label: "日本語", flag: "🇯🇵" },
+                    { id: "auto", label: "Original", flag: "🌐" }
+                  ].map((item) => {
+                    const isSelected = (playbackPreferences.preferredAudioLanguage || "fr") === item.id;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        style={[styles.chip, isSelected && styles.chipActive]}
+                        onPress={() => {
+                          hapticService.selection();
+                          setPreferredAudioLanguage(item.id);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${item.label} audio`}
+                        accessibilityState={{ selected: isSelected }}
+                      >
+                        <Text style={styles.chipFlag}>{item.flag}</Text>
+                        <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Download Quality Selection Cards */}
+              <View style={styles.prefSection}>
+                <Text style={styles.prefSectionLabel}>{t("onboarding.downloadQualityTitle")}</Text>
+                <View style={styles.qualityCardsList}>
+                  {([
+                    {
+                      id: "1080p" as DownloadQuality,
+                      title: t("onboarding.quality1080pTitle"),
+                      desc: t("onboarding.quality1080pDesc"),
+                      badge: t("onboarding.quality1080pBadge")
+                    },
+                    {
+                      id: "720p" as DownloadQuality,
+                      title: t("onboarding.quality720pTitle"),
+                      desc: t("onboarding.quality720pDesc")
+                    },
+                    {
+                      id: "original" as DownloadQuality,
+                      title: t("onboarding.qualityOriginalTitle"),
+                      desc: t("onboarding.qualityOriginalDesc")
+                    }
+                  ]).map((opt) => {
+                    const isSelected = defaultDownloadQuality === opt.id;
+                    return (
+                      <Pressable
+                        key={opt.id}
+                        style={[
+                          styles.qualityCard,
+                          isSelected && styles.qualityCardActive
+                        ]}
+                        onPress={() => {
+                          hapticService.selection();
+                          setDefaultDownloadQuality(opt.id);
+                        }}
+                        accessibilityRole="radio"
+                        accessibilityLabel={`${opt.title} - ${opt.desc}`}
+                        accessibilityState={{ selected: isSelected }}
+                      >
+                        <View style={styles.qualityTexts}>
+                          <View style={styles.qualityTitleRow}>
+                            <Text style={styles.qualityName}>{opt.title}</Text>
+                            {opt.badge ? (
+                              <View style={styles.qualityBadge}>
+                                <Text style={styles.qualityBadgeText}>{opt.badge}</Text>
+                              </View>
+                            ) : null}
+                          </View>
+                          <Text style={styles.qualitySubName}>{opt.desc}</Text>
+                        </View>
+                        <View style={[styles.qualityRadio, isSelected && styles.qualityRadioActive]}>
+                          {isSelected && <View style={styles.qualityRadioDot} />}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Wi-Fi Only Downloads Card */}
+              <Pressable
+                style={[
+                  styles.interactiveQuestionCard,
+                  playbackPreferences.downloadWifiOnly && styles.interactiveQuestionCardActive
+                ]}
+                onPress={() => {
+                  hapticService.impactLight();
+                  setDownloadWifiOnly(!playbackPreferences.downloadWifiOnly);
+                }}
+                accessibilityRole="switch"
+                accessibilityLabel={t("onboarding.wifiOnlyLabel")}
+                accessibilityState={{ checked: playbackPreferences.downloadWifiOnly }}
+              >
+                <View style={styles.cardIconBox}>
+                  <Ionicons name="wifi-outline" size={20} color="#FFB800" />
+                </View>
+                <View style={styles.cardTexts}>
+                  <Text style={styles.cardTitle}>{t("onboarding.wifiOnlyLabel")}</Text>
+                  <Text style={styles.cardSubtitle}>{t("onboarding.wifiOnlyDesc")}</Text>
+                </View>
+                <Switch
+                  value={playbackPreferences.downloadWifiOnly}
+                  onValueChange={(val) => {
+                    hapticService.impactLight();
+                    setDownloadWifiOnly(val);
+                  }}
+                  trackColor={{ false: "#2A2A38", true: colors.primary }}
+                  thumbColor={Platform.OS === "android" ? "#FFFFFF" : undefined}
+                />
+              </Pressable>
+
+              {/* Notifications Card */}
+              <Pressable
+                style={[
+                  styles.interactiveQuestionCard,
+                  notifPreferences.enabled && styles.interactiveQuestionCardActive
+                ]}
+                onPress={() => handleToggleNotifications(!notifPreferences.enabled)}
+                accessibilityRole="switch"
+                accessibilityLabel={t("onboarding.notificationsLabel")}
+                accessibilityState={{ checked: notifPreferences.enabled }}
+              >
+                <View style={[styles.cardIconBox, { backgroundColor: "rgba(52, 199, 89, 0.12)" }]}>
+                  <Ionicons name="notifications-outline" size={20} color="#34C759" />
+                </View>
+                <View style={styles.cardTexts}>
+                  <Text style={styles.cardTitle}>{t("onboarding.notificationsLabel")}</Text>
+                  <Text style={styles.cardSubtitle}>{t("onboarding.notificationsDesc")}</Text>
+                </View>
+                <Switch
+                  value={notifPreferences.enabled}
+                  onValueChange={handleToggleNotifications}
+                  trackColor={{ false: "#2A2A38", true: colors.primary }}
+                  thumbColor={Platform.OS === "android" ? "#FFFFFF" : undefined}
+                />
+              </Pressable>
+            </Animated.View>
+          </ScrollView>
+        </View>
+
+        {/* Slide 3: Question 4 — Server Connection */}
         <View style={styles.slide}>
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -307,186 +707,223 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={styles.badgeContainer}>
-                <Ionicons name="server" size={14} color={colors.primary} />
-                <Text style={styles.badgeText}>{t("onboarding.slide3Badge")}</Text>
-              </View>
+              <Animated.View
+                style={
+                  currentSlide === 3
+                    ? {
+                        opacity: slideAnim,
+                        transform: [{ translateY: slideTranslateY }]
+                      }
+                    : undefined
+                }
+              >
+                <View style={styles.badgeContainer}>
+                  <Ionicons name="server" size={14} color={colors.primary} />
+                  <Text style={styles.badgeText}>{t("onboarding.slide3Badge")}</Text>
+                </View>
 
-              {status === "authenticated" && session && !showSwitchAccount ? (
-                <>
-                  <Text style={styles.connectionTitle}>
-                    {t("onboarding.welcomeBackUser", { username: session.userName || "User" })}
-                  </Text>
-                  <Text style={styles.connectionSubtitle}>
-                    {t("onboarding.sessionReadyDesc")}
-                  </Text>
+                {status === "authenticated" && session && !showSwitchAccount ? (
+                  <>
+                    <Text style={styles.connectionTitle}>
+                      {t("onboarding.welcomeBackUser", { username: session.userName || "User" })}
+                    </Text>
+                    <Text style={styles.connectionSubtitle}>
+                      {t("onboarding.sessionReadyDesc")}
+                    </Text>
 
-                  <View style={styles.activeSessionCard}>
-                    <View style={styles.activeSessionRow}>
-                      <View style={styles.activeSessionAvatar}>
-                        <Ionicons name="person" size={22} color="#FFFFFF" />
+                    <View style={styles.activeSessionCard}>
+                      <View style={styles.activeSessionRow}>
+                        <View style={styles.activeSessionAvatar}>
+                          <Ionicons name="person" size={22} color="#FFFFFF" />
+                        </View>
+                        <View style={styles.activeSessionTexts}>
+                          <Text style={styles.activeSessionUser}>
+                            {session.userName || "FINORA User"}
+                          </Text>
+                          <Text style={styles.activeSessionServer} numberOfLines={1}>
+                            {session.serverUrl}
+                          </Text>
+                        </View>
+                        <Ionicons name="checkmark-circle" size={22} color="#34C759" />
                       </View>
-                      <View style={styles.activeSessionTexts}>
-                        <Text style={styles.activeSessionUser}>
-                          {session.userName || "FINORA User"}
-                        </Text>
-                        <Text style={styles.activeSessionServer} numberOfLines={1}>
-                          {session.serverUrl}
-                        </Text>
-                      </View>
-                      <Ionicons name="checkmark-circle" size={22} color="#34C759" />
                     </View>
-                  </View>
 
-                  <FinoraButton
-                    label={t("onboarding.enterFinora")}
-                    variant="primary"
-                    size="lg"
-                    onPress={handleCompleteExistingSession}
-                    style={styles.loginButton}
-                  />
+                    <FinoraButton
+                      label={t("onboarding.enterFinora")}
+                      variant="primary"
+                      size="lg"
+                      onPress={handleCompleteExistingSession}
+                      style={styles.loginButton}
+                    />
 
-                  <Pressable
-                    style={styles.secondaryActionButton}
-                    onPress={() => setShowSwitchAccount(true)}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("onboarding.switchAccount")}
-                  >
-                    <Text style={styles.secondaryActionText}>{t("onboarding.switchAccount")}</Text>
-                  </Pressable>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.connectionTitle}>{t("onboarding.connectTitle")}</Text>
-                  <Text style={styles.connectionSubtitle}>
-                    {t("onboarding.connectSubtitle")}
-                  </Text>
-
-                  {session && (
                     <Pressable
-                      style={styles.returnSessionButton}
-                      onPress={() => setShowSwitchAccount(false)}
+                      style={styles.secondaryActionButton}
+                      onPress={() => setShowSwitchAccount(true)}
                       accessibilityRole="button"
-                      accessibilityLabel={t("onboarding.keepAccount", { username: session.userName || "" })}
+                      accessibilityLabel={t("onboarding.switchAccount")}
                     >
-                      <Ionicons name="arrow-back" size={16} color={colors.textSecondary} />
-                      <Text style={styles.returnSessionText}>
-                        {t("onboarding.keepAccount", { username: session.userName || "" })}
-                      </Text>
+                      <Text style={styles.secondaryActionText}>{t("onboarding.switchAccount")}</Text>
                     </Pressable>
-                  )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.connectionTitle}>{t("onboarding.connectTitle")}</Text>
+                    <Text style={styles.connectionSubtitle}>
+                      {t("onboarding.connectSubtitle")}
+                    </Text>
 
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>{t("onboarding.serverUrlLabel")}</Text>
-                    <View style={styles.inputFieldContainer}>
-                      <Ionicons name="globe-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
-                      <TextInput
-                        style={styles.textInput}
-                        value={serverUrl}
-                        onChangeText={(val) => {
-                          setServerUrl(val);
-                          setServerStatus("idle");
-                          setServerError(null);
-                        }}
-                        placeholder={t("onboarding.serverUrlPlaceholder")}
-                        placeholderTextColor={colors.textMuted}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        keyboardType="url"
-                        accessibilityLabel={t("onboarding.serverUrlLabel")}
-                      />
+                    {session && (
                       <Pressable
-                        style={({ pressed }) => [
-                          styles.testServerButton,
-                          pressed && styles.buttonPressed,
-                          (isTestingServer || !serverUrl.trim()) && styles.buttonDisabled
-                        ]}
-                        onPress={handleTestServer}
-                        disabled={isTestingServer || !serverUrl.trim()}
+                        style={styles.returnSessionButton}
+                        onPress={() => setShowSwitchAccount(false)}
                         accessibilityRole="button"
-                        accessibilityLabel={t("onboarding.testServer")}
+                        accessibilityLabel={t("onboarding.keepAccount", { username: session.userName || "" })}
                       >
-                        {isTestingServer ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <Text style={styles.testServerText}>{t("onboarding.testServer")}</Text>
-                        )}
+                        <Ionicons name="arrow-back" size={16} color={colors.textSecondary} />
+                        <Text style={styles.returnSessionText}>
+                          {t("onboarding.keepAccount", { username: session.userName || "" })}
+                        </Text>
                       </Pressable>
-                    </View>
-                  </View>
+                    )}
 
-                  {serverStatus === "success" && (
-                    <View style={styles.serverSuccessBanner}>
-                      <Ionicons name="checkmark-circle" size={16} color="#34C759" style={{ marginRight: 6 }} />
-                      <Text style={styles.serverSuccessText}>
-                        {t("onboarding.serverOnline", { name: serverName || "Jellyfin OK" })}
-                      </Text>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>{t("onboarding.serverUrlLabel")}</Text>
+                      <View style={styles.inputFieldContainer}>
+                        <Ionicons name="globe-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
+                        <TextInput
+                          style={styles.textInput}
+                          value={serverUrl}
+                          onChangeText={(val) => {
+                            setServerUrl(val);
+                            setServerStatus("idle");
+                            setServerError(null);
+                          }}
+                          placeholder={t("onboarding.serverUrlPlaceholder")}
+                          placeholderTextColor={colors.textMuted}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          keyboardType="url"
+                          accessibilityLabel={t("onboarding.serverUrlLabel")}
+                        />
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.testServerButton,
+                            pressed && styles.buttonPressed,
+                            (isTestingServer || !serverUrl?.trim()) && styles.buttonDisabled
+                          ]}
+                          onPress={handleTestServer}
+                          disabled={isTestingServer || !serverUrl?.trim()}
+                          accessibilityRole="button"
+                          accessibilityLabel={t("onboarding.testServer")}
+                        >
+                          {isTestingServer ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <Text style={styles.testServerText}>{t("onboarding.testServer")}</Text>
+                          )}
+                        </Pressable>
+                      </View>
                     </View>
-                  )}
-                  {serverStatus === "error" && (
-                    <View style={styles.serverErrorBanner}>
-                      <Ionicons name="alert-circle" size={16} color="#FF3B30" style={{ marginRight: 6 }} />
-                      <Text style={styles.serverErrorText}>{serverError}</Text>
-                    </View>
-                  )}
 
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>{t("onboarding.usernameLabel")}</Text>
-                    <View style={styles.inputFieldContainer}>
-                      <Ionicons name="person-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
-                      <TextInput
-                        style={styles.textInput}
-                        value={username}
-                        onChangeText={setUsername}
-                        placeholder={t("onboarding.usernamePlaceholder")}
-                        placeholderTextColor={colors.textMuted}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        accessibilityLabel={t("onboarding.usernameLabel")}
+                    {serverStatus === "success" && (
+                      <View style={styles.serverSuccessBanner}>
+                        <Ionicons name="checkmark-circle" size={16} color="#34C759" style={{ marginRight: 6 }} />
+                        <Text style={styles.serverSuccessText}>
+                          {t("onboarding.serverOnline", { name: serverName || "Jellyfin OK" })}
+                        </Text>
+                      </View>
+                    )}
+                    {serverStatus === "error" && (
+                      <View style={styles.serverErrorBanner}>
+                        <Ionicons name="alert-circle" size={16} color="#FF3B30" style={{ marginRight: 6 }} />
+                        <Text style={styles.serverErrorText}>{serverError}</Text>
+                      </View>
+                    )}
+
+                    {serverStatus === "success" && publicUsers.length > 0 && !showManualLogin ? (
+                      <ProfilePickerView
+                        users={publicUsers}
+                        serverUrl={serverUrl}
+                        onSelectUser={handleSelectPublicProfile}
+                        onManualLoginPress={() => setShowManualLogin(true)}
+                        isLoading={isLoadingPublicUsers}
                       />
-                    </View>
-                  </View>
+                    ) : (
+                      <>
+                        {publicUsers.length > 0 && (
+                          <Pressable
+                            style={styles.returnSessionButton}
+                            onPress={() => setShowManualLogin(false)}
+                            accessibilityRole="button"
+                            accessibilityLabel={t("auth.selectProfile")}
+                          >
+                            <Ionicons name="arrow-back" size={16} color={colors.textSecondary} />
+                            <Text style={styles.returnSessionText}>
+                              {t("auth.selectProfile")}
+                            </Text>
+                          </Pressable>
+                        )}
 
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>{t("onboarding.passwordLabel")}</Text>
-                    <View style={styles.inputFieldContainer}>
-                      <Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
-                      <TextInput
-                        style={styles.textInput}
-                        value={password}
-                        onChangeText={setPassword}
-                        placeholder={t("onboarding.passwordPlaceholder")}
-                        placeholderTextColor={colors.textMuted}
-                        secureTextEntry
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        accessibilityLabel={t("onboarding.passwordLabel")}
-                      />
-                    </View>
-                  </View>
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.inputLabel}>{t("onboarding.usernameLabel")}</Text>
+                          <View style={styles.inputFieldContainer}>
+                            <Ionicons name="person-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
+                            <TextInput
+                              style={styles.textInput}
+                              value={username}
+                              onChangeText={setUsername}
+                              placeholder={t("onboarding.usernamePlaceholder")}
+                              placeholderTextColor={colors.textMuted}
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                              accessibilityLabel={t("onboarding.usernameLabel")}
+                            />
+                          </View>
+                        </View>
 
-                  {loginError && (
-                    <View style={styles.loginErrorBanner}>
-                      <Ionicons name="close-circle" size={16} color="#FF3B30" style={{ marginRight: 6 }} />
-                      <Text style={styles.loginErrorText}>{loginError}</Text>
-                    </View>
-                  )}
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.inputLabel}>{t("onboarding.passwordLabel")}</Text>
+                          <View style={styles.inputFieldContainer}>
+                            <Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} style={styles.inputIcon} />
+                            <TextInput
+                              style={styles.textInput}
+                              value={password}
+                              onChangeText={setPassword}
+                              placeholder={t("onboarding.passwordPlaceholder")}
+                              placeholderTextColor={colors.textMuted}
+                              secureTextEntry
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                              accessibilityLabel={t("onboarding.passwordLabel")}
+                            />
+                          </View>
+                        </View>
 
-                  <FinoraButton
-                    label={t("onboarding.loginAndStart")}
-                    variant="primary"
-                    size="lg"
-                    loading={isSubmitting}
-                    disabled={isSubmitting}
-                    onPress={handleLoginAndComplete}
-                    style={styles.loginButton}
-                  />
+                        {loginError && (
+                          <View style={styles.loginErrorBanner}>
+                            <Ionicons name="close-circle" size={16} color="#FF3B30" style={{ marginRight: 6 }} />
+                            <Text style={styles.loginErrorText}>{loginError}</Text>
+                          </View>
+                        )}
 
-                  <Text style={styles.connectionRequirementText}>
-                    {t("onboarding.serverRequiredWarning")}
-                  </Text>
-                </>
-              )}
+                        <FinoraButton
+                          label={t("onboarding.loginAndStart")}
+                          variant="primary"
+                          size="lg"
+                          loading={isSubmitting}
+                          disabled={isSubmitting}
+                          onPress={handleLoginAndComplete}
+                          style={styles.loginButton}
+                        />
+
+                        <Text style={styles.connectionRequirementText}>
+                          {t("onboarding.serverRequiredWarning")}
+                        </Text>
+                      </>
+                    )}
+                  </>
+                )}
+              </Animated.View>
             </ScrollView>
           </KeyboardAvoidingView>
         </View>
@@ -500,7 +937,7 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
               onPress={() => goToSlide(idx)}
               style={styles.dotTouchTarget}
               accessibilityRole="button"
-              accessibilityLabel={`Step ${idx + 1}`}
+              accessibilityLabel={t("onboarding.stepA11y", { step: idx + 1, total: TOTAL_SLIDES })}
               accessibilityState={{ selected: currentSlide === idx }}
             >
               <View
@@ -524,6 +961,16 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
           />
         )}
       </View>
+
+      <ProfilePasswordModal
+        visible={Boolean(selectedProfileForPassword)}
+        user={selectedProfileForPassword}
+        serverUrl={serverUrl}
+        onClose={() => setSelectedProfileForPassword(null)}
+        onSubmit={handleProfilePasswordSubmit}
+        isLoading={isSubmitting}
+        errorMessage={loginError}
+      />
     </View>
   );
 }
@@ -588,11 +1035,98 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center"
   },
+  slideScroll: {
+    width: "100%",
+    flex: 1
+  },
+  slideScrollContent: {
+    paddingHorizontal: 28,
+    paddingTop: 16,
+    paddingBottom: 40
+  },
   slideContent: {
     paddingHorizontal: 28,
     justifyContent: "center",
     alignItems: "flex-start",
     width: "100%"
+  },
+  prefSection: {
+    width: "100%",
+    marginBottom: 16
+  },
+  prefSectionLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#B3B3CC",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.6
+  },
+  chipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  chipActive: {
+    borderColor: colors.primary,
+    backgroundColor: "rgba(229, 9, 20, 0.15)"
+  },
+  chipFlag: {
+    fontSize: 15,
+    marginRight: 6
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#8A8A9E"
+  },
+  chipTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "700"
+  },
+  prefSwitchCard: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12
+  },
+  prefSwitchIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10
+  },
+  prefSwitchTextBox: {
+    flex: 1,
+    marginRight: 8
+  },
+  prefSwitchTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#FFFFFF"
+  },
+  prefSwitchSubtitle: {
+    fontSize: 11,
+    color: "#8A8A9E",
+    marginTop: 2
   },
   badgeContainer: {
     flexDirection: "row",
@@ -682,6 +1216,60 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: colors.primary
   },
+  interactiveQuestionCard: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(24, 24, 34, 0.78)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.10)",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 14,
+    gap: 12
+  },
+  interactiveQuestionCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: "rgba(229, 9, 20, 0.08)"
+  },
+  featureShowcaseCard: {
+    width: "100%",
+    backgroundColor: "rgba(255, 184, 0, 0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 184, 0, 0.25)",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 20
+  },
+  featureShowcaseRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  cardIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: "rgba(229, 9, 20, 0.15)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  cardTexts: {
+    flex: 1
+  },
+  cardTitle: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 2
+  },
+  cardSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17
+  },
   featuresPillsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -707,6 +1295,73 @@ const styles = StyleSheet.create({
   highlightCardsList: {
     width: "100%",
     gap: 14
+  },
+  qualityCardsList: {
+    width: "100%",
+    gap: 12
+  },
+  qualityCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(24, 24, 34, 0.78)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.10)",
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    gap: 14
+  },
+  qualityCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: "rgba(229, 9, 20, 0.08)"
+  },
+  qualityTexts: {
+    flex: 1
+  },
+  qualityTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  qualityName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF"
+  },
+  qualityBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10
+  },
+  qualityBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700"
+  },
+  qualitySubName: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 3,
+    lineHeight: 16
+  },
+  qualityRadio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  qualityRadioActive: {
+    borderColor: colors.primary
+  },
+  qualityRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primary
   },
   featureHighlightCard: {
     flexDirection: "row",
