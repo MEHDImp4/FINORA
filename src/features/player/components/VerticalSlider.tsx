@@ -119,12 +119,14 @@ export function VerticalSlider({
       accessibilityLabel={accessibilityLabel}
       accessibilityValue={{ min: 0, max: 100, now: percent, text: `${percent}%` }}
     >
-      <Ionicons name={iconName} size={18} color="#FFFFFF" />
+      <View style={styles.iconBadge}>
+        <Ionicons name={iconName} size={18} color="#FFFFFF" />
+      </View>
 
       <View
         style={styles.trackTouchArea}
         onLayout={handleTrackLayout}
-        hitSlop={{ top: 12, bottom: 12, left: 14, right: 14 }}
+        hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
         {...panResponder.panHandlers}
         testID={testID ? `${testID}-track` : undefined}
       >
@@ -138,29 +140,51 @@ export function VerticalSlider({
         />
       </View>
 
-      <FinoraText variant="caption" style={styles.label}>
-        {label}
-      </FinoraText>
-      <FinoraText variant="caption" style={styles.valueLabel} testID={testID ? `${testID}-value` : undefined}>
-        {percent}%
-      </FinoraText>
+      <View style={styles.footerContainer}>
+        <FinoraText variant="caption" style={styles.valueLabel} testID={testID ? `${testID}-value` : undefined}>
+          {percent}%
+        </FinoraText>
+        <FinoraText
+          variant="caption"
+          style={styles.label}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {label}
+        </FinoraText>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    width: 64,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    backgroundColor: "rgba(0, 0, 0, 0.55)",
-    borderRadius: 18,
-    alignItems: "center"
+    width: 52,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
+    alignItems: "center",
+    backgroundColor: "rgba(14, 14, 20, 0.65)",
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.09)",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    elevation: 6
+  },
+  iconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12
   },
   trackTouchArea: {
     height: DEFAULT_TRACK_HEIGHT,
-    width: "100%",
-    marginTop: spacing.sm,
+    width: 40,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -168,7 +192,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: "100%",
     borderRadius: 3,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
     overflow: "hidden",
     justifyContent: "flex-end"
   },
@@ -187,21 +211,28 @@ const styles = StyleSheet.create({
     marginLeft: -THUMB_SIZE / 2,
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 3,
-    elevation: 4
+    shadowOpacity: 0.55,
+    shadowRadius: 4,
+    elevation: 5
   },
-  label: {
-    color: "rgba(255, 255, 255, 0.7)",
-    fontSize: 10,
-    textAlign: "center",
-    marginTop: spacing.sm
+  footerContainer: {
+    alignItems: "center",
+    marginTop: 12,
+    width: "100%"
   },
   valueLabel: {
     color: "#FFFFFF",
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "700",
+    textAlign: "center"
+  },
+  label: {
+    color: "rgba(255, 255, 255, 0.60)",
+    fontSize: 9,
+    fontWeight: "600",
     textAlign: "center",
-    marginTop: spacing.xxs
+    marginTop: 2,
+    letterSpacing: 0.3,
+    textTransform: "uppercase"
   }
 });

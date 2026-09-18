@@ -465,7 +465,7 @@ export function CinematicOverlay({
 
       {/* Rails latéraux : Luminosité & Volume tactiles */}
       <View
-        style={[styles.sideRail, { left: Math.max(insets.left, spacing.sm) }]}
+        style={[styles.sideRail, { left: Math.max(insets.left + spacing.md, 24) }]}
         pointerEvents="box-none"
       >
         <VerticalSlider
@@ -480,7 +480,7 @@ export function CinematicOverlay({
       </View>
 
       <View
-        style={[styles.sideRail, { right: Math.max(insets.right, spacing.sm) }]}
+        style={[styles.sideRail, { right: Math.max(insets.right + spacing.md, 24) }]}
         pointerEvents="box-none"
       >
         <VerticalSlider
