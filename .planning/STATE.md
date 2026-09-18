@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 status: Awaiting next milestone
 stopped_at: Milestone v1.0 complete and archived; ready for /gsd-new-milestone
-last_updated: "2026-09-18T02:38:00.000Z"
+last_updated: "2026-09-18T02:42:00.000Z"
 last_activity: 2026-09-18
-last_activity_desc: Quick task fix-server-connect-modal-scroll-layout completed (fixed server connect modal bottom cut-off, safe area insets, and scroll touch responder conflicts)
+last_activity_desc: Quick task add-github-community-feedback-settings completed (added GitHub repo, bug reporting, and feature suggestion links to Settings screen)
 state_head: 82d83c8
 progress:
   total_phases: 10
@@ -120,6 +120,7 @@ Items acknowledged and carried forward from previous milestone close:
 | fix-episode-thumbnail-display | 2026-09-17 | Prioritize episode still frame screenshots over series poster in episode cards and lists | Complete ✓ |
 | fix-server-change-and-profile-detection | 2026-09-17 | Fix Jellyfin profile detection via clean unauthenticated client + /Users fallback, separate server change from user login | Complete ✓ |
 | fix-server-connect-modal-scroll-layout | 2026-09-18 | Fix server connect modal cut-off layout, safe insets, and scroll touch responder conflicts | Complete ✓ |
+| add-github-community-feedback-settings | 2026-09-18 | Add GitHub repository, bug reporting, and feature suggestion links in Settings | Complete ✓ |
 
 ## Session Continuity
  

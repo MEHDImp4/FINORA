@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Alert,
-  Pressable
+  Pressable,
+  Linking
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -31,6 +32,7 @@ import {
 } from "../../features/settings/components/SelectionPickerModal";
 import { ServerConnectModal } from "../../features/settings/components/ServerConnectModal";
 import { ServerDiagnosticsModal } from "../../features/settings/components/ServerDiagnosticsModal";
+import { SwitchProfileModal } from "../../features/settings/components/SwitchProfileModal";
 import { hapticService } from "../../core/feedback/hapticService";
 import { useNotificationStore } from "../../stores/notificationStore";
 import { notificationService } from "../../core/notifications/notificationService";
@@ -38,75 +40,90 @@ import { useQueryClient } from "@tanstack/react-query";
 import { cacheService } from "../../core/cache/cacheService";
 import { useTranslation, SupportedLanguage } from "../../i18n";
 
-const AUDIO_LANG_OPTIONS: SelectionOption<string>[] = [
-  { id: "fr", label: "Français", subtitle: "Piste audio française prioritaire" },
-  { id: "en", label: "Anglais", subtitle: "Piste audio anglaise" },
-  { id: "ja", label: "Japonais", subtitle: "Idéal pour les animations et animes" },
-  { id: "es", label: "Espagnol", subtitle: "Piste audio espagnole" },
-  { id: "de", label: "Allemand", subtitle: "Piste audio allemande" },
-  { id: "auto", label: "Original / Auto", subtitle: "Piste par défaut du média" }
-];
-
-const SUBTITLE_LANG_OPTIONS: SelectionOption<string>[] = [
-  { id: "fr", label: "Français", subtitle: "Sous-titres complets en français" },
-  { id: "en", label: "Anglais", subtitle: "Sous-titres en anglais" },
-  { id: "es", label: "Espagnol", subtitle: "Sous-titres en espagnol" },
-  { id: "none", label: "Désactivés", subtitle: "Aucun sous-titre par défaut" }
-];
-
-const SUBTITLE_MODE_OPTIONS: SelectionOption<SubtitleMode>[] = [
-  {
-    id: "smart",
-    label: "Intelligent",
-    subtitle: "Active les sous-titres seulement si l'audio n'est pas dans votre langue",
-    badge: "Recommandé"
-  },
-  {
-    id: "always",
-    label: "Toujours afficher",
-    subtitle: "Affiche systématiquement les sous-titres disponibles"
-  },
-  {
-    id: "off",
-    label: "Désactivés",
-    subtitle: "Démarre la lecture sans sous-titres"
-  }
-];
-
-const DOWNLOAD_QUALITY_OPTIONS: SelectionOption<DownloadQuality>[] = [
-  {
-    id: "original",
-    label: "Qualité d'origine",
-    subtitle: "Fichier source direct sans transcodage",
-    badge: "Optimal"
-  },
-  {
-    id: "1080p",
-    label: "1080p Full HD",
-    subtitle: "Haute fidélité grand écran"
-  },
-  {
-    id: "720p",
-    label: "720p HD",
-    subtitle: "Optimal pour mobile"
-  },
-  {
-    id: "480p",
-    label: "480p SD",
-    subtitle: "Économiseur d'espace"
-  }
-];
-
-const PLAYBACK_SPEED_OPTIONS: SelectionOption<number>[] = [
-  { id: 1.0, label: "1.0x", subtitle: "Vitesse standard" },
-  { id: 1.25, label: "1.25x", subtitle: "Légère accélération" },
-  { id: 1.5, label: "1.5x", subtitle: "Visionnage rapide" }
-];
-
 export default function SettingsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t, language, setLanguage, languages } = useTranslation();
+
+  const audioOptions: SelectionOption<string>[] = useMemo(
+    () => [
+      { id: "fr", label: t("settings.langFrench"), subtitle: t("settings.langFrenchSub") },
+      { id: "en", label: t("settings.langEnglish"), subtitle: t("settings.langEnglishSub") },
+      { id: "ja", label: t("settings.langJapanese"), subtitle: t("settings.langJapaneseSub") },
+      { id: "es", label: t("settings.langSpanish"), subtitle: t("settings.langSpanishSub") },
+      { id: "de", label: t("settings.langGerman"), subtitle: t("settings.langGermanSub") },
+      { id: "auto", label: t("settings.langAuto"), subtitle: t("settings.langAutoSub") }
+    ],
+    [t]
+  );
+
+  const subtitleOptions: SelectionOption<string>[] = useMemo(
+    () => [
+      { id: "fr", label: t("settings.subFrench"), subtitle: t("settings.subFrenchDesc") },
+      { id: "en", label: t("settings.subEnglish"), subtitle: t("settings.subEnglishDesc") },
+      { id: "es", label: t("settings.subSpanish"), subtitle: t("settings.subSpanishDesc") },
+      { id: "none", label: t("settings.subNone"), subtitle: t("settings.subNoneDesc") }
+    ],
+    [t]
+  );
+
+  const subtitleModeOptions: SelectionOption<SubtitleMode>[] = useMemo(
+    () => [
+      {
+        id: "smart",
+        label: t("settings.subModeSmart"),
+        subtitle: t("settings.subModeSmartDesc"),
+        badge: t("settings.subModeSmartBadge")
+      },
+      {
+        id: "always",
+        label: t("settings.subModeAlways"),
+        subtitle: t("settings.subModeAlwaysDesc")
+      },
+      {
+        id: "off",
+        label: t("settings.subModeOff"),
+        subtitle: t("settings.subModeOffDesc")
+      }
+    ],
+    [t]
+  );
+
+  const downloadQualityOptions: SelectionOption<DownloadQuality>[] = useMemo(
+    () => [
+      {
+        id: "original",
+        label: t("settings.qualityOriginal"),
+        subtitle: t("settings.qualityOriginalDesc"),
+        badge: t("settings.qualityOptimalBadge")
+      },
+      {
+        id: "1080p",
+        label: t("settings.quality1080p"),
+        subtitle: t("settings.quality1080pDesc")
+      },
+      {
+        id: "720p",
+        label: t("settings.quality720p"),
+        subtitle: t("settings.quality720pDesc")
+      },
+      {
+        id: "480p",
+        label: t("settings.quality480p"),
+        subtitle: t("settings.quality480pDesc")
+      }
+    ],
+    [t]
+  );
+
+  const playbackSpeedOptions: SelectionOption<number>[] = useMemo(
+    () => [
+      { id: 1.0, label: "1.0x", subtitle: t("settings.speedStandardDesc") },
+      { id: 1.25, label: "1.25x", subtitle: t("settings.speedSlightDesc") },
+      { id: 1.5, label: "1.5x", subtitle: t("settings.speedFastDesc") }
+    ],
+    [t]
+  );
 
   const session = useAuthStore((state) => state.session);
   const logout = useAuthStore((state) => state.logout);
@@ -126,6 +143,9 @@ export default function SettingsScreen() {
   const setHapticsEnabled = usePlaybackPreferencesStore((state) => state.setHapticsEnabled);
 
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [showSwitchProfileModal, setShowSwitchProfileModal] = useState(false);
+  const [targetServerForProfile, setTargetServerForProfile] = useState<string | undefined>(undefined);
+  const [requirePasswordForProfile, setRequirePasswordForProfile] = useState(false);
   const [showDiagModal, setShowDiagModal] = useState(false);
   const [showSubtitleStyleModal, setShowSubtitleStyleModal] = useState(false);
   const [activePicker, setActivePicker] = useState<
@@ -144,8 +164,8 @@ export default function SettingsScreen() {
       const granted = await notificationService.requestPermissions();
       if (!granted) {
         Alert.alert(
-          "Autorisation requise",
-          "Veuillez autoriser les notifications dans les paramètres de votre téléphone pour recevoir des alertes."
+          t("settings.notificationsPermissionTitle"),
+          t("settings.notificationsPermissionDesc")
         );
         return;
       }
@@ -153,37 +173,28 @@ export default function SettingsScreen() {
     updateNotifPreferences({ enabled });
   };
 
-  const handleSendTestNotification = async () => {
-    hapticService.notificationSuccess();
-    await notificationService.sendTestNotification();
-    Alert.alert(
-      "Notification envoyée",
-      "Une notification de test a été envoyée sur votre appareil."
-    );
-  };
-
   const handleClearCache = () => {
     hapticService.impactMedium();
     Alert.alert(
-      "Vider le cache",
-      "Supprimer les miniatures et métadonnées temporaires ?",
+      t("settings.clearCacheConfirmTitle"),
+      t("settings.clearCacheConfirmDesc"),
       [
-        { text: "Annuler", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Vider",
+          text: t("settings.clearCacheButton"),
           style: "destructive",
           onPress: async () => {
             hapticService.impactHeavy();
             try {
               const result = await cacheService.clearAllCaches(queryClient);
               Alert.alert(
-                "Cache libéré",
+                t("settings.cacheClearedTitle"),
                 result.tempFilesCleared > 0
-                  ? `Le cache temporaire a été vidé avec succès (${result.tempFilesCleared} fichier${result.tempFilesCleared > 1 ? "s" : ""} supprimé${result.tempFilesCleared > 1 ? "s" : ""}).`
-                  : "Le cache temporaire et les miniatures ont été vidés avec succès."
+                  ? t("settings.cacheClearedDesc", { count: result.tempFilesCleared })
+                  : t("settings.clearCacheSuccessNoCount")
               );
             } catch {
-              Alert.alert("Erreur", "Impossible de vider complètement le cache.");
+              Alert.alert(t("settings.cacheClearedErrorTitle"), t("settings.cacheClearedErrorDesc"));
             }
           }
         }
@@ -194,12 +205,12 @@ export default function SettingsScreen() {
   const handleLogout = () => {
     hapticService.impactHeavy();
     Alert.alert(
-      "Déconnexion",
-      "Voulez-vous vous déconnecter du serveur actif ?",
+      t("settings.logoutConfirmTitle"),
+      t("settings.logoutConfirmDesc"),
       [
-        { text: "Annuler", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Se déconnecter",
+          text: t("settings.logout"),
           style: "destructive",
           onPress: async () => {
             await logout();
@@ -212,12 +223,12 @@ export default function SettingsScreen() {
   const handleRemoveAccount = (serverId: string, userId: string, userName: string) => {
     hapticService.impactLight();
     Alert.alert(
-      "Retirer ce compte ?",
-      `Le compte « ${userName} » sera retiré de FINORA. Vous pourrez toujours vous reconnecter plus tard.`,
+      t("settings.removeAccountConfirmTitle"),
+      t("settings.removeAccountConfirmDesc", { username: userName }),
       [
-        { text: "Annuler", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Retirer",
+          text: t("settings.removeButton"),
           style: "destructive",
           onPress: async () => {
             await removeAccount(serverId, userId);
@@ -227,12 +238,26 @@ export default function SettingsScreen() {
     );
   };
 
+  const handleOpenExternalUrl = async (url: string) => {
+    hapticService.impactLight();
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert(t("common.error"), t("settings.cannotOpenUrl"));
+      }
+    } catch {
+      Alert.alert(t("common.error"), t("settings.cannotOpenUrl"));
+    }
+  };
+
   const currentLanguageOption = languages.find((l) => l.code === language) || languages[0];
   const languageLabel = `${currentLanguageOption.flag} ${currentLanguageOption.nativeName}`;
-  const audioLabel = AUDIO_LANG_OPTIONS.find((o) => o.id === preferences.preferredAudioLanguage)?.label || preferences.preferredAudioLanguage;
-  const subtitleLabel = SUBTITLE_LANG_OPTIONS.find((o) => o.id === preferences.preferredSubtitleLanguage)?.label || preferences.preferredSubtitleLanguage;
-  const subtitleModeLabel = SUBTITLE_MODE_OPTIONS.find((o) => o.id === preferences.subtitleMode)?.label || preferences.subtitleMode;
-  const downloadQualityLabel = DOWNLOAD_QUALITY_OPTIONS.find((o) => o.id === preferences.defaultDownloadQuality)?.label || preferences.defaultDownloadQuality;
+  const audioLabel = audioOptions.find((o) => o.id === preferences.preferredAudioLanguage)?.label || preferences.preferredAudioLanguage;
+  const subtitleLabel = subtitleOptions.find((o) => o.id === preferences.preferredSubtitleLanguage)?.label || preferences.preferredSubtitleLanguage;
+  const subtitleModeLabel = subtitleModeOptions.find((o) => o.id === preferences.subtitleMode)?.label || preferences.subtitleMode;
+  const downloadQualityLabel = downloadQualityOptions.find((o) => o.id === preferences.defaultDownloadQuality)?.label || preferences.defaultDownloadQuality;
   const speedLabel = `${preferences.playbackSpeed || 1.0}x`;
 
   return (
@@ -257,6 +282,16 @@ export default function SettingsScreen() {
                 </Text>
               </View>
             </View>
+          ) : null}
+
+          {session ? (
+            <SettingsRow
+              iconName="people-outline"
+              iconColor={colors.primary}
+              title={t("settings.switchProfile")}
+              subtitle={t("settings.switchProfileSubtitle")}
+              onPress={() => setShowSwitchProfileModal(true)}
+            />
           ) : null}
 
           <SettingsRow
@@ -347,7 +382,7 @@ export default function SettingsScreen() {
           ) : null}
         </SettingsSection>
 
-        <SettingsSection title={t("settings.playbackSpeed")}>
+        <SettingsSection title={t("settings.playbackSection")}>
           <SettingsRow
             iconName="volume-medium-outline"
             iconColor={colors.primary}
@@ -374,7 +409,7 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
-        <SettingsSection title={t("settings.subtitleStyle")}>
+        <SettingsSection title={t("settings.subtitlesSection")}>
           <SettingsRow
             iconName="chatbubble-ellipses-outline"
             iconColor={colors.textSecondary}
@@ -420,7 +455,7 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="folder-open-outline"
             iconColor={colors.textSecondary}
-            title={t("settings.downloadsSection")}
+            title={t("settings.manageDownloads")}
             onPress={() => router.push("/(tabs)/downloads")}
           />
 
@@ -448,7 +483,7 @@ export default function SettingsScreen() {
               <SettingsSwitchRow
                 iconName="tv-outline"
                 iconColor={colors.textSecondary}
-                title="Épisodes de mes séries"
+                title={t("settings.notifEpisodesOfMySeries")}
                 value={notifPreferences.newEpisodes}
                 onValueChange={(val) => updateNotifPreferences({ newEpisodes: val })}
               />
@@ -456,7 +491,7 @@ export default function SettingsScreen() {
               <SettingsSwitchRow
                 iconName="film-outline"
                 iconColor={colors.textSecondary}
-                title="Nouveaux films ajoutés"
+                title={t("settings.notifNewMoviesAdded")}
                 value={notifPreferences.newMovies}
                 onValueChange={(val) => updateNotifPreferences({ newMovies: val })}
               />
@@ -464,7 +499,7 @@ export default function SettingsScreen() {
               <SettingsSwitchRow
                 iconName="sparkles-outline"
                 iconColor={colors.textSecondary}
-                title="Nouvelles séries ajoutées"
+                title={t("settings.notifNewSeriesAdded")}
                 value={notifPreferences.newSeries}
                 onValueChange={(val) => updateNotifPreferences({ newSeries: val })}
               />
@@ -472,18 +507,10 @@ export default function SettingsScreen() {
               <SettingsSwitchRow
                 iconName="arrow-down-circle-outline"
                 iconColor={colors.textSecondary}
-                title="Téléchargements terminés"
+                title={t("settings.notifDownloadsCompleted")}
                 value={notifPreferences.downloadsCompleted}
                 onValueChange={(val) => updateNotifPreferences({ downloadsCompleted: val })}
-              />
-
-              <SettingsRow
-                iconName="paper-plane-outline"
-                iconColor={colors.textSecondary}
-                title="Tester une notification"
-                showChevron={false}
                 isLast
-                onPress={handleSendTestNotification}
               />
             </>
           ) : null}
@@ -510,7 +537,7 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="hardware-chip-outline"
             iconColor={colors.textSecondary}
-            title="Moteur"
+            title={t("settings.engine")}
             value="ExoPlayer"
             showChevron={false}
           />
@@ -526,19 +553,19 @@ export default function SettingsScreen() {
           <SettingsRow
             iconName="sparkles-outline"
             iconColor={colors.primary}
-            title="Revoir la présentation FINORA"
-            subtitle="Relancer la présentation de bienvenue"
+            title={t("settings.replayOnboarding")}
+            subtitle={t("settings.replayOnboardingDesc")}
             showChevron
             isLast
             onPress={() => {
               hapticService.impactLight();
               Alert.alert(
-                "Présentation FINORA",
-                "Souhaitez-vous revoir l'écran de bienvenue et de présentation ?",
+                t("settings.replayOnboardingConfirmTitle"),
+                t("settings.replayOnboardingConfirmDesc"),
                 [
-                  { text: "Annuler", style: "cancel" },
+                  { text: t("common.cancel"), style: "cancel" },
                   {
-                    text: "Revoir",
+                    text: t("settings.replayButton"),
                     onPress: async () => {
                       await useOnboardingStore.getState().resetOnboarding();
                     }
@@ -546,6 +573,40 @@ export default function SettingsScreen() {
                 ]
               );
             }}
+          />
+        </SettingsSection>
+
+        <SettingsSection title={t("settings.communitySection")}>
+          <SettingsRow
+            iconName="bug-outline"
+            iconColor="#FF6B6B"
+            title={t("settings.reportBug")}
+            subtitle={t("settings.reportBugDesc")}
+            showChevron
+            onPress={() =>
+              handleOpenExternalUrl("https://github.com/MEHDImp4/FINORA/issues/new?template=bug_report.yml")
+            }
+          />
+
+          <SettingsRow
+            iconName="bulb-outline"
+            iconColor="#FFB800"
+            title={t("settings.suggestFeature")}
+            subtitle={t("settings.suggestFeatureDesc")}
+            showChevron
+            onPress={() =>
+              handleOpenExternalUrl("https://github.com/MEHDImp4/FINORA/issues/new?template=feature_request.yml")
+            }
+          />
+
+          <SettingsRow
+            iconName="logo-github"
+            iconColor="#FFFFFF"
+            title={t("settings.githubRepo")}
+            subtitle={t("settings.githubRepoDesc")}
+            showChevron
+            isLast
+            onPress={() => handleOpenExternalUrl("https://github.com/MEHDImp4/FINORA")}
           />
         </SettingsSection>
       </ScrollView>
@@ -569,8 +630,8 @@ export default function SettingsScreen() {
 
       <SelectionPickerModal
         visible={activePicker === "audio"}
-        title="Langue audio"
-        options={AUDIO_LANG_OPTIONS}
+        title={t("settings.audioLanguageModalTitle")}
+        options={audioOptions}
         selectedValue={preferences.preferredAudioLanguage}
         onSelect={setPreferredAudioLanguage}
         onClose={() => setActivePicker(null)}
@@ -578,8 +639,8 @@ export default function SettingsScreen() {
 
       <SelectionPickerModal
         visible={activePicker === "sub"}
-        title="Sous-titres"
-        options={SUBTITLE_LANG_OPTIONS}
+        title={t("settings.subtitlesModalTitle")}
+        options={subtitleOptions}
         selectedValue={preferences.preferredSubtitleLanguage}
         onSelect={setPreferredSubtitleLanguage}
         onClose={() => setActivePicker(null)}
@@ -587,8 +648,8 @@ export default function SettingsScreen() {
 
       <SelectionPickerModal
         visible={activePicker === "subMode"}
-        title="Affichage des sous-titres"
-        options={SUBTITLE_MODE_OPTIONS}
+        title={t("settings.subtitleModeModalTitle")}
+        options={subtitleModeOptions}
         selectedValue={preferences.subtitleMode}
         onSelect={setSubtitleMode}
         onClose={() => setActivePicker(null)}
@@ -596,8 +657,8 @@ export default function SettingsScreen() {
 
       <SelectionPickerModal
         visible={activePicker === "downloadQuality"}
-        title="Qualité de téléchargement"
-        options={DOWNLOAD_QUALITY_OPTIONS}
+        title={t("settings.downloadQualityModalTitle")}
+        options={downloadQualityOptions}
         selectedValue={preferences.defaultDownloadQuality}
         onSelect={setDefaultDownloadQuality}
         onClose={() => setActivePicker(null)}
@@ -605,8 +666,8 @@ export default function SettingsScreen() {
 
       <SelectionPickerModal
         visible={activePicker === "speed"}
-        title="Vitesse de lecture"
-        options={PLAYBACK_SPEED_OPTIONS}
+        title={t("settings.playbackSpeedModalTitle")}
+        options={playbackSpeedOptions}
         selectedValue={preferences.playbackSpeed || 1.0}
         onSelect={setPlaybackSpeed}
         onClose={() => setActivePicker(null)}
@@ -615,6 +676,23 @@ export default function SettingsScreen() {
       <ServerConnectModal
         visible={showConnectModal}
         onClose={() => setShowConnectModal(false)}
+        onServerChanged={(newUrl) => {
+          setShowConnectModal(false);
+          setTargetServerForProfile(newUrl);
+          setRequirePasswordForProfile(true);
+          setShowSwitchProfileModal(true);
+        }}
+      />
+
+      <SwitchProfileModal
+        visible={showSwitchProfileModal}
+        targetServerUrl={targetServerForProfile}
+        requirePassword={requirePasswordForProfile}
+        onClose={() => {
+          setShowSwitchProfileModal(false);
+          setTargetServerForProfile(undefined);
+          setRequirePasswordForProfile(false);
+        }}
       />
 
       <ServerDiagnosticsModal
