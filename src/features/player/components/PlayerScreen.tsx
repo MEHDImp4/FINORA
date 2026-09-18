@@ -412,18 +412,16 @@ export function PlayerScreen({
     }
   }, [isCustomSubtitleActive, player]);
 
-  // Detect playback ended for series → show next episode overlay
+  // Query next episode in advance for series
   useEffect(() => {
+    let active = true;
+
     if (
-      snapshot.state === "ended" &&
       item.type === "Episode" &&
       item.seriesId &&
       item.seasonId &&
-      item.episodeIndex != null &&
-      !nextEpisodeFetchedRef.current
+      item.episodeIndex != null
     ) {
-      nextEpisodeFetchedRef.current = true;
-
       const fetchNextEpisode = async () => {
         try {
           const url = `${serverUrl}/Shows/${item.seriesId}/Episodes?seasonId=${item.seasonId}${token ? `&api_key=${encodeURIComponent(token)}` : ""}&startItemId=${item.id}&limit=1&fields=IndexNumber,Name`;
@@ -432,25 +430,38 @@ export function PlayerScreen({
               Authorization: formatAuthorizationHeader("finora-mobile", token)
             }
           });
-          if (!res.ok) return;
+          if (!res.ok || !active) return;
           const data = await res.json();
           const next = data.Items?.[0];
-          if (next && next.Id !== item.id) {
+          if (next && next.Id !== item.id && active) {
             setNextEpisode({
               id: next.Id,
               name: next.Name || "",
               label: `E${next.IndexNumber || (item.episodeIndex || 0) + 1}`
             });
-            setShowNextEpisode(true);
           }
         } catch {
-          // Silently ignore — next episode overlay simply won't show
+          // Silently ignore — next episode button simply won't show
         }
       };
 
       fetchNextEpisode();
+    } else {
+      setNextEpisode(null);
     }
-  }, [snapshot.state, item, serverUrl, token]);
+
+    return () => {
+      active = false;
+    };
+  }, [item.id, item.type, item.seriesId, item.seasonId, item.episodeIndex, serverUrl, token]);
+
+  // Trigger next episode countdown overlay when playback ends
+  useEffect(() => {
+    if (snapshot.state === "ended" && nextEpisode && !nextEpisodeFetchedRef.current) {
+      nextEpisodeFetchedRef.current = true;
+      setShowNextEpisode(true);
+    }
+  }, [snapshot.state, nextEpisode]);
 
   // Automatic intro skip if preference is enabled
   useEffect(() => {
@@ -616,7 +627,9 @@ export function PlayerScreen({
       {/* Buffering Indicator */}
       {!isInPiP && isBufferingOrLoading && (
         <View style={styles.loaderOverlay} pointerEvents="none" testID="player-loading">
-          <ActivityIndicator size="large" color={colors.primary} />
+          <View style={styles.loaderCapsule}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
         </View>
       )}
 
@@ -641,6 +654,7 @@ export function PlayerScreen({
           currentTimeSeconds={snapshot.currentTimeSeconds}
           durationSeconds={snapshot.durationSeconds > 0 ? snapshot.durationSeconds : initialDurationSeconds}
           bufferedSeconds={localPath ? (snapshot.durationSeconds || initialDurationSeconds) : snapshot.bufferedPositionSeconds}
+          chapters={item.chapters}
           onPlayPause={() => {
             if (snapshot.state === "playing") {
               controls.pause();
@@ -669,6 +683,9 @@ export function PlayerScreen({
           playbackRate={currentSpeed}
           onCycleSpeed={handleCycleSpeed}
           onTogglePiP={handleTogglePiP}
+          hasNextEpisode={Boolean(nextEpisode)}
+          onPlayNextEpisode={handlePlayNextEpisode}
+          nextEpisodeLabel={nextEpisode?.label}
         />
       )}
 
@@ -804,28 +821,31 @@ export function PlayerScreen({
       {/* Error Banner if error occurs */}
       {snapshot.state === "error" && (
         <View style={styles.errorOverlay} testID="player-error">
-          <Ionicons
-            name="alert-circle-outline"
-            size={48}
-            color={colors.primary}
-            style={{ marginBottom: spacing.sm }}
-          />
-          <FinoraText variant="title" style={styles.errorText}>
-            {t("player.cantPlayMedia")}
-          </FinoraText>
-          <FinoraText variant="caption" style={styles.errorSubtext}>
-            {localPath
-              ? t("player.corruptedFile")
-              : snapshot.errorMessage?.includes("500") || snapshot.errorMessage?.includes("source")
-              ? t("player.serverLostMedia")
-              : snapshot.errorMessage || t("player.playbackError")}
-          </FinoraText>
-          <FinoraButton
-            label={t("common.back")}
-            variant="secondary"
-            onPress={handleBack}
-            style={{ marginTop: spacing.md }}
-          />
+          <View style={styles.errorCard}>
+            <View style={styles.errorIconBadge}>
+              <Ionicons
+                name="alert-circle"
+                size={36}
+                color={colors.primary}
+              />
+            </View>
+            <FinoraText variant="title" style={styles.errorText}>
+              {t("player.cantPlayMedia")}
+            </FinoraText>
+            <FinoraText variant="caption" style={styles.errorSubtext}>
+              {localPath
+                ? t("player.corruptedFile")
+                : snapshot.errorMessage?.includes("500") || snapshot.errorMessage?.includes("source")
+                ? t("player.serverLostMedia")
+                : snapshot.errorMessage || t("player.playbackError")}
+            </FinoraText>
+            <FinoraButton
+              label={t("common.back")}
+              variant="secondary"
+              onPress={handleBack}
+              style={{ marginTop: spacing.md }}
+            />
+          </View>
         </View>
       )}
     </View>
@@ -846,19 +866,60 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center"
   },
+  loaderCapsule: {
+    padding: spacing.md,
+    borderRadius: 24,
+    backgroundColor: "rgba(16, 16, 24, 0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 8
+  },
   errorOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    backgroundColor: "rgba(6, 6, 10, 0.85)",
     justifyContent: "center",
     alignItems: "center",
     padding: spacing.xl
   },
+  errorCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "rgba(20, 20, 28, 0.95)",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    padding: spacing.xl,
+    alignItems: "center",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 16,
+    elevation: 12
+  },
+  errorIconBadge: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(229, 9, 20, 0.12)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: spacing.md
+  },
   errorText: {
-    color: colors.primary,
-    marginBottom: spacing.xs
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: spacing.xs,
+    textAlign: "center"
   },
   errorSubtext: {
-    color: colors.textMuted,
-    textAlign: "center"
+    color: colors.textSecondary,
+    textAlign: "center",
+    fontSize: 13,
+    lineHeight: 18
   }
 });

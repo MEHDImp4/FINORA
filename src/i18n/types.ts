@@ -487,6 +487,9 @@ export interface PlayerTranslations {
   externalTrack: string;
   scrubberValueText: string;
   playbackSpeedA11y: string;
+  nextEpisodeA11y: string;
+  pipA11y: string;
+  pipNotSupported: string;
 }
 
 export interface SettingsTranslations {
@@ -495,6 +498,11 @@ export interface SettingsTranslations {
   switchServer: string;
   connected: string;
   notConnected: string;
+  connectionTypeLocal: string;
+  connectionTypeRemote: string;
+  serverLocalUrl: string;
+  serverRemoteUrl: string;
+  autoDetectConnection: string;
   savedAccounts: string;
   activeAccount: string;
   switchAccountTo: string;

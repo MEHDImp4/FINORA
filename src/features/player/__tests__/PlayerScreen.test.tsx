@@ -134,4 +134,69 @@ describe("PlayerScreen", () => {
       root.unmount();
     });
   });
+
+  it("renders next episode button and triggers onNextEpisode when available", async () => {
+    const originalFetch = global.fetch;
+    const mockNextEpisodeItem = {
+      Id: "item-episode-2",
+      Name: "Episode 2",
+      IndexNumber: 2
+    };
+    (global as any).fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ Items: [mockNextEpisodeItem] })
+    });
+
+    const episodeItem: MediaItem = {
+      id: "item-episode-1",
+      name: "Episode 1",
+      type: "Episode",
+      seriesId: "series-1",
+      seasonId: "season-1",
+      seriesName: "Arcane",
+      seasonIndex: 1,
+      episodeIndex: 1,
+      genres: ["Action", "Animation"],
+      playbackPositionTicks: 0,
+      totalTicks: 2400000000,
+      playedPercentage: 0,
+      isPlayed: false,
+      isFavorite: false
+    };
+
+    const onNextEpisodeMock = jest.fn();
+    const mockRepo = createMockRepo();
+    let root: any;
+
+    await act(async () => {
+      root = renderer.create(
+        <QueryClientProvider client={queryClient}>
+          <PlayerScreen
+            item={episodeItem}
+            serverUrl="https://demo.jellyfin.org"
+            token="test-token"
+            onBack={jest.fn()}
+            onNextEpisode={onNextEpisodeMock}
+            playbackRepository={mockRepo}
+            overlayAutoHideMs={0}
+          />
+        </QueryClientProvider>
+      );
+    });
+
+    const nextEpisodeBtn = root.root.findByProps({ testID: "overlay-next-episode-button" });
+    expect(nextEpisodeBtn).toBeTruthy();
+
+    await act(async () => {
+      nextEpisodeBtn.props.onPress();
+    });
+
+    expect(onNextEpisodeMock).toHaveBeenCalledWith("item-episode-2");
+
+    act(() => {
+      root.unmount();
+    });
+
+    global.fetch = originalFetch;
+  });
 });
