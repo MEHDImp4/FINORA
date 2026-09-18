@@ -203,3 +203,97 @@ export async function validateAndDiscoverServer(
     );
   }
 }
+
+export interface ServerConnectionDetectionResult {
+  activeUrl: string;
+  isLocal: boolean;
+  strategy: "local-lan" | "remote-wan" | "fallback";
+}
+
+/**
+ * Automatically detects whether the server is directly reachable on the local LAN
+ * or if the client should connect via remote WAN.
+ *
+ * Checks the candidate local address first with a fast timeout (default 1500ms).
+ * If the local ping succeeds (Jellyfin System/Info/Public responds with a valid ID),
+ * FINORA selects the local address to maximize throughput (Direct Play, zero transcoding).
+ * Otherwise, it falls back to the remote WAN address (or current active URL).
+ */
+export async function autoDetectServerConnection(
+  localCandidateUrl?: string | null,
+  remoteCandidateUrl?: string | null,
+  fallbackUrl?: string | null,
+  timeoutMs: number = 1500
+): Promise<ServerConnectionDetectionResult> {
+  const pingServer = async (candidateUrl: string): Promise<boolean> => {
+    try {
+      const normalized = normalizeServerUrl(candidateUrl);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      const response = await fetch(`${normalized.url}/System/Info/Public`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+
+      if (!response.ok) return false;
+      const data = await response.json();
+      return !!(data && (data.Id || data.ServerName));
+    } catch {
+      return false;
+    }
+  };
+
+  // 1. If a local candidate URL is configured, probe it first
+  if (localCandidateUrl && localCandidateUrl.trim()) {
+    const isLocalAlive = await pingServer(localCandidateUrl.trim());
+    if (isLocalAlive) {
+      const normalized = normalizeServerUrl(localCandidateUrl.trim());
+      return {
+        activeUrl: normalized.url,
+        isLocal: true,
+        strategy: "local-lan"
+      };
+    }
+  }
+
+  // 2. If local fails or is not set, probe remote WAN candidate
+  if (remoteCandidateUrl && remoteCandidateUrl.trim()) {
+    const isRemoteAlive = await pingServer(remoteCandidateUrl.trim());
+    if (isRemoteAlive) {
+      const normalized = normalizeServerUrl(remoteCandidateUrl.trim());
+      const hostname = new URL(normalized.url).hostname;
+      return {
+        activeUrl: normalized.url,
+        isLocal: isLocalNetworkHost(hostname),
+        strategy: "remote-wan"
+      };
+    }
+  }
+
+  // 3. Fallback to current URL or whatever candidate was provided
+  const targetFallback = (fallbackUrl || remoteCandidateUrl || localCandidateUrl || "").trim();
+  let isLocal = false;
+  if (targetFallback) {
+    try {
+      const normalized = normalizeServerUrl(targetFallback);
+      const hostname = new URL(normalized.url).hostname;
+      isLocal = isLocalNetworkHost(hostname);
+      return {
+        activeUrl: normalized.url,
+        isLocal,
+        strategy: "fallback"
+      };
+    } catch {
+      // Ignored - return raw fallback below
+    }
+  }
+
+  return {
+    activeUrl: targetFallback,
+    isLocal,
+    strategy: "fallback"
+  };
+}

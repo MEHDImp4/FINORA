@@ -16,7 +16,9 @@ import {
   ServerDiagnosticsResult
 } from "../../../core/jellyfin/diagnosticsService";
 import { useAuthStore } from "../../../stores/authStore";
+import { useServerStore } from "../../../stores/serverStore";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { useTranslation } from "../../../i18n";
 
 interface ServerDiagnosticsModalProps {
   visible: boolean;
@@ -24,7 +26,10 @@ interface ServerDiagnosticsModalProps {
 }
 
 export function ServerDiagnosticsModal({ visible, onClose }: ServerDiagnosticsModalProps) {
+  const { t } = useTranslation();
   const session = useAuthStore((state) => state.session);
+  const autoDetectActiveConnection = useServerStore((state) => state.autoDetectActiveConnection);
+  const isLocalConnection = useServerStore((state) => state.isLocalConnection);
   const [isRunning, setIsRunning] = useState(false);
   const [diagResult, setDiagResult] = useState<ServerDiagnosticsResult | null>(null);
 
@@ -33,7 +38,10 @@ export function ServerDiagnosticsModal({ visible, onClose }: ServerDiagnosticsMo
     if (!url) return; // No server configured — nothing to diagnose
     setIsRunning(true);
     try {
-      const res = await diagnosticsService.runDiagnostics(url, session?.token);
+      const [res] = await Promise.all([
+        diagnosticsService.runDiagnostics(url, session?.token),
+        autoDetectActiveConnection(session?.serverId)
+      ]);
       setDiagResult(res);
       hapticService.impactMedium();
     } finally {
@@ -52,15 +60,15 @@ export function ServerDiagnosticsModal({ visible, onClose }: ServerDiagnosticsMo
         <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle}>Diagnostic Réseau & Serveur</Text>
+              <Text style={styles.headerTitle}>{t("settings.diagTitle")}</Text>
               <Text style={styles.headerDescription}>
-                Vérification de la connectivité, latence, chiffrement et statut de l'API.
+                {t("settings.diagDesc")}
               </Text>
             </View>
             <TouchableOpacity
               onPress={onClose}
               style={styles.closeButton}
-              accessibilityLabel="Fermer"
+              accessibilityLabel={t("common.close")}
             >
               <Ionicons name="close" size={22} color="#FFFFFF" />
             </TouchableOpacity>
@@ -69,7 +77,7 @@ export function ServerDiagnosticsModal({ visible, onClose }: ServerDiagnosticsMo
           <ScrollView contentContainerStyle={styles.body}>
             <View style={styles.actionContainer}>
               <FinoraButton
-                label={isRunning ? "Analyse en cours..." : "Lancer le test de connexion"}
+                label={isRunning ? t("settings.diagRunning") : t("settings.diagRunTest")}
                 variant="primary"
                 size="md"
                 loading={isRunning}
@@ -80,14 +88,36 @@ export function ServerDiagnosticsModal({ visible, onClose }: ServerDiagnosticsMo
             {diagResult ? (
               <View style={styles.resultsContainer}>
                 <View style={styles.metricRow}>
-                  <Text style={styles.metricLabel}>Serveur cible</Text>
+                  <Text style={styles.metricLabel}>{t("settings.diagTargetServer")}</Text>
                   <Text style={styles.metricValue} numberOfLines={1}>
                     {diagResult.serverUrl}
                   </Text>
                 </View>
 
                 <View style={styles.metricRow}>
-                  <Text style={styles.metricLabel}>Chiffrement / Sécurité</Text>
+                  <Text style={styles.metricLabel}>{t("settings.autoDetectConnection")}</Text>
+                  <View style={styles.badgeRow}>
+                    <Ionicons
+                      name={isLocalConnection ? "flash-outline" : "globe-outline"}
+                      size={16}
+                      color={isLocalConnection ? "#00D26A" : "#3B82F6"}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text
+                      style={[
+                        styles.metricValue,
+                        { color: isLocalConnection ? "#00D26A" : "#3B82F6" }
+                      ]}
+                    >
+                      {isLocalConnection
+                        ? t("settings.connectionTypeLocal")
+                        : t("settings.connectionTypeRemote")}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.metricRow}>
+                  <Text style={styles.metricLabel}>{t("settings.diagSecurity")}</Text>
                   <View style={styles.badgeRow}>
                     <Ionicons
                       name={diagResult.isHttps ? "shield-checkmark" : "warning"}
@@ -101,13 +131,13 @@ export function ServerDiagnosticsModal({ visible, onClose }: ServerDiagnosticsMo
                         { color: diagResult.isHttps ? "#4BB543" : "#FFB800" }
                       ]}
                     >
-                      {diagResult.isHttps ? "HTTPS Sécurisé" : "HTTP Non chiffré"}
+                      {diagResult.isHttps ? t("settings.diagSecureHttps") : t("settings.diagUnencryptedHttp")}
                     </Text>
                   </View>
                 </View>
 
                 <View style={styles.metricRow}>
-                  <Text style={styles.metricLabel}>Latence aller-retour</Text>
+                  <Text style={styles.metricLabel}>{t("settings.diagLatency")}</Text>
                   <Text
                     style={[
                       styles.metricValue,
@@ -126,26 +156,26 @@ export function ServerDiagnosticsModal({ visible, onClose }: ServerDiagnosticsMo
                 </View>
 
                 <View style={styles.metricRow}>
-                  <Text style={styles.metricLabel}>Nom du serveur</Text>
+                  <Text style={styles.metricLabel}>{t("settings.diagServerName")}</Text>
                   <Text style={styles.metricValue}>
-                    {diagResult.serverName || "Serveur Jellyfin"}
+                    {diagResult.serverName || t("settings.defaultServerName")}
                   </Text>
                 </View>
 
                 <View style={styles.metricRow}>
-                  <Text style={styles.metricLabel}>Version Jellyfin</Text>
-                  <Text style={styles.metricValue}>{diagResult.version || "Inconnue"}</Text>
+                  <Text style={styles.metricLabel}>{t("settings.diagVersion")}</Text>
+                  <Text style={styles.metricValue}>{diagResult.version || t("common.unknown")}</Text>
                 </View>
 
                 <View style={styles.metricRow}>
-                  <Text style={styles.metricLabel}>Santé de l'API</Text>
+                  <Text style={styles.metricLabel}>{t("settings.diagApiHealth")}</Text>
                   <Text
                     style={[
                       styles.metricValue,
                       { color: diagResult.apiHealthy ? "#4BB543" : "#FF4D4D" }
                     ]}
                   >
-                    {diagResult.apiHealthy ? "Opérationnelle" : "Inaccessible"}
+                    {diagResult.apiHealthy ? t("settings.diagOnline") : t("settings.diagUnreachable")}
                   </Text>
                 </View>
 
@@ -157,7 +187,7 @@ export function ServerDiagnosticsModal({ visible, onClose }: ServerDiagnosticsMo
               <View style={styles.placeholderContainer}>
                 <Ionicons name="pulse-outline" size={40} color="#3D3D52" />
                 <Text style={styles.placeholderText}>
-                  Appuyez sur le bouton ci-dessus pour inspecter les métriques réseau et serveur.
+                  {t("settings.diagPlaceholder")}
                 </Text>
               </View>
             )}

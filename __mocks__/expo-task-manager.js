@@ -6,6 +6,7 @@ module.exports = {
   }),
   isTaskDefined: jest.fn((taskName) => tasks.has(taskName)),
   isTaskRegisteredAsync: jest.fn().mockResolvedValue(false),
+  unregisterTaskAsync: jest.fn().mockResolvedValue(undefined),
   unregisterAllTasksAsync: jest.fn().mockResolvedValue(undefined),
   _tasks: tasks
 };

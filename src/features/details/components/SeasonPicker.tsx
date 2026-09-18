@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, Pressable } from "react-native";
 import { MediaItem } from "../../../types/media";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
+import { useTranslation } from "../../../i18n";
 
 export interface SeasonPickerProps {
   seasons: MediaItem[];
@@ -12,9 +13,22 @@ export interface SeasonPickerProps {
 
 export const SeasonPicker: React.FC<SeasonPickerProps> = React.memo(
   ({ seasons, selectedSeasonId, onSelectSeason }) => {
+    const { t } = useTranslation();
+
     if (!seasons || seasons.length === 0) {
       return null;
     }
+
+    const getSeasonLabel = (season: MediaItem): string => {
+      if (typeof season.seasonIndex === "number" && season.seasonIndex > 0) {
+        return t("details.downloadSeasonNumber", { season: season.seasonIndex });
+      }
+      const match = season.name?.match(/^(?:season|saison)\s+(\d+)$/i);
+      if (match) {
+        return t("details.downloadSeasonNumber", { season: match[1] });
+      }
+      return season.name;
+    };
 
     return (
       <View style={styles.container}>
@@ -25,11 +39,15 @@ export const SeasonPicker: React.FC<SeasonPickerProps> = React.memo(
         >
           {seasons.map((season) => {
             const isSelected = season.id === selectedSeasonId;
+            const displayLabel = getSeasonLabel(season);
             return (
               <Pressable
                 key={season.id}
                 testID={`season-pill-${season.id}`}
                 onPress={() => onSelectSeason(season.id)}
+                accessibilityRole="button"
+                accessibilityLabel={displayLabel}
+                accessibilityState={{ selected: isSelected }}
                 style={({ pressed }) => [
                   styles.pill,
                   isSelected ? styles.selectedPill : styles.unselectedPill,
@@ -41,7 +59,7 @@ export const SeasonPicker: React.FC<SeasonPickerProps> = React.memo(
                   color={isSelected ? "#FFFFFF" : colors.textSecondary}
                   style={[styles.pillText, isSelected && styles.selectedPillText]}
                 >
-                  {season.name}
+                  {displayLabel}
                 </FinoraText>
               </Pressable>
             );

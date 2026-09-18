@@ -13,6 +13,18 @@ export interface LanguageState {
   resetLanguage: () => Promise<void>;
 }
 
+export function detectDeviceLanguage(): SupportedLanguage {
+  try {
+    const sysLocale = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().locale : "";
+    if (sysLocale && sysLocale.toLowerCase().startsWith("fr")) {
+      return "fr";
+    }
+  } catch {
+    // fallback
+  }
+  return DEFAULT_LANGUAGE;
+}
+
 export const useLanguageStore = create<LanguageState>((set) => ({
   language: DEFAULT_LANGUAGE,
   isLoaded: false,
@@ -24,7 +36,8 @@ export const useLanguageStore = create<LanguageState>((set) => ({
         set({ language: savedLang as SupportedLanguage, isLoaded: true });
         return;
       }
-      set({ language: DEFAULT_LANGUAGE, isLoaded: true });
+      const initial = detectDeviceLanguage();
+      set({ language: initial, isLoaded: true });
     } catch {
       set({ language: DEFAULT_LANGUAGE, isLoaded: true });
     }

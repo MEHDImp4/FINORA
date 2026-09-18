@@ -6,6 +6,7 @@ import { FinoraText } from "./FinoraText";
 import { colors, spacing } from "../tokens";
 import { NetworkFailureType } from "../../core/network/networkStatusService";
 import { hapticService } from "../../core/feedback/hapticService";
+import { useTranslation } from "../../i18n";
 
 export interface NetworkFailureStateViewProps {
   failureType?: NetworkFailureType | null;
@@ -27,16 +28,17 @@ export function NetworkFailureStateView({
   fullScreen = true
 }: NetworkFailureStateViewProps) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const isNoInternet = failureType === "no_internet";
   const isServerDown = failureType === "server_unreachable";
 
   // Visual tokens depending on diagnosed failure
   const badgeText = isNoInternet
-    ? "MODE HORS-LIGNE"
+    ? t("errors.badgeOffline")
     : isServerDown
-    ? "SERVEUR INDISPONIBLE"
-    : "CONNEXION INTERROMPUE";
+    ? t("errors.badgeServerDown")
+    : t("errors.badgeConnectionLost");
 
   const badgeColor = isNoInternet ? "#F59E0B" : isServerDown ? "#EF4444" : colors.primary;
   const badgeBg = isNoInternet
@@ -52,16 +54,16 @@ export function NetworkFailureStateView({
     : "wifi-outline";
 
   const defaultTitle = isNoInternet
-    ? "Aucune connexion Internet"
+    ? t("errors.networkFailureTitle")
     : isServerDown
-    ? "Serveur Jellyfin injoignable"
-    : "Impossible de joindre le serveur";
+    ? t("errors.serverUnreachableTitle")
+    : t("errors.genericErrorTitle");
 
   const defaultMessage = isNoInternet
-    ? "Votre appareil n'est pas connecté à Internet. Vérifiez votre Wi-Fi ou vos données mobiles, ou regardez vos contenus déjà téléchargés."
+    ? t("errors.networkFailureDesc")
     : isServerDown
-    ? "Votre serveur Jellyfin semble éteint ou inaccessible sur le réseau. Vous pouvez toujours visionner vos films et séries téléchargés."
-    : "Une erreur réseau empêche le chargement du catalogue. Vos téléchargements hors-ligne restent disponibles.";
+    ? t("errors.serverUnreachableDesc")
+    : t("errors.genericErrorDesc");
 
   const title = customTitle || defaultTitle;
   const message = customMessage || defaultMessage;
@@ -110,12 +112,12 @@ export function NetworkFailureStateView({
             style={styles.primaryButton}
             onPress={handleGoToDownloads}
             accessibilityRole="button"
-            accessibilityLabel="Regarder mes téléchargements hors-ligne"
+            accessibilityLabel={t("errors.watchOffline")}
             testID="failure-go-downloads-button"
           >
             <Ionicons name="download" size={18} color="#FFFFFF" style={styles.buttonIcon} />
             <FinoraText variant="body" weight="700" style={styles.primaryButtonText}>
-              Regarder hors-ligne
+              {t("errors.watchOffline")}
             </FinoraText>
           </Pressable>
         )}
@@ -126,7 +128,7 @@ export function NetworkFailureStateView({
             onPress={handleRetry}
             disabled={isRetrying}
             accessibilityRole="button"
-            accessibilityLabel="Réessayer la connexion"
+            accessibilityLabel={t("errors.retryConnection")}
             testID="failure-retry-button"
           >
             {isRetrying ? (
@@ -135,7 +137,7 @@ export function NetworkFailureStateView({
               <Ionicons name="refresh" size={18} color={colors.textPrimary} style={styles.buttonIcon} />
             )}
             <FinoraText variant="body" weight="600" style={styles.secondaryButtonText}>
-              {isRetrying ? "Vérification..." : "Réessayer la connexion"}
+              {isRetrying ? t("errors.checkingConnection") : t("errors.retryConnection")}
             </FinoraText>
           </Pressable>
         )}

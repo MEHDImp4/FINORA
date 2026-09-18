@@ -183,16 +183,39 @@ const Animated = {
     },
     stop: () => {}
   }),
+  spring: (val, config) => ({
+    start: (callback) => {
+      if (config && config.toValue !== undefined) {
+        val.setValue(config.toValue);
+      }
+      if (callback) callback({ finished: true });
+    },
+    stop: () => {}
+  }),
+  parallel: (animations) => ({
+    start: (callback) => {
+      if (Array.isArray(animations)) {
+        animations.forEach((a) => a && a.start && a.start());
+      }
+      if (callback) callback({ finished: true });
+    },
+    stop: () => {}
+  }),
   sequence: (animations) => ({
     start: (callback) => {
-      animations.forEach((a) => a.start());
+      if (Array.isArray(animations)) {
+        animations.forEach((a) => a && a.start && a.start());
+      }
       if (callback) callback({ finished: true });
     },
     stop: () => {}
   }),
   loop: (animation) => ({
     start: (callback) => {
-      animation.start();
+      if (animation && animation.start) {
+        animation.start();
+      }
+      if (callback) callback({ finished: true });
     },
     stop: () => {}
   }),

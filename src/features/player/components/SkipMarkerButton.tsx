@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ChapterMarker } from "../../../types/media";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
+import { useTranslation } from "../../../i18n";
 
 export interface SkipMarkerButtonProps {
   chapters?: ChapterMarker[];
@@ -19,6 +20,7 @@ export function SkipMarkerButton({
   durationSeconds = 0,
   onSeek
 }: SkipMarkerButtonProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   if (!chapters || chapters.length === 0) {
     return null;
@@ -73,7 +75,7 @@ export function SkipMarkerButton({
         testID="skip-intro-button"
       >
         <FinoraText variant="body" style={styles.buttonText}>
-          Passer l'intro
+          {t("player.skipIntro")}
         </FinoraText>
         <Ionicons name="play-skip-forward" size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
       </Pressable>
@@ -112,7 +114,7 @@ export function SkipMarkerButton({
         testID="skip-credits-button"
       >
         <FinoraText variant="body" style={styles.buttonText}>
-          Passer le générique
+          {t("player.skipOutro")}
         </FinoraText>
         <Ionicons name="play-skip-forward" size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
       </Pressable>
@@ -127,24 +129,25 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 85,
     right: spacing.lg,
-    backgroundColor: "rgba(20, 20, 26, 0.88)",
-    borderColor: "#FFFFFF",
-    borderWidth: 1,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 8,
+    backgroundColor: "rgba(16, 16, 24, 0.88)",
+    borderColor: "rgba(255, 255, 255, 0.35)",
+    borderWidth: 1.5,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
     flexDirection: "row",
     alignItems: "center",
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 5,
-    elevation: 6,
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 8,
     zIndex: 25
   },
   buttonText: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: "700"
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.3
   }
 });

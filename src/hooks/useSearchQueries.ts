@@ -22,3 +22,25 @@ export function useSearchMedia(
     staleTime: 60 * 1000
   });
 }
+
+const DEFAULT_SUGGESTION_ITEM_TYPES = ["Movie", "Series"];
+
+export function useSearchSuggestions(
+  userId?: string,
+  itemTypes: string[] = DEFAULT_SUGGESTION_ITEM_TYPES
+) {
+  return useQuery<MediaItem[]>({
+    queryKey: [...searchKeys.all, "suggestions", userId || "", itemTypes],
+    queryFn: () =>
+      mediaRepository.getItems(userId!, {
+        includeItemTypes: itemTypes,
+        sortBy: "CommunityRating,SortName",
+        sortOrder: "Descending",
+        limit: 24,
+        recursive: true
+      }),
+    enabled: Boolean(userId),
+    staleTime: 5 * 60 * 1000
+  });
+}
+

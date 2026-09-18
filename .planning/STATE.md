@@ -123,6 +123,7 @@ Items acknowledged and carried forward from previous milestone close:
 | add-github-community-feedback-settings | 2026-09-18 | Add GitHub repository, bug reporting, and feature suggestion links in Settings | Complete ✓ |
 | fix-hero-genre-badge-action-and-empty | 2026-09-18 | Prevent hero genre badge line-wrap glitch and localize genres | Complete ✓ |
 | interactive-question-driven-onboarding | 2026-09-18 | Revamp onboarding with question-driven interactive steps and fluid spring transitions | Complete ✓ |
+| player-cinematic-redesign | 2026-09-18 | Complete visual & UX redesign of video player with cinematic gradients, glowing hero controls, premium scrubber with chapters, and luxury sheets | Complete ✓ |
 
 ## Session Continuity
  

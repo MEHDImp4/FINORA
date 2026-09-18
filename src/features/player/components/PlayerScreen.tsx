@@ -13,6 +13,7 @@ import { MediaItem } from "../../../types/media";
 import { useFinoraPlayer } from "../useFinoraPlayer";
 import { usePlaybackSession } from "../usePlaybackSession";
 import { createPlaybackPlan } from "../playbackPlanner";
+import { offlineStorageService } from "../../offline/offlineStorage";
 import { CinematicOverlay } from "./CinematicOverlay";
 import { PlayerGestures } from "./PlayerGestures";
 import { TrackSelectionModal } from "./TrackSelectionModal";
@@ -434,15 +435,37 @@ export function PlayerScreen({
   useEffect(() => {
     let active = true;
 
-    if (
-      item.type === "Episode" &&
-      item.seriesId &&
-      item.seasonId &&
-      item.episodeIndex != null
-    ) {
+    if (item.type === "Episode" && item.seriesId) {
       const fetchNextEpisode = async () => {
         try {
-          const url = `${serverUrl}/Shows/${item.seriesId}/Episodes?seasonId=${item.seasonId}${token ? `&api_key=${encodeURIComponent(token)}` : ""}&startItemId=${item.id}&limit=1&fields=IndexNumber,Name`;
+          // Mode hors ligne
+          if (localPath) {
+            const allRecords = await offlineStorageService.getAllOfflineMedia();
+            if (!active) return;
+            const downloaded = allRecords.filter((r) => r.seriesId === item.seriesId);
+            const sorted = downloaded.sort((a, b) => {
+              const sA = a.seasonIndex ?? 1;
+              const sB = b.seasonIndex ?? 1;
+              if (sA !== sB) return sA - sB;
+              return (a.episodeIndex ?? 0) - (b.episodeIndex ?? 0);
+            });
+            const currentIndex = sorted.findIndex((ep) => ep.itemId === item.id);
+            if (currentIndex !== -1 && currentIndex + 1 < sorted.length) {
+              const next = sorted[currentIndex + 1];
+              setNextEpisode({
+                id: next.itemId,
+                name: next.title,
+                label: `S${next.seasonIndex || 1} E${next.episodeIndex || (item.episodeIndex || 0) + 1}`
+              });
+              return;
+            }
+          }
+
+          // Mode en ligne : interroger Jellyfin pour tous les épisodes de la saison ou de la série
+          const endpoint = item.seasonId
+            ? `/Shows/${item.seriesId}/Episodes?seasonId=${item.seasonId}&fields=IndexNumber,ParentIndexNumber,Name,Id`
+            : `/Shows/${item.seriesId}/Episodes?fields=IndexNumber,ParentIndexNumber,Name,Id`;
+          const url = `${serverUrl}${endpoint}${token ? `&api_key=${encodeURIComponent(token)}` : ""}`;
           const res = await fetch(url, {
             headers: {
               Authorization: formatAuthorizationHeader("finora-mobile", token)
@@ -450,12 +473,49 @@ export function PlayerScreen({
           });
           if (!res.ok || !active) return;
           const data = await res.json();
-          const next = data.Items?.[0];
-          if (next && next.Id !== item.id && active) {
+          const items: any[] = data.Items || [];
+          if (!active || items.length === 0) return;
+
+          let next: any = null;
+          // 1. Chercher par ID exact
+          const currentIndex = items.findIndex((ep) => ep.Id === item.id);
+          if (currentIndex !== -1 && currentIndex + 1 < items.length) {
+            next = items[currentIndex + 1];
+          } else if (item.episodeIndex != null) {
+            // 2. Fallback par numéro d'épisode dans la saison
+            next = items.find(
+              (ep) =>
+                ep.IndexNumber === (item.episodeIndex || 0) + 1 &&
+                (item.seasonIndex == null || ep.ParentIndexNumber == null || ep.ParentIndexNumber === item.seasonIndex)
+            );
+          }
+
+          // 3. Si on était au dernier épisode de la saison, interroger la série complète pour la saison d'après
+          if (!next && item.seasonId) {
+            const seriesUrl = `${serverUrl}/Shows/${item.seriesId}/Episodes?fields=IndexNumber,ParentIndexNumber,Name,Id${token ? `&api_key=${encodeURIComponent(token)}` : ""}`;
+            const seriesRes = await fetch(seriesUrl, {
+              headers: {
+                Authorization: formatAuthorizationHeader("finora-mobile", token)
+              }
+            });
+            if (seriesRes.ok && active) {
+              const seriesData = await seriesRes.json();
+              const allItems: any[] = seriesData.Items || [];
+              const cIdx = allItems.findIndex((ep) => ep.Id === item.id);
+              if (cIdx !== -1 && cIdx + 1 < allItems.length) {
+                next = allItems[cIdx + 1];
+              }
+            }
+          }
+
+          if (next && active) {
+            const sNum = next.ParentIndexNumber ?? item.seasonIndex ?? 1;
+            const eNum = next.IndexNumber ?? ((item.episodeIndex || 0) + 1);
+            logger.info(`[PlayerScreen] Next episode identified: id=${next.Id} (S${sNum} E${eNum})`);
             setNextEpisode({
               id: next.Id,
               name: next.Name || "",
-              label: `E${next.IndexNumber || (item.episodeIndex || 0) + 1}`
+              label: `S${sNum} E${eNum}`
             });
           }
         } catch {
@@ -471,7 +531,7 @@ export function PlayerScreen({
     return () => {
       active = false;
     };
-  }, [item.id, item.type, item.seriesId, item.seasonId, item.episodeIndex, serverUrl, token]);
+  }, [item.id, item.type, item.seriesId, item.seasonId, item.episodeIndex, item.seasonIndex, serverUrl, token, localPath]);
 
   // Trigger next episode countdown overlay when playback ends
   useEffect(() => {

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../../../design-system/tokens";
+import { useTranslation } from "../../../i18n";
 
 export interface NextEpisodeOverlayProps {
   visible: boolean;
@@ -22,6 +23,7 @@ export function NextEpisodeOverlay({
   onPlayNext,
   onCancel
 }: NextEpisodeOverlayProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [remaining, setRemaining] = useState(countdownSeconds);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -70,7 +72,7 @@ export function NextEpisodeOverlay({
         <View style={styles.infoRow}>
           <View style={styles.textColumn}>
             <FinoraText variant="caption" style={styles.upNextLabel}>
-              SUIVANT
+              {t("player.upNext")}
             </FinoraText>
             <FinoraText variant="body" style={styles.episodeName} numberOfLines={1}>
               {nextEpisodeLabel}
@@ -96,7 +98,7 @@ export function NextEpisodeOverlay({
 
         <Pressable onPress={onCancel} style={styles.cancelButton} testID="next-episode-cancel">
           <FinoraText variant="caption" style={styles.cancelText}>
-            Annuler ({remaining}s)
+            {t("player.cancelCountdown", { seconds: remaining })}
           </FinoraText>
         </Pressable>
       </View>
@@ -114,11 +116,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg
   },
   card: {
-    backgroundColor: "rgba(20, 20, 26, 0.92)",
-    borderRadius: 12,
+    backgroundColor: "rgba(16, 16, 24, 0.95)",
+    borderRadius: 18,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)"
+    borderColor: "rgba(255, 255, 255, 0.14)",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 16,
+    elevation: 14
   },
   infoRow: {
     flexDirection: "row",
@@ -132,32 +139,38 @@ const styles = StyleSheet.create({
   upNextLabel: {
     color: colors.primary,
     fontSize: 10,
-    fontWeight: "700",
+    fontWeight: "800",
     letterSpacing: 1.5,
     marginBottom: 4
   },
   episodeName: {
-    color: colors.textPrimary,
-    fontWeight: "600",
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 15,
     marginBottom: 2
   },
   episodeTitle: {
     color: colors.textSecondary,
-    fontSize: 12
+    fontSize: 13
   },
   playButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: colors.primary,
     justifyContent: "center",
-    alignItems: "center"
+    alignItems: "center",
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 8
   },
   progressTrack: {
-    height: 3,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    height: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
     borderRadius: 2,
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
     overflow: "hidden"
   },
   progressBar: {
@@ -173,6 +186,7 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: colors.textMuted,
-    fontSize: 11
+    fontSize: 11,
+    fontWeight: "600"
   }
 });

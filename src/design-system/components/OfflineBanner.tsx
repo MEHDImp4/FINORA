@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { FinoraText } from "./FinoraText";
 import { colors, spacing } from "../tokens";
 import { hapticService } from "../../core/feedback/hapticService";
+import { useTranslation } from "../../i18n";
 
 export interface OfflineBannerProps {
   isOffline: boolean;
@@ -15,12 +16,15 @@ export interface OfflineBannerProps {
 
 export function OfflineBanner({
   isOffline,
-  message = "You are currently offline. Showing cached content.",
+  message,
   onRetry,
   onDismiss
 }: OfflineBannerProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [isDismissed, setIsDismissed] = useState(false);
+
+  const displayMessage = message || t("errors.offlineBanner");
 
   // Reset dismissed state whenever offline status re-triggers
   useEffect(() => {
@@ -63,7 +67,7 @@ export function OfflineBanner({
         </View>
 
         <FinoraText variant="caption" weight="600" style={styles.message} numberOfLines={2}>
-          {message}
+          {displayMessage}
         </FinoraText>
 
         <View style={styles.actionsGroup}>
@@ -72,7 +76,7 @@ export function OfflineBanner({
               onPress={handleRetry}
               style={styles.actionButton}
               accessibilityRole="button"
-              accessibilityLabel="Réessayer la connexion"
+              accessibilityLabel={t("errors.retryConnection")}
               hitSlop={8}
             >
               <Ionicons name="refresh" size={16} color="#FFFFFF" />
@@ -83,7 +87,7 @@ export function OfflineBanner({
             onPress={handleDismiss}
             style={styles.actionButton}
             accessibilityRole="button"
-            accessibilityLabel="Fermer le message"
+            accessibilityLabel={t("common.closeA11y")}
             hitSlop={8}
           >
             <Ionicons name="close" size={18} color="rgba(255, 255, 255, 0.7)" />

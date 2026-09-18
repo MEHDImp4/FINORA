@@ -243,4 +243,95 @@ describe("AuthRepository", () => {
       expect(mockClient.setAuthToken).toHaveBeenCalledWith(null);
     });
   });
+
+  describe("getPublicUsers", () => {
+    it("fetches and maps public users from server", async () => {
+      mockHttpClient.request.mockResolvedValue([
+        {
+          Id: "user-1",
+          Name: "Alice",
+          ServerId: "server-001",
+          PrimaryImageTag: "tag-alice",
+          HasPassword: true
+        },
+        {
+          Id: "user-2",
+          Name: "Bob",
+          ServerId: "server-001",
+          HasPassword: false
+        }
+      ]);
+
+      const users = await repository.getPublicUsers("https://jellyfin.example.com", mockHttpClient);
+
+      expect(users).toHaveLength(2);
+      expect(users[0]).toEqual({
+        id: "user-1",
+        name: "Alice",
+        serverId: "server-001",
+        primaryImageTag: "tag-alice",
+        hasPassword: true
+      });
+      expect(users[1]).toEqual({
+        id: "user-2",
+        name: "Bob",
+        serverId: "server-001",
+        primaryImageTag: undefined,
+        hasPassword: false
+      });
+    });
+
+    it("returns empty array on network or server error", async () => {
+      mockHttpClient.request.mockRejectedValue(new Error("500 Server Error"));
+
+      const users = await repository.getPublicUsers("https://jellyfin.example.com", mockHttpClient);
+
+      expect(users).toEqual([]);
+    });
+
+    it("returns empty array when given an empty server URL", async () => {
+      const users = await repository.getPublicUsers("", mockHttpClient);
+      expect(users).toEqual([]);
+      expect(mockHttpClient.request).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getAvailableUsers", () => {
+    it("combines public and authenticated users when authenticated", async () => {
+      mockHttpClient.request
+        .mockResolvedValueOnce([
+          { Id: "pub-1", Name: "PublicUser", HasPassword: false }
+        ])
+        .mockResolvedValueOnce([
+          { Id: "auth-1", Name: "AdminUser", HasPassword: true },
+          { Id: "pub-1", Name: "PublicUser", HasPassword: false }
+        ]);
+
+      const users = await repository.getAvailableUsers(
+        "https://jellyfin.example.com",
+        true,
+        mockHttpClient
+      );
+
+      expect(users).toHaveLength(2);
+      expect(users.map((u) => u.name)).toEqual(["PublicUser", "AdminUser"]);
+    });
+
+    it("falls back gracefully to public users if /Users fails", async () => {
+      mockHttpClient.request
+        .mockResolvedValueOnce([
+          { Id: "pub-1", Name: "PublicUser", HasPassword: false }
+        ])
+        .mockRejectedValueOnce(new Error("403 Forbidden"));
+
+      const users = await repository.getAvailableUsers(
+        "https://jellyfin.example.com",
+        true,
+        mockHttpClient
+      );
+
+      expect(users).toHaveLength(1);
+      expect(users[0].name).toBe("PublicUser");
+    });
+  });
 });

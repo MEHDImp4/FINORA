@@ -1,3 +1,4 @@
+import { NativeModules, Platform } from "react-native";
 import BackgroundService from "react-native-background-actions";
 import { logger } from "../network/logger";
 import { notificationService } from "./notificationService";
@@ -18,6 +19,20 @@ const NOTIFICATION_LINKING_URI = "finora://downloads";
 
 let _active = false;
 let _permissionRequested = false;
+let _hasLoggedUnsupported = false;
+let _startFailed = false;
+
+/**
+ * Checks whether the native background service is supported in the current runtime.
+ * In Expo Go, web, or environments where NativeModules.RNBackgroundActions is not linked,
+ * calling BackgroundService.start throws: Cannot read property 'start' of null.
+ */
+export function isBackgroundServiceSupported(): boolean {
+  return (
+    Platform.OS === "android" &&
+    Boolean((NativeModules as any)?.RNBackgroundActions)
+  );
+}
 
 /**
  * Android 13+ requires the runtime POST_NOTIFICATIONS permission for the
@@ -58,6 +73,21 @@ export async function startDownloadForeground(
   description: string,
   progressPercent?: number
 ): Promise<void> {
+  if (!isBackgroundServiceSupported()) {
+    if (!_hasLoggedUnsupported) {
+      _hasLoggedUnsupported = true;
+      logger.info(
+        "[ForegroundService] Native module RNBackgroundActions not available (e.g. running in Expo Go). Foreground service bypassed."
+      );
+    }
+    return;
+  }
+
+  // If a previous start attempt failed for this active download batch, don't spam attempts on every progress tick.
+  if (_startFailed) {
+    return;
+  }
+
   const determinate = typeof progressPercent === "number";
 
   if (_active && BackgroundService.isRunning()) {
@@ -95,6 +125,7 @@ export async function startDownloadForeground(
     logger.info("[ForegroundService] Started");
   } catch (err: any) {
     // Non-fatal — downloads still work, just without process protection.
+    _startFailed = true;
     logger.warn("[ForegroundService] Failed to start:", err?.message ?? err);
   }
 }
@@ -105,7 +136,7 @@ export async function updateDownloadNotification(
   description: string,
   progressPercent: number
 ): Promise<void> {
-  if (!_active) return;
+  if (!isBackgroundServiceSupported() || !_active || _startFailed) return;
   try {
     await BackgroundService.updateNotification({
       taskTitle: title,
@@ -123,7 +154,12 @@ export async function updateDownloadNotification(
 
 /** Stops the foreground service. */
 export async function stopDownloadForeground(): Promise<void> {
-  if (!_active) return;
+  _startFailed = false;
+  if (!isBackgroundServiceSupported() || !_active) {
+    _active = false;
+    return;
+  }
+
   try {
     await BackgroundService.stop();
     logger.info("[ForegroundService] Stopped");
@@ -135,5 +171,14 @@ export async function stopDownloadForeground(): Promise<void> {
 }
 
 export function isForegroundActive(): boolean {
-  return _active && BackgroundService.isRunning();
+  return isBackgroundServiceSupported() && _active && BackgroundService.isRunning();
 }
+
+/** Internal helper strictly for unit tests */
+export function _resetForegroundServiceStateForTesting(): void {
+  _active = false;
+  _permissionRequested = false;
+  _hasLoggedUnsupported = false;
+  _startFailed = false;
+}
+

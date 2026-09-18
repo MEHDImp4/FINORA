@@ -19,6 +19,7 @@
 
 import * as TaskManager from "expo-task-manager";
 import * as BackgroundTask from "expo-background-task";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { authRepository } from "../../core/jellyfin/authRepository";
 import { jellyfinClient } from "../../core/jellyfin/jellyfinClient";
@@ -36,6 +37,50 @@ export const BACKGROUND_NOTIFICATION_INTERVAL_MINUTES = 15;
 // as 900 minutes (~15h), so version 2 forces one clean re-registration.
 const BACKGROUND_TASK_CONFIG_VERSION = 2;
 const BACKGROUND_TASK_CONFIG_VERSION_KEY = "@finora_background_task_config_version";
+
+/**
+ * Checks whether the current runtime is Expo Go.
+ * In Expo Go, expo-background-task is not supported and unregistering tasks
+ * registered by other consumers triggers InvalidConsumerClassException.
+ */
+export function isExpoGoEnvironment(): boolean {
+  const appOwnership = Constants?.appOwnership;
+  const executionEnv = Constants?.executionEnvironment;
+  const storeClient = ExecutionEnvironment?.StoreClient || "storeClient";
+  if (appOwnership === "expo" || executionEnv === storeClient) {
+    return true;
+  }
+  try {
+    const { requireNativeModule } = require("expo-modules-core");
+    return requireNativeModule("ExpoGo") != null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Unregisters a task safely. If BackgroundTask.unregisterTaskAsync rejects
+ * (e.g. because of InvalidConsumerClassException from a legacy consumer class),
+ * falls back to TaskManager.unregisterTaskAsync which removes the task without
+ * consumer-class validation.
+ */
+export async function safeUnregisterTask(taskName: string): Promise<void> {
+  try {
+    await BackgroundTask.unregisterTaskAsync(taskName);
+  } catch (err: any) {
+    logger.info(
+      `[BgTask] BackgroundTask unregister failed (${err?.message ?? err}); falling back to TaskManager.unregisterTaskAsync.`
+    );
+    try {
+      await TaskManager.unregisterTaskAsync(taskName);
+    } catch (fallbackErr: any) {
+      logger.warn(
+        `[BgTask] TaskManager.unregisterTaskAsync also failed: ${fallbackErr?.message ?? fallbackErr}`
+      );
+      throw err;
+    }
+  }
+}
 
 TaskManager.defineTask(FINORA_BG_FETCH_TASK, async () => {
   try {
@@ -77,6 +122,17 @@ TaskManager.defineTask(FINORA_BG_FETCH_TASK, async () => {
  */
 export async function registerBackgroundFetch(): Promise<void> {
   try {
+    if (isExpoGoEnvironment()) {
+      logger.info(
+        "[BgTask] Background task skipped: Expo Go environment detected (background tasks require dev-client or standalone build)."
+      );
+      const isRegistered = await TaskManager.isTaskRegisteredAsync(FINORA_BG_FETCH_TASK);
+      if (isRegistered) {
+        await TaskManager.unregisterTaskAsync(FINORA_BG_FETCH_TASK).catch(() => {});
+      }
+      return;
+    }
+
     const [isRegistered, storedVersion] = await Promise.all([
       TaskManager.isTaskRegisteredAsync(FINORA_BG_FETCH_TASK),
       AsyncStorage.getItem(BACKGROUND_TASK_CONFIG_VERSION_KEY)
@@ -89,7 +145,7 @@ export async function registerBackgroundFetch(): Promise<void> {
     }
 
     if (isRegistered) {
-      await BackgroundTask.unregisterTaskAsync(FINORA_BG_FETCH_TASK);
+      await safeUnregisterTask(FINORA_BG_FETCH_TASK);
     }
 
     await BackgroundTask.registerTaskAsync(FINORA_BG_FETCH_TASK, {
@@ -117,7 +173,11 @@ export async function unregisterBackgroundFetch(): Promise<void> {
   try {
     const isRegistered = await TaskManager.isTaskRegisteredAsync(FINORA_BG_FETCH_TASK);
     if (isRegistered) {
-      await BackgroundTask.unregisterTaskAsync(FINORA_BG_FETCH_TASK);
+      if (isExpoGoEnvironment()) {
+        await TaskManager.unregisterTaskAsync(FINORA_BG_FETCH_TASK).catch(() => {});
+      } else {
+        await safeUnregisterTask(FINORA_BG_FETCH_TASK);
+      }
     }
     await AsyncStorage.removeItem(BACKGROUND_TASK_CONFIG_VERSION_KEY).catch(() => {});
     logger.info("[BgTask] Background content check task unregistered.");
@@ -125,3 +185,4 @@ export async function unregisterBackgroundFetch(): Promise<void> {
     logger.warn("[BgTask] Failed to unregister background task:", err?.message ?? err);
   }
 }
+

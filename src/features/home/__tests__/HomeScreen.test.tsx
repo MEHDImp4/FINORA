@@ -5,6 +5,7 @@ import HomeScreen from "../../../app/(tabs)/index";
 import { useAuthStore } from "../../../stores/authStore";
 import { useResumeItems, useRecentlyAdded, useLibraries, useWatchlistItems } from "../../../hooks/useMediaQueries";
 import { useToggleFavorite } from "../../../hooks/useUserDataMutations";
+import { translate } from "../../../i18n";
 
 const mockPush = jest.fn();
 jest.mock("expo-router", () => ({
@@ -111,8 +112,8 @@ describe("HomeScreen", () => {
     );
     const root = component.root;
 
-    expect(root.findByProps({ title: "Continuer à regarder" })).toBeDefined();
-    expect(root.findByProps({ title: "Ajouts récents" })).toBeDefined();
+    expect(root.findByProps({ title: translate("home.continueWatching", undefined, "en") })).toBeDefined();
+    expect(root.findByProps({ title: translate("home.recentlyAdded", undefined, "en") })).toBeDefined();
 
     ReactTestRenderer.act(() => {
       component.unmount();
@@ -139,7 +140,7 @@ describe("HomeScreen", () => {
     });
 
     const root = component.root;
-    expect(root.findByProps({ accessibilityLabel: "À la une : Oppenheimer" })).toBeDefined();
+    expect(root.findByProps({ accessibilityLabel: translate("home.featured", { title: "Oppenheimer" }, "en") })).toBeDefined();
 
     const scrollView = root.findByType("ScrollView" as any);
     expect(scrollView.props.refreshControl).toBeDefined();
@@ -147,12 +148,12 @@ describe("HomeScreen", () => {
     await ReactTestRenderer.act(async () => {
       await scrollView.props.refreshControl.props.onRefresh();
     });
-    expect(root.findByProps({ accessibilityLabel: "À la une : Interstellar" })).toBeDefined();
+    expect(root.findByProps({ accessibilityLabel: translate("home.featured", { title: "Interstellar" }, "en") })).toBeDefined();
 
     await ReactTestRenderer.act(async () => {
       await scrollView.props.refreshControl.props.onRefresh();
     });
-    expect(root.findByProps({ accessibilityLabel: "À la une : Oppenheimer" })).toBeDefined();
+    expect(root.findByProps({ accessibilityLabel: translate("home.featured", { title: "Oppenheimer" }, "en") })).toBeDefined();
 
     ReactTestRenderer.act(() => {
       component.unmount();
@@ -196,7 +197,7 @@ describe("HomeScreen", () => {
     );
     const root = component.root;
 
-    const watchlistPill = root.findByProps({ accessibilityLabel: "Parcourir ma liste" });
+    const watchlistPill = root.findByProps({ accessibilityLabel: translate("home.myList", undefined, "en") });
     ReactTestRenderer.act(() => {
       watchlistPill.props.onPress();
     });
@@ -205,7 +206,7 @@ describe("HomeScreen", () => {
       params: { tab: "watchlist" }
     });
 
-    const moviesPill = root.findByProps({ accessibilityLabel: "Parcourir les films" });
+    const moviesPill = root.findByProps({ accessibilityLabel: "Movies" });
     ReactTestRenderer.act(() => {
       moviesPill.props.onPress();
     });

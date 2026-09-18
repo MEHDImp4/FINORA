@@ -57,6 +57,8 @@ const mockMovie: MediaItem = {
   ]
 };
 
+import { translate } from "../../../i18n";
+
 describe("MovieDetailsView", () => {
   it("renders movie metadata, specs, tagline, and cast list accurately", () => {
     let root: renderer.ReactTestRenderer;
@@ -97,7 +99,7 @@ describe("MovieDetailsView", () => {
       );
     });
 
-    const playButton = root!.root.findByProps({ label: "Lire" });
+    const playButton = root!.root.findByProps({ label: translate("details.play") });
     act(() => {
       playButton.props.onPress();
     });
@@ -124,7 +126,15 @@ describe("MovieDetailsView", () => {
       );
     });
 
-    expect(root!.root.findByProps({ label: "Reprendre (42 %)" })).toBeTruthy();
+    const expectedA11yLabel = translate("details.resumeWithProgress", { percent: 42 });
+    expect(expectedA11yLabel).toBe("Resume (42%)");
+    expect(
+      root!.root.findByProps({
+        label: translate("details.resume"),
+        badge: "42%",
+        accessibilityLabel: expectedA11yLabel
+      })
+    ).toBeTruthy();
   });
 
   it("handles back button and favorite toggle", () => {
@@ -144,16 +154,47 @@ describe("MovieDetailsView", () => {
       );
     });
 
-    const backButton = root!.root.findByProps({ accessibilityLabel: "Retour" });
+    const backButton = root!.root.findByProps({ accessibilityLabel: translate("common.back") });
     act(() => {
       backButton.props.onPress();
     });
     expect(onBack).toHaveBeenCalled();
 
-    const watchlistButton = root!.root.findByProps({ accessibilityLabel: "Ajouter à ma liste" });
+    const watchlistButton = root!.root.findByProps({ accessibilityLabel: translate("details.addToMyList") });
     act(() => {
       watchlistButton.props.onPress();
     });
     expect(onToggleFavorite).toHaveBeenCalledWith(mockMovie);
+  });
+
+  it("triggers onDownload directly on download button press with defaultDownloadQuality and opens modal on long-press", () => {
+    const onDownload = jest.fn();
+
+    let root: renderer.ReactTestRenderer;
+    act(() => {
+      root = renderer.create(
+        <MovieDetailsView
+          item={mockMovie}
+          serverUrl="https://jellyfin.example.com"
+          onPlay={jest.fn()}
+          onBack={jest.fn()}
+          onDownload={onDownload}
+        />
+      );
+    });
+
+    const downloadButton = root!.root.findByProps({ accessibilityLabel: translate("details.download") });
+    // Press directly
+    act(() => {
+      downloadButton.props.onPress();
+    });
+    expect(onDownload).toHaveBeenCalledWith(mockMovie, "1080p");
+
+    // Long-press opens modal
+    act(() => {
+      downloadButton.props.onLongPress();
+    });
+    const modal = root!.root.findByProps({ testID: "download-quality-modal" });
+    expect(modal).toBeTruthy();
   });
 });

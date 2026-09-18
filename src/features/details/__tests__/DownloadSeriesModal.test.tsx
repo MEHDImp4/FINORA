@@ -3,6 +3,7 @@ import renderer, { act } from "react-test-renderer";
 import { DownloadSeriesModal } from "../components/DownloadSeriesModal";
 import { MediaItem } from "../../../types/media";
 import { mediaRepository } from "../../../core/repositories/mediaRepository";
+import { translate } from "../../../i18n";
 
 jest.mock("../../../core/repositories/mediaRepository");
 
@@ -147,7 +148,7 @@ describe("DownloadSeriesModal", () => {
     // Confirm button should be active and trigger download of 3 unplayed episodes
     const downloadBtn = root.root.findByProps({ testID: "confirm-download-button" });
     expect(downloadBtn).toBeTruthy();
-    expect(downloadBtn.props.label).toBe("Télécharger (3)");
+    expect(downloadBtn.props.label).toBe(translate("details.downloadWithCount", { count: 3 }));
 
     await act(async () => {
       downloadBtn.props.onPress();
@@ -159,7 +160,7 @@ describe("DownloadSeriesModal", () => {
     expect(downloadedEpisodes).toHaveLength(3);
     expect(downloadedEpisodes.every((ep) => !ep.isPlayed)).toBe(true);
     expect(downloadedEpisodes.map((ep) => ep.id)).toEqual(["ep-1-2", "ep-1-3", "ep-2-1"]);
-    expect(chosenQuality).toBe("original");
+    expect(chosenQuality).toBe("1080p");
     expect(onCloseMock).toHaveBeenCalledTimes(1);
   });
 });

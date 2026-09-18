@@ -34,6 +34,8 @@ import { hapticService } from "../../../core/feedback/hapticService";
 import { MediaCarousel } from "../../home/components/MediaCarousel";
 import { useSimilarItems } from "../../../hooks/useMediaQueries";
 import { MediaQuickActionsModal } from "../../home/components/MediaQuickActionsModal";
+import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
+import { useTranslation } from "../../../i18n";
 
 export interface SeriesDetailsViewProps {
   series: MediaItem;
@@ -67,12 +69,16 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
     onDownloadEpisodes
   }) => {
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation();
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
     const [selectedSeasonId, setSelectedSeasonId] = useState<string>("");
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
     const [selectedEpisodeForDownload, setSelectedEpisodeForDownload] =
       useState<MediaItem | null>(null);
     const [actionItem, setActionItem] = useState<MediaItem | null>(null);
+
+    const defaultDownloadQuality =
+      usePlaybackPreferencesStore((s) => s.preferences.defaultDownloadQuality) || "1080p";
 
     const handleTogglePlayedAction = React.useCallback(
       (item: MediaItem, played: boolean) => {
@@ -191,7 +197,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
 
           <View style={[styles.topBar, { top: Math.max(insets.top, 16) + 8 }]}>
             <FinoraIconButton
-              accessibilityLabel="Retour"
+              accessibilityLabel={t("common.back")}
               onPress={onBack}
               size={40}
               backgroundColor="rgba(10, 10, 12, 0.6)"
@@ -227,7 +233,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
 
           {seasons.length > 0 ? (
             <FinoraText variant="caption" color="textSecondary" style={styles.badgeText}>
-              {`${seasons.length} saison${seasons.length > 1 ? "s" : ""}`}
+              {t("details.seasonCount", { count: seasons.length, plural: seasons.length > 1 ? "s" : "" })}
             </FinoraText>
           ) : null}
 
@@ -254,9 +260,12 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
             label={
               nextEpisodeToPlay
                 ? typeof nextEpisodeToPlay.episodeIndex === "number"
-                  ? `Lire S${nextEpisodeToPlay.seasonIndex ?? 1}:E${nextEpisodeToPlay.episodeIndex}`
-                  : "Lire l'épisode suivant"
-                : "Lire"
+                  ? t("details.playEpisodeSpecific", {
+                      season: nextEpisodeToPlay.seasonIndex ?? 1,
+                      episode: nextEpisodeToPlay.episodeIndex
+                    })
+                  : t("details.playNextEpisode")
+                : t("details.play")
             }
             variant="primary"
             size="lg"
@@ -272,7 +281,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
 
           {onToggleFavorite ? (
             <FinoraIconButton
-              accessibilityLabel={series.isFavorite ? "Retirer de ma liste" : "Ajouter à ma liste"}
+              accessibilityLabel={series.isFavorite ? t("details.removeFromMyList") : t("details.addToMyList")}
               onPress={() => onToggleFavorite(series)}
               size={48}
               backgroundColor={series.isFavorite ? colors.primary : colors.surface}
@@ -286,7 +295,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
           ) : null}
 
           <FinoraIconButton
-            accessibilityLabel="Télécharger la série"
+            accessibilityLabel={t("details.downloadSeries")}
             onPress={() => {
               hapticService.impactLight();
               setIsDownloadModalOpen(true);
@@ -303,7 +312,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
             onPress={() => setIsOverviewExpanded(!isOverviewExpanded)}
             style={styles.overviewContainer}
             accessibilityRole="button"
-            accessibilityLabel={isOverviewExpanded ? "Réduire le synopsis" : "Développer le synopsis"}
+            accessibilityLabel={isOverviewExpanded ? t("common.seeLess") : t("common.seeMore")}
           >
             <FinoraText
               variant="body"
@@ -314,7 +323,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
             </FinoraText>
             {series.overview.length > 150 ? (
               <FinoraText variant="caption" color={colors.primary} style={styles.expandText}>
-                {isOverviewExpanded ? "Voir moins" : "Voir plus"}
+                {isOverviewExpanded ? t("common.seeLess") : t("common.seeMore")}
               </FinoraText>
             ) : null}
           </Pressable>
@@ -336,7 +345,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
 
         <View style={styles.episodesSection}>
           <FinoraText variant="title" style={styles.sectionTitle}>
-            Épisodes
+            {t("details.episodes")}
           </FinoraText>
           {isLoadingEpisodes ? (
             <EpisodeListSkeleton count={6} />
@@ -353,13 +362,19 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
                 }}
                 onDownload={(episode) => {
                   hapticService.impactMedium();
+                  if (onDownloadEpisodes) {
+                    onDownloadEpisodes([episode], defaultDownloadQuality);
+                  }
+                }}
+                onLongPressDownload={(episode) => {
+                  hapticService.impactHeavy();
                   setSelectedEpisodeForDownload(episode);
                 }}
               />
             ))
           ) : (
             <FinoraText variant="caption" color="textMuted" style={styles.emptyText}>
-              Aucun épisode pour cette saison.
+              {t("details.noEpisodesForSeason")}
             </FinoraText>
           )}
         </View>
@@ -371,7 +386,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
         {similarItems && similarItems.length > 0 ? (
           <View style={{ marginTop: spacing.md }}>
             <MediaCarousel
-              title="Titres similaires"
+              title={t("details.similar")}
               items={similarItems}
               serverUrl={serverUrl}
               variant="poster"
@@ -496,6 +511,8 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   ratingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "rgba(255, 184, 0, 0.15)",
     paddingHorizontal: 6,
     paddingVertical: 2,

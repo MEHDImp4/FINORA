@@ -19,6 +19,7 @@ import {
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { useTranslation } from "../../../i18n";
 
 export interface MediaQuickActionsModalProps {
   visible: boolean;
@@ -121,6 +122,7 @@ export function MediaQuickActionsModal({
   onToggleFavorite
 }: MediaQuickActionsModalProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   if (!item) {
     return null;
@@ -140,7 +142,7 @@ export function MediaQuickActionsModal({
     ? typeof item.episodeIndex === "number"
       ? typeof item.seasonIndex === "number"
         ? `S${item.seasonIndex}:E${item.episodeIndex} · ${item.name}`
-        : `Épisode ${item.episodeIndex} · ${item.name}`
+        : `${t("common.episode")} ${item.episodeIndex} · ${item.name}`
       : item.name
     : isSeason
     ? item.name
@@ -232,21 +234,21 @@ export function MediaQuickActionsModal({
                   <View style={[styles.statusBadge, styles.statusPlayedBadge]}>
                     <Ionicons name="checkmark-circle" size={12} color="#4ADE80" />
                     <Text style={[styles.statusBadgeText, { color: "#4ADE80" }]}>
-                      Vu · Terminé
+                      {t("quickActions.statusPlayed")}
                     </Text>
                   </View>
                 ) : hasProgress ? (
                   <View style={[styles.statusBadge, styles.statusProgressBadge]}>
                     <Ionicons name="time" size={12} color="#FF6B6B" />
                     <Text style={[styles.statusBadgeText, { color: "#FF6B6B" }]}>
-                      En cours ({Math.round(item.playedPercentage)}%)
+                      {t("quickActions.statusInProgress", { percent: Math.round(item.playedPercentage) })}
                     </Text>
                   </View>
                 ) : (
                   <View style={[styles.statusBadge, styles.statusUnplayedBadge]}>
                     <Ionicons name="radio-button-off-outline" size={12} color="rgba(255, 255, 255, 0.5)" />
                     <Text style={[styles.statusBadgeText, { color: "rgba(255, 255, 255, 0.6)" }]}>
-                      Non commencé
+                      {t("quickActions.statusUnplayed")}
                     </Text>
                   </View>
                 )}
@@ -255,7 +257,7 @@ export function MediaQuickActionsModal({
                   <View style={[styles.statusBadge, styles.favoriteBadge]}>
                     <Ionicons name="heart" size={11} color="#E50914" />
                     <Text style={[styles.statusBadgeText, { color: "#E50914" }]}>
-                      Favori
+                      {t("quickActions.statusFavorite")}
                     </Text>
                   </View>
                 )}
@@ -289,13 +291,13 @@ export function MediaQuickActionsModal({
                 icon="checkmark-circle-outline"
                 iconColor="#4ADE80"
                 iconBg="rgba(74, 222, 128, 0.16)"
-                title="Marquer comme vu"
+                title={t("quickActions.markWatched")}
                 description={
                   isSeries
-                    ? "Marquer tous les épisodes comme terminés"
+                    ? t("quickActions.markWatchedSeriesDesc")
                     : isEpisode
-                    ? "Considérer cet épisode comme regardé"
-                    : "Considérer comme terminé"
+                    ? t("quickActions.markWatchedEpisodeDesc")
+                    : t("quickActions.markWatchedMovieDesc")
                 }
                 onPress={() => {
                   hapticService.impactMedium();
@@ -311,11 +313,11 @@ export function MediaQuickActionsModal({
                 icon="eye-off-outline"
                 iconColor="#FBBF24"
                 iconBg="rgba(251, 191, 36, 0.16)"
-                title="Marquer comme non vu"
+                title={t("quickActions.markUnwatched")}
                 description={
                   isSeries
-                    ? "Marquer toute la série comme non vue"
-                    : "Réinitialiser l'état et la progression à zéro"
+                    ? t("quickActions.markUnwatchedSeriesDesc")
+                    : t("quickActions.markUnwatchedDesc")
                 }
                 onPress={() => {
                   hapticService.impactMedium();
@@ -331,8 +333,8 @@ export function MediaQuickActionsModal({
                 icon="close-circle-outline"
                 iconColor="#FF4D4D"
                 iconBg="rgba(255, 77, 77, 0.16)"
-                title="Retirer de Reprendre la lecture"
-                description="Supprimer de la liste sans marquer comme vu"
+                title={t("quickActions.removeFromResume")}
+                description={t("quickActions.removeFromResumeDesc")}
                 onPress={() => {
                   hapticService.impactMedium();
                   onRemoveFromResume(item);
@@ -351,8 +353,8 @@ export function MediaQuickActionsModal({
                     ? "rgba(229, 9, 20, 0.16)"
                     : "rgba(255, 255, 255, 0.08)"
                 }
-                title={item.isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
-                description="Synchronisé avec votre compte Jellyfin"
+                title={item.isFavorite ? t("quickActions.removeFavorite") : t("quickActions.addFavorite")}
+                description={t("quickActions.favoriteSyncDesc")}
                 onPress={() => {
                   hapticService.impactMedium();
                   onToggleFavorite(item);
@@ -367,11 +369,11 @@ export function MediaQuickActionsModal({
                 icon="play-circle-outline"
                 iconColor="#FFFFFF"
                 iconBg="rgba(229, 9, 20, 0.3)"
-                title={hasProgress ? "Reprendre la lecture" : "Regarder"}
+                title={hasProgress ? t("quickActions.resume") : t("quickActions.watch")}
                 description={
                   hasProgress
-                    ? `Reprendre à ${Math.round(item.playedPercentage)}%`
-                    : "Lancer le lecteur vidéo FINORA"
+                    ? t("quickActions.resumeDesc", { percent: Math.round(item.playedPercentage) })
+                    : t("quickActions.watchDesc")
                 }
                 onPress={() => {
                   hapticService.impactLight();
@@ -387,8 +389,8 @@ export function MediaQuickActionsModal({
                 icon="information-circle-outline"
                 iconColor="#FFFFFF"
                 iconBg="rgba(255, 255, 255, 0.08)"
-                title="Voir la fiche détaillée"
-                description="Synopsis, casting, saisons et épisodes"
+                title={t("quickActions.viewDetails")}
+                description={t("quickActions.viewDetailsDesc")}
                 onPress={() => {
                   hapticService.impactLight();
                   onViewDetails(item);
@@ -410,9 +412,9 @@ export function MediaQuickActionsModal({
                 onClose();
               }}
               accessibilityRole="button"
-              accessibilityLabel="Fermer le menu"
+              accessibilityLabel={t("common.close")}
             >
-              <Text style={styles.closeButtonText}>Fermer</Text>
+              <Text style={styles.closeButtonText}>{t("common.close")}</Text>
             </Pressable>
           </View>
         </View>
@@ -432,18 +434,17 @@ const styles = StyleSheet.create({
     width: "92%",
     maxWidth: 440,
     maxHeight: "84%",
-    backgroundColor: "rgba(16, 16, 24, 0.95)",
-    borderRadius: 28,
+    backgroundColor: "#14141C",
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.16)",
-    borderTopColor: "rgba(255, 255, 255, 0.32)",
+    borderColor: "#262636",
     paddingTop: 12,
     paddingBottom: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.6,
-    shadowRadius: 24,
-    elevation: 24,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 16,
     overflow: "hidden"
   },
   handle: {
@@ -464,11 +465,11 @@ const styles = StyleSheet.create({
   posterContainer: {
     width: 58,
     height: 82,
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: "hidden",
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: "#1E1E28",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)"
+    borderColor: "#2A2A38"
   },
   posterImage: {
     width: "100%",
@@ -542,7 +543,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: "#22222E",
     marginHorizontal: 18,
     marginBottom: 8
   },

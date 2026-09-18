@@ -11,6 +11,7 @@ import { FinoraButton } from "../../../design-system/components/FinoraButton";
 import { colors, spacing } from "../../../design-system/tokens";
 import { hapticService } from "../../../core/feedback/hapticService";
 import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
+import { useTranslation } from "../../../i18n";
 
 export interface DownloadQualityModalProps {
   visible: boolean;
@@ -25,6 +26,7 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
   item,
   onConfirmDownload
 }) => {
+  const { t } = useTranslation();
   const defaultDownloadQuality =
     usePlaybackPreferencesStore((s) => s.preferences.defaultDownloadQuality) || "original";
   const [selectedQuality, setSelectedQuality] = useState<DownloadQuality>(defaultDownloadQuality);
@@ -39,6 +41,34 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
     hapticService.impactMedium();
     onConfirmDownload(selectedQuality);
     onClose();
+  };
+
+  const getProfileTitle = (id: DownloadQuality, fallback: string) => {
+    if (id === "original") return t("details.qualityOriginal");
+    return fallback;
+  };
+
+  const getProfileDesc = (id: DownloadQuality, fallback: string) => {
+    switch (id) {
+      case "original":
+        return t("details.qualityOriginalDesc");
+      case "1080p":
+        return t("details.quality1080pDesc");
+      case "720p":
+        return t("details.quality720pDesc");
+      case "480p":
+        return t("details.quality480pDesc");
+      default:
+        return fallback;
+    }
+  };
+
+  const getBadgeLabel = (badge?: string) => {
+    if (!badge) return null;
+    if (badge === "Recommandé" || badge === "Recommended") {
+      return t("details.badgeRecommended");
+    }
+    return badge;
   };
 
   return (
@@ -56,7 +86,7 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
               <FinoraText variant="title" style={styles.title}>
-                Qualité du téléchargement
+                {t("details.qualityModalTitle")}
               </FinoraText>
               <FinoraText variant="caption" style={styles.subtitle} numberOfLines={1}>
                 {item.name}
@@ -67,7 +97,7 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
               style={styles.closeButton}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Fermer"
+              accessibilityLabel={t("common.close")}
             >
               <Ionicons name="close" size={22} color={colors.textSecondary} />
             </Pressable>
@@ -76,11 +106,14 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
           {/* Qualities List */}
           <View style={styles.content}>
             <FinoraText variant="caption" style={styles.helperText}>
-              Choisissez la résolution adaptée à votre stockage et connexion :
+              {t("details.qualityHelperText")}
             </FinoraText>
 
             {DOWNLOAD_QUALITIES.map((profile) => {
               const isSelected = selectedQuality === profile.id;
+              const displayTitle = getProfileTitle(profile.id, profile.title);
+              const displayDesc = getProfileDesc(profile.id, profile.description);
+              const badgeLabel = getBadgeLabel(profile.badge);
 
               return (
                 <Pressable
@@ -99,25 +132,25 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
                   <View style={styles.qualityInfo}>
                     <View style={styles.qualityHeaderRow}>
                       <FinoraText variant="body" style={styles.qualityTitle}>
-                        {profile.title}
+                        {displayTitle}
                       </FinoraText>
-                      {profile.badge ? (
+                      {badgeLabel ? (
                         <View
                           style={[
                             styles.badge,
-                            profile.badge === "Recommandé"
+                            profile.badge === "Recommandé" || profile.badge === "Recommended"
                               ? styles.badgeRecommended
                               : styles.badgeSource
                           ]}
                         >
                           <FinoraText variant="caption" style={styles.badgeText}>
-                            {profile.badge}
+                            {badgeLabel}
                           </FinoraText>
                         </View>
                       ) : null}
                     </View>
                     <FinoraText variant="caption" style={styles.qualityDesc}>
-                      {profile.description}
+                      {displayDesc}
                     </FinoraText>
                   </View>
 
@@ -134,7 +167,7 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
           {/* Footer */}
           <View style={styles.footer}>
             <FinoraButton
-              label="Annuler"
+              label={t("common.cancel")}
               variant="secondary"
               size="md"
               onPress={onClose}
@@ -142,7 +175,7 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
             />
             <FinoraButton
               testID="confirm-quality-download-button"
-              label="Télécharger"
+              label={t("details.download")}
               variant="primary"
               size="md"
               onPress={handleConfirm}

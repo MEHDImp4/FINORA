@@ -1,4 +1,8 @@
-import { ServerManager, SAVED_ACCOUNTS_STORAGE_KEY } from "../serverManager";
+import {
+  ServerManager,
+  SAVED_ACCOUNTS_STORAGE_KEY,
+  SAVED_SERVERS_STORAGE_KEY
+} from "../serverManager";
 import { JellyfinClient } from "../jellyfinClient";
 import { ISecureTokenStorage, IUserPreferencesStorage } from "../../security/storage";
 import { getAuthTokenStorageKey, ACTIVE_SESSION_STORAGE_KEY } from "../authRepository";
@@ -178,6 +182,104 @@ describe("ServerManager", () => {
       expect(mockPrefStorage.setItem).toHaveBeenCalledWith(SAVED_ACCOUNTS_STORAGE_KEY, []);
       expect(mockPrefStorage.removeItem).toHaveBeenCalledWith(ACTIVE_SESSION_STORAGE_KEY);
       expect(mockClient.setAuthToken).toHaveBeenCalledWith(null);
+    });
+  });
+
+  describe("savedServers management", () => {
+    it("returns saved servers sorted by lastUsedAt", async () => {
+      mockPrefStorage.getItem.mockResolvedValue([
+        { id: "s1", name: "Server 1", url: "https://s1.test", lastUsedAt: 100 },
+        { id: "s2", name: "Server 2", url: "https://s2.test", lastUsedAt: 200 }
+      ]);
+
+      const servers = await manager.getSavedServers();
+      expect(servers).toHaveLength(2);
+      expect(servers[0].id).toBe("s2");
+      expect(servers[1].id).toBe("s1");
+    });
+
+    it("auto-migrates from saved accounts when no saved servers exist", async () => {
+      mockPrefStorage.getItem.mockImplementation(async (key) => {
+        if (key === SAVED_SERVERS_STORAGE_KEY) return null;
+        if (key === SAVED_ACCOUNTS_STORAGE_KEY) {
+          return [
+            {
+              serverId: "srv-alpha",
+              serverName: "Alpha",
+              serverUrl: "https://alpha.test",
+              userId: "u1",
+              userName: "Alice",
+              lastUsedAt: 500
+            }
+          ];
+        }
+        return null;
+      });
+
+      const servers = await manager.getSavedServers();
+      expect(servers).toHaveLength(1);
+      expect(servers[0].id).toBe("srv-alpha");
+      expect(mockPrefStorage.setItem).toHaveBeenCalledWith(
+        SAVED_SERVERS_STORAGE_KEY,
+        expect.arrayContaining([expect.objectContaining({ id: "srv-alpha" })])
+      );
+    });
+
+    it("saves and upserts server in storage", async () => {
+      mockPrefStorage.getItem.mockResolvedValue([]);
+
+      await manager.saveServer({
+        id: "srv-new",
+        name: "New Server",
+        url: "https://new.test",
+        lastUsedAt: 10
+      });
+
+      expect(mockPrefStorage.setItem).toHaveBeenCalledWith(
+        SAVED_SERVERS_STORAGE_KEY,
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "srv-new",
+            name: "New Server",
+            url: "https://new.test"
+          })
+        ])
+      );
+    });
+
+    it("removes server and associated accounts/tokens", async () => {
+      mockPrefStorage.getItem.mockImplementation(async (key) => {
+        if (key === SAVED_SERVERS_STORAGE_KEY) {
+          return [
+            { id: "srv-1", name: "Server 1", url: "https://s1.test", lastUsedAt: 100 },
+            { id: "srv-2", name: "Server 2", url: "https://s2.test", lastUsedAt: 200 }
+          ];
+        }
+        if (key === SAVED_ACCOUNTS_STORAGE_KEY) {
+          return [
+            {
+              serverId: "srv-1",
+              serverName: "Server 1",
+              serverUrl: "https://s1.test",
+              userId: "u1",
+              userName: "Alice",
+              lastUsedAt: 100
+            }
+          ];
+        }
+        return null;
+      });
+
+      await manager.removeServer("srv-1");
+
+      expect(mockSecureStorage.deleteToken).toHaveBeenCalledWith(
+        getAuthTokenStorageKey("srv-1", "u1")
+      );
+      expect(mockPrefStorage.setItem).toHaveBeenCalledWith(
+        SAVED_SERVERS_STORAGE_KEY,
+        [expect.objectContaining({ id: "srv-2" })]
+      );
+      expect(mockPrefStorage.setItem).toHaveBeenCalledWith(SAVED_ACCOUNTS_STORAGE_KEY, []);
     });
   });
 });

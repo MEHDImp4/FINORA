@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../../../design-system/tokens";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { useTranslation } from "../../../i18n";
 
 export interface SelectionOption<T extends string | number> {
   id: T;
@@ -38,6 +39,7 @@ export function SelectionPickerModal<T extends string | number>({
   onSelect,
   onClose
 }: SelectionPickerModalProps<T>) {
+  const { t } = useTranslation();
   const handleSelect = (val: T) => {
     hapticService.impactMedium();
     onSelect(val);
@@ -63,7 +65,7 @@ export function SelectionPickerModal<T extends string | number>({
             <TouchableOpacity
               onPress={onClose}
               style={styles.closeButton}
-              accessibilityLabel="Fermer"
+              accessibilityLabel={t("common.closeA11y")}
             >
               <Ionicons name="close" size={22} color="#FFFFFF" />
             </TouchableOpacity>

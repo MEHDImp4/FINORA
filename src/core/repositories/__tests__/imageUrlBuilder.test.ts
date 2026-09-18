@@ -7,7 +7,8 @@ import {
   getMediaThumbnailUrl,
   getMediaPosterUrls,
   getMediaThumbnailUrls,
-  getHeroBannerUrls
+  getHeroBannerUrls,
+  getUserAvatarUrl
 } from "../imageUrlBuilder";
 
 describe("imageUrlBuilder", () => {
@@ -117,7 +118,7 @@ describe("imageUrlBuilder", () => {
   });
 
   describe("getMediaThumbnailUrl & getMediaThumbnailUrls", () => {
-    it("prioritizes series Primary poster for episodes as first choice", () => {
+    it("prioritizes episode Primary still frame for episodes as first choice", () => {
       const episodeItem: any = {
         id: "ep-1",
         type: "Episode",
@@ -129,27 +130,29 @@ describe("imageUrlBuilder", () => {
       };
 
       const url = getMediaThumbnailUrl(baseUrl, episodeItem);
-      expect(url).toContain("/Items/series-99/Images/Primary");
-      expect(url).toContain("tag=series-poster-123");
+      expect(url).toContain("/Items/ep-1/Images/Primary");
+      expect(url).toContain("tag=ep-still-456");
 
       const urls = getMediaThumbnailUrls(baseUrl, episodeItem);
       expect(urls[0]).toBe(url);
       expect(urls.some((u) => u.includes("series-bd-789"))).toBe(true);
-      // Episode still should be relegated to the end of the candidate list
-      expect(urls[urls.length - 2]).toContain("/Items/ep-1/Images/Primary");
+      expect(urls.some((u) => u.includes("series-poster-123"))).toBe(true);
     });
 
-    it("falls back to series backdrop for episodes without poster tags", () => {
+    it("falls back to series backdrop then poster for episodes without episode image tag", () => {
       const episodeWithoutPoster: any = {
         id: "ep-1",
         type: "Episode",
         name: "Pilot",
         seriesId: "series-99",
-        parentBackdropImageTag: "series-bd-789"
+        parentBackdropImageTag: "series-bd-789",
+        seriesPrimaryImageTag: "series-poster-123"
       };
 
       const urls = getMediaThumbnailUrls(baseUrl, episodeWithoutPoster);
+      expect(urls[0]).toContain("/Items/ep-1/Images/Primary");
       expect(urls.some((u) => u.includes("/Items/series-99/Images/Backdrop"))).toBe(true);
+      expect(urls.some((u) => u.includes("/Items/series-99/Images/Primary"))).toBe(true);
     });
 
     it("prioritizes primary poster for movies and series", () => {
@@ -211,6 +214,21 @@ describe("imageUrlBuilder", () => {
       expect(urls.some((u) => u.includes("/Items/series-50/Images/Backdrop") && u.includes("series-bd-tag"))).toBe(true);
       // Episode still should never appear on the hero banner
       expect(urls.some((u) => u.includes("ep-still-tag"))).toBe(false);
+    });
+  });
+
+  describe("getUserAvatarUrl", () => {
+    it("generates user avatar url with tag and maxWidth", () => {
+      const url = getUserAvatarUrl(baseUrl, "user-999", "avatar-tag-1", 180);
+      expect(url).toContain("https://jellyfin.example.com/Users/user-999/Images/Primary");
+      expect(url).toContain("maxWidth=180");
+      expect(url).toContain("tag=avatar-tag-1");
+      expect(url).toContain("quality=85");
+    });
+
+    it("returns empty string when baseUrl or userId is empty", () => {
+      expect(getUserAvatarUrl("", "user-999")).toBe("");
+      expect(getUserAvatarUrl(baseUrl, "")).toBe("");
     });
   });
 });

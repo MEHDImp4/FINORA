@@ -129,6 +129,9 @@ export default function SettingsScreen() {
   const logout = useAuthStore((state) => state.logout);
   const savedAccounts = useServerStore((state) => state.savedAccounts);
   const loadSavedAccounts = useServerStore((state) => state.loadSavedAccounts);
+  const loadSavedServers = useServerStore((state) => state.loadSavedServers);
+  const isLocalConnection = useServerStore((state) => state.isLocalConnection);
+  const autoDetectActiveConnection = useServerStore((state) => state.autoDetectActiveConnection);
   const switchAccount = useServerStore((state) => state.switchAccount);
   const removeAccount = useServerStore((state) => state.removeAccount);
 
@@ -154,7 +157,11 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     loadSavedAccounts();
-  }, [loadSavedAccounts]);
+    loadSavedServers();
+    if (session?.serverUrl) {
+      autoDetectActiveConnection(session.serverId);
+    }
+  }, [loadSavedAccounts, loadSavedServers, autoDetectActiveConnection, session?.serverId, session?.serverUrl]);
 
   const notifPreferences = useNotificationStore((state) => state.preferences);
   const updateNotifPreferences = useNotificationStore((state) => state.updatePreferences);
@@ -298,6 +305,13 @@ export default function SettingsScreen() {
             iconName="server-outline"
             iconColor={colors.textSecondary}
             title={t("settings.switchServer")}
+            subtitle={
+              session
+                ? isLocalConnection
+                  ? `⚡ ${t("settings.connectionTypeLocal")}`
+                  : `🌐 ${t("settings.connectionTypeRemote")}`
+                : undefined
+            }
             value={session ? t("settings.connected") : t("settings.notConnected")}
             onPress={() => setShowConnectModal(true)}
           />

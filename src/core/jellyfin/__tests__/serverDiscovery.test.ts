@@ -1,4 +1,5 @@
 import {
+  autoDetectServerConnection,
   isLocalNetworkHost,
   normalizeServerUrl,
   normalizeServerUrlForCredentials,
@@ -151,6 +152,74 @@ describe("serverDiscovery", () => {
       await expect(
         validateAndDiscoverServer("https://jellyfin.example.com", mockHttpClient)
       ).rejects.toThrow("Failed to connect to server");
+    });
+  });
+
+  describe("autoDetectServerConnection", () => {
+    const originalFetch = global.fetch;
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+    });
+
+    it("prefers local LAN URL when local endpoint responds with valid Jellyfin payload", async () => {
+      global.fetch = jest.fn().mockImplementation(async (url: string) => {
+        if (url.includes("192.168.1.50")) {
+          return {
+            ok: true,
+            json: async () => ({ Id: "srv-local-1", ServerName: "Local Jellyfin" })
+          };
+        }
+        return { ok: false };
+      });
+
+      const result = await autoDetectServerConnection(
+        "http://192.168.1.50:8096",
+        "https://finora.mydomain.com",
+        "https://finora.mydomain.com"
+      );
+
+      expect(result.activeUrl).toBe("http://192.168.1.50:8096");
+      expect(result.isLocal).toBe(true);
+      expect(result.strategy).toBe("local-lan");
+    });
+
+    it("falls back to remote WAN URL when local LAN endpoint fails or is unreachable", async () => {
+      global.fetch = jest.fn().mockImplementation(async (url: string) => {
+        if (url.includes("192.168.1.50")) {
+          throw new Error("Local host unreachable");
+        }
+        if (url.includes("finora.mydomain.com")) {
+          return {
+            ok: true,
+            json: async () => ({ Id: "srv-remote-1", ServerName: "Remote Jellyfin" })
+          };
+        }
+        return { ok: false };
+      });
+
+      const result = await autoDetectServerConnection(
+        "http://192.168.1.50:8096",
+        "https://finora.mydomain.com",
+        "https://finora.mydomain.com"
+      );
+
+      expect(result.activeUrl).toBe("https://finora.mydomain.com");
+      expect(result.isLocal).toBe(false);
+      expect(result.strategy).toBe("remote-wan");
+    });
+
+    it("uses fallback URL if both local and remote candidates fail", async () => {
+      global.fetch = jest.fn().mockRejectedValue(new Error("Network offline"));
+
+      const result = await autoDetectServerConnection(
+        "http://192.168.1.50:8096",
+        "https://finora.mydomain.com",
+        "https://fallback.domain.com"
+      );
+
+      expect(result.activeUrl).toBe("https://fallback.domain.com");
+      expect(result.strategy).toBe("fallback");
     });
   });
 });

@@ -1,7 +1,8 @@
 import React from "react";
 import ReactTestRenderer, { act } from "react-test-renderer";
 import { SortOptionsModal } from "../components/SortOptionsModal";
-import { AVAILABLE_SORT_OPTIONS } from "../types";
+import { AVAILABLE_SORT_OPTIONS, getSortOptionLabel } from "../types";
+import { translate } from "../../../i18n";
 
 describe("SortOptionsModal", () => {
   const mockOnSelectSort = jest.fn();
@@ -23,12 +24,15 @@ describe("SortOptionsModal", () => {
       />
     );
 
+    const titleAscLabel = getSortOptionLabel("title-asc", (k) => translate(k));
+    const dateDescLabel = getSortOptionLabel("date-desc", (k) => translate(k));
+
     expect(tree.root.findByProps({
-      accessibilityLabel: "Trier par Titre (A à Z)"
+      accessibilityLabel: `${translate("library.sortBy")} ${titleAscLabel}`
     })).toBeTruthy();
 
     expect(tree.root.findByProps({
-      accessibilityLabel: "Trier par Date de sortie (plus récent)"
+      accessibilityLabel: `${translate("library.sortBy")} ${dateDescLabel}`
     })).toBeTruthy();
   });
 
@@ -45,15 +49,16 @@ describe("SortOptionsModal", () => {
     );
 
     const targetOption = AVAILABLE_SORT_OPTIONS[2];
+    const targetLabel = getSortOptionLabel(targetOption.id, (k) => translate(k));
     const button = tree.root.findByProps({
-      accessibilityLabel: `Trier par ${targetOption.label}`
+      accessibilityLabel: `${translate("library.sortBy")} ${targetLabel}`
     });
 
     act(() => {
       button.props.onPress();
     });
 
-    expect(mockOnSelectSort).toHaveBeenCalledWith(targetOption);
+    expect(mockOnSelectSort).toHaveBeenCalledWith({ ...targetOption, label: targetLabel });
     expect(mockOnClose).toHaveBeenCalled();
   });
 });

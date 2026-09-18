@@ -10,6 +10,7 @@ import {
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { useTranslation } from "../../../i18n";
 
 export type CardVariant = "poster" | "thumbnail";
 
@@ -41,6 +42,7 @@ export const MediaCard = React.memo(
     onPress,
     onLongPress
   }: MediaCardProps) {
+    const { t } = useTranslation();
     const isThumbnail = variant === "thumbnail";
     const width = cardWidth ?? (isThumbnail ? THUMBNAIL_WIDTH : POSTER_WIDTH);
     const height = cardHeight ?? (isThumbnail ? THUMBNAIL_HEIGHT : POSTER_HEIGHT);
@@ -70,7 +72,9 @@ export const MediaCard = React.memo(
     };
 
     const hasProgress = item.playedPercentage > 0 && !item.isPlayed;
-    const progressLabel = hasProgress ? `, ${Math.round(item.playedPercentage)}% watched` : "";
+    const progressLabel = hasProgress
+      ? `, ${t("home.percentWatched", { percent: Math.round(item.playedPercentage) })}`
+      : "";
 
     const isEpisode = item.type === "Episode";
     const isSeason = item.type === "Season";
@@ -138,7 +142,7 @@ export const MediaCard = React.memo(
         delayLongPress={350}
         accessibilityRole="button"
         accessibilityLabel={`${mainTitle}${subTitle ? `, ${subTitle}` : ""}${progressLabel}`}
-        accessibilityHint="Double tap to open media details"
+        accessibilityHint={t("home.openMediaDetailsHint")}
       >
         <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
           {/* Media Poster / Thumbnail Image */}

@@ -3,6 +3,8 @@ import { View, ScrollView, Pressable, StyleSheet } from "react-native";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
 
+import { useTranslation } from "../../../i18n";
+
 export interface SearchCategory {
   id: string;
   label: string;
@@ -25,6 +27,23 @@ export function SearchCategoryChips({
   selectedCategoryId,
   onSelectCategory
 }: SearchCategoryChipsProps) {
+  const { t } = useTranslation();
+
+  const getCategoryLabel = (cat: SearchCategory): string => {
+    switch (cat.id) {
+      case "all":
+        return t("search.allCategory");
+      case "movies":
+        return t("search.moviesCategory");
+      case "series":
+        return t("search.showsCategory");
+      case "episodes":
+        return t("search.episodesCategory");
+      default:
+        return cat.label;
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -34,6 +53,7 @@ export function SearchCategoryChips({
       >
         {SEARCH_CATEGORIES.map((cat) => {
           const isSelected = cat.id === selectedCategoryId;
+          const displayLabel = getCategoryLabel(cat);
           return (
             <Pressable
               key={cat.id}
@@ -41,9 +61,9 @@ export function SearchCategoryChips({
                 styles.chip,
                 isSelected ? styles.chipSelected : styles.chipUnselected
               ]}
-              onPress={() => onSelectCategory(cat)}
+              onPress={() => onSelectCategory({ ...cat, label: displayLabel })}
               accessibilityRole="button"
-              accessibilityLabel={`Filtrer par ${cat.label}`}
+              accessibilityLabel={displayLabel}
               accessibilityState={{ selected: isSelected }}
             >
               <FinoraText
@@ -53,7 +73,7 @@ export function SearchCategoryChips({
                   isSelected ? styles.chipTextSelected : styles.chipTextUnselected
                 ]}
               >
-                {cat.label}
+                {displayLabel}
               </FinoraText>
             </Pressable>
           );

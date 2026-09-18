@@ -3,6 +3,7 @@ import { View, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FinoraText } from "./FinoraText";
 import { colors, spacing } from "../tokens";
+import { useTranslation } from "../../i18n";
 
 export interface ErrorStateViewProps {
   title?: string;
@@ -12,11 +13,14 @@ export interface ErrorStateViewProps {
 }
 
 export function ErrorStateView({
-  title = "Something Went Wrong",
+  title,
   error,
   onRetry,
-  retryLabel = "Try Again"
+  retryLabel
 }: ErrorStateViewProps) {
+  const { t } = useTranslation();
+  const displayTitle = title || t("errors.genericErrorTitle");
+  const displayRetryLabel = retryLabel || t("common.retry");
   const errorMessage =
     error instanceof Error ? error.message : typeof error === "string" ? error : "";
 
@@ -29,7 +33,7 @@ export function ErrorStateView({
         style={styles.icon}
       />
       <FinoraText variant="title" style={styles.title}>
-        {title}
+        {displayTitle}
       </FinoraText>
       {Boolean(errorMessage) && (
         <FinoraText variant="caption" style={styles.message}>
@@ -41,11 +45,11 @@ export function ErrorStateView({
           style={styles.retryButton}
           onPress={onRetry}
           accessibilityRole="button"
-          accessibilityLabel={retryLabel}
+          accessibilityLabel={displayRetryLabel}
         >
           <Ionicons name="refresh" size={18} color="#FFFFFF" style={styles.retryIcon} />
           <FinoraText variant="body" style={styles.retryText}>
-            {retryLabel}
+            {displayRetryLabel}
           </FinoraText>
         </Pressable>
       )}

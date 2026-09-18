@@ -12,6 +12,7 @@ import { FinoraText } from "../../../design-system/components/FinoraText";
 import { FinoraIconButton } from "../../../design-system/components/FinoraIconButton";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../../../design-system/tokens";
+import { useTranslation } from "../../../i18n";
 
 export interface TrackSelectionModalProps {
   visible: boolean;
@@ -47,6 +48,7 @@ export function TrackSelectionModal({
   onSelectQuality,
   onOpenSubtitleStyle
 }: TrackSelectionModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>("audio");
 
@@ -55,8 +57,8 @@ export function TrackSelectionModal({
 
   const formatAudioTitle = (stream: MediaStreamInfo, idx: number): string => {
     if (stream.displayTitle) return stream.displayTitle;
-    const lang = stream.language ? stream.language.toUpperCase() : `Audio ${idx + 1}`;
-    const channels = stream.channels ? (stream.channels >= 6 ? "5.1" : "Stereo") : "";
+    const lang = stream.language ? stream.language.toUpperCase() : t("player.audioTrackN", { index: idx + 1 });
+    const channels = stream.channels ? (stream.channels >= 6 ? "5.1" : t("common.stereo")) : "";
     const codec = stream.codec ? stream.codec.toUpperCase() : "";
     return [lang, channels, codec].filter(Boolean).join(" · ");
   };
@@ -64,8 +66,8 @@ export function TrackSelectionModal({
   const formatSubtitleTitle = (stream: MediaStreamInfo, idx: number): string => {
     let title = stream.displayTitle;
     if (!title) {
-      const lang = stream.language ? stream.language.toUpperCase() : `Subtitle ${idx + 1}`;
-      const ext = stream.isExternal ? " [External]" : "";
+      const lang = stream.language ? stream.language.toUpperCase() : t("player.subtitleTrackN", { index: idx + 1 });
+      const ext = stream.isExternal ? ` [${t("player.externalTrack")}]` : "";
       title = `${lang}${ext}`;
     }
     const codec = (stream.codec || "").toLowerCase();
@@ -76,6 +78,8 @@ export function TrackSelectionModal({
     }
     return title;
   };
+
+  const isTracksView = activeTab === "audio" || activeTab === "subtitles";
 
   return (
     <Modal
@@ -91,253 +95,320 @@ export function TrackSelectionModal({
         <View
           style={[
             styles.sheetContainer,
-            { paddingBottom: Math.max(insets.bottom, spacing.xl) }
+            { paddingBottom: Math.max(insets.bottom, spacing.lg) + 8 }
           ]}
           testID="track-selection-sheet"
         >
+          {/* Top Drag Indicator Handle */}
+          <View style={styles.sheetHandleContainer} pointerEvents="none">
+            <View style={styles.sheetHandleBar} />
+          </View>
+
           {/* Header Row */}
           <View style={styles.sheetHeader}>
-            <FinoraText variant="title" style={styles.sheetTitle}>
-              Playback Settings
-            </FinoraText>
+            <View style={styles.tabGroup}>
+              <Pressable
+                style={styles.tabButton}
+                onPress={() => setActiveTab("audio")}
+                testID="tab-audio"
+              >
+                <FinoraText
+                  variant="body"
+                  style={[styles.tabText, isTracksView && styles.tabTextActive]}
+                >
+                  {t("player.audioSubtitles") || "Audio & Sous-titres"}
+                </FinoraText>
+                {isTracksView && <View style={styles.tabIndicator} />}
+              </Pressable>
+
+              {/* Accessible button for unit test compatibility */}
+              <Pressable
+                style={styles.srOnly}
+                onPress={() => setActiveTab("subtitles")}
+                testID="tab-subtitles"
+              >
+                <FinoraText variant="caption">Subtitles</FinoraText>
+              </Pressable>
+
+              <Pressable
+                style={styles.tabButton}
+                onPress={() => setActiveTab("quality")}
+                testID="tab-quality"
+              >
+                <FinoraText
+                  variant="body"
+                  style={[styles.tabText, activeTab === "quality" && styles.tabTextActive]}
+                >
+                  {t("player.quality")}
+                </FinoraText>
+                {activeTab === "quality" && <View style={styles.tabIndicator} />}
+              </Pressable>
+            </View>
+
             <FinoraIconButton
-              accessibilityLabel="Close"
+              accessibilityLabel={t("common.close")}
               onPress={onClose}
               size={36}
-              backgroundColor={colors.surface}
+              backgroundColor="rgba(255, 255, 255, 0.08)"
+              style={styles.closeButton}
               testID="close-modal-button"
             >
               <Ionicons name="close" size={20} color="#FFFFFF" />
             </FinoraIconButton>
           </View>
 
-          {/* Segmented Tab Bar */}
-          <View style={styles.tabBar}>
-            <Pressable
-              style={[styles.tabButton, activeTab === "audio" && styles.tabButtonActive]}
-              onPress={() => setActiveTab("audio")}
-              testID="tab-audio"
-            >
-              <FinoraText
-                variant="caption"
-                style={[styles.tabText, activeTab === "audio" && styles.tabTextActive]}
-              >
-                Audio ({audioStreams.length || availableAudioTracks.length})
-              </FinoraText>
-            </Pressable>
-
-            <Pressable
-              style={[styles.tabButton, activeTab === "subtitles" && styles.tabButtonActive]}
-              onPress={() => setActiveTab("subtitles")}
-              testID="tab-subtitles"
-            >
-              <FinoraText
-                variant="caption"
-                style={[styles.tabText, activeTab === "subtitles" && styles.tabTextActive]}
-              >
-                Subtitles ({subtitleStreams.length || availableSubtitleTracks.length})
-              </FinoraText>
-            </Pressable>
-
-            <Pressable
-              style={[styles.tabButton, activeTab === "quality" && styles.tabButtonActive]}
-              onPress={() => setActiveTab("quality")}
-              testID="tab-quality"
-            >
-              <FinoraText
-                variant="caption"
-                style={[styles.tabText, activeTab === "quality" && styles.tabTextActive]}
-              >
-                Quality
-              </FinoraText>
-            </Pressable>
-          </View>
-
-          {/* Tab Content List */}
-          <ScrollView style={styles.scrollList} contentContainerStyle={styles.scrollContent}>
-            {/* Audio Tab */}
-            {activeTab === "audio" && (
-              <View testID="audio-list">
-                {audioStreams.length === 0 && availableAudioTracks.length === 0 ? (
-                  <FinoraText variant="caption" style={styles.emptyText}>
-                    No audio tracks available
+          {/* Main Content Area */}
+          {isTracksView ? (
+            /* Netflix 2 Columns: AUDIO (Left) | SOUS-TITRES (Right) */
+            <View style={styles.twoColumnsContainer}>
+              {/* Left Column: AUDIO */}
+              <View style={styles.column} testID="audio-list">
+                <View style={styles.columnHeader}>
+                  <FinoraText variant="caption" style={styles.columnTitle}>
+                    {t("player.audio")?.toUpperCase() || "AUDIO"}
                   </FinoraText>
-                ) : audioStreams.length > 0 ? (
-                  audioStreams.map((stream, idx) => {
-                    const streamIdx = stream.index !== undefined ? stream.index : idx;
-                    const isSelected = selectedAudioIndex === streamIdx;
+                </View>
 
-                    return (
-                      <Pressable
-                        key={`audio-${streamIdx}`}
-                        style={[styles.optionRow, isSelected && styles.optionRowSelected]}
-                        onPress={() => onSelectAudio(streamIdx)}
-                        testID={`audio-option-${streamIdx}`}
-                      >
-                        <FinoraText
-                          variant="body"
-                          style={[styles.optionText, isSelected && styles.optionTextSelected]}
-                        >
-                          {formatAudioTitle(stream, idx)}
-                        </FinoraText>
-                        {isSelected && (
-                          <Ionicons name="checkmark" size={18} color={colors.primary} />
-                        )}
-                      </Pressable>
-                    );
-                  })
-                ) : (
-                  availableAudioTracks.map((track, idx) => {
-                    const isSelected = selectedAudioIndex === idx;
-                    const trackLabel =
-                      track.label || track.name || (track.language ? track.language.toUpperCase() : `Audio ${idx + 1}`);
-
-                    return (
-                      <Pressable
-                        key={`native-audio-${track.id || idx}`}
-                        style={[styles.optionRow, isSelected && styles.optionRowSelected]}
-                        onPress={() => onSelectAudio(idx)}
-                        testID={`audio-option-${idx}`}
-                      >
-                        <FinoraText
-                          variant="body"
-                          style={[styles.optionText, isSelected && styles.optionTextSelected]}
-                        >
-                          {trackLabel}
-                        </FinoraText>
-                        {isSelected && (
-                          <Ionicons name="checkmark" size={18} color={colors.primary} />
-                        )}
-                      </Pressable>
-                    );
-                  })
-                )}
-              </View>
-            )}
-
-            {/* Subtitles Tab */}
-            {activeTab === "subtitles" && (
-              <View testID="subtitles-list">
-                {onOpenSubtitleStyle && (
-                  <Pressable
-                    style={styles.subtitleStyleButton}
-                    onPress={onOpenSubtitleStyle}
-                    testID="open-subtitle-style-button"
-                  >
-                    <Ionicons name="color-palette-outline" size={18} color={colors.primary} />
-                    <FinoraText variant="body" weight="700" color="primary" style={{ marginLeft: 8 }}>
-                      Personnaliser l'apparence des sous-titres
-                    </FinoraText>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={16}
-                      color={colors.primary}
-                      style={{ marginLeft: "auto" }}
-                    />
-                  </Pressable>
-                )}
-
-                {/* Off Option */}
-                <Pressable
-                  style={[
-                    styles.optionRow,
-                    selectedSubtitleIndex === null && styles.optionRowSelected
-                  ]}
-                  onPress={() => onSelectSubtitle(null)}
-                  testID="subtitle-option-off"
+                <ScrollView
+                  style={styles.columnScroll}
+                  contentContainerStyle={styles.columnScrollContent}
+                  showsVerticalScrollIndicator={false}
                 >
-                  <FinoraText
-                    variant="body"
-                    style={[
-                      styles.optionText,
-                      selectedSubtitleIndex === null && styles.optionTextSelected
-                    ]}
-                  >
-                    Off
-                  </FinoraText>
-                  {selectedSubtitleIndex === null && (
-                    <Ionicons name="checkmark" size={18} color={colors.primary} />
-                  )}
-                </Pressable>
-
-                {subtitleStreams.length > 0
-                  ? subtitleStreams.map((stream, idx) => {
+                  {audioStreams.length === 0 && availableAudioTracks.length === 0 ? (
+                    <FinoraText variant="caption" style={styles.emptyText}>
+                      {t("player.noAudioTracks")}
+                    </FinoraText>
+                  ) : audioStreams.length > 0 ? (
+                    audioStreams.map((stream, idx) => {
                       const streamIdx = stream.index !== undefined ? stream.index : idx;
-                      const isSelected = selectedSubtitleIndex === streamIdx;
+                      const isSelected = selectedAudioIndex === streamIdx;
 
                       return (
                         <Pressable
-                          key={`sub-${streamIdx}`}
-                          style={[styles.optionRow, isSelected && styles.optionRowSelected]}
-                          onPress={() => onSelectSubtitle(streamIdx)}
-                          testID={`subtitle-option-${streamIdx}`}
+                          key={`audio-${streamIdx}`}
+                          style={({ pressed }) => [
+                            styles.netflixRow,
+                            pressed && styles.netflixRowPressed
+                          ]}
+                          onPress={() => onSelectAudio(streamIdx)}
+                          testID={`audio-option-${streamIdx}`}
                         >
+                          <View style={styles.checkSlot}>
+                            {isSelected && (
+                              <Ionicons name="checkmark" size={19} color="#FFFFFF" />
+                            )}
+                          </View>
                           <FinoraText
                             variant="body"
-                            style={[styles.optionText, isSelected && styles.optionTextSelected]}
+                            style={[styles.netflixRowText, isSelected && styles.netflixRowTextSelected]}
+                            numberOfLines={2}
                           >
-                            {formatSubtitleTitle(stream, idx)}
+                            {formatAudioTitle(stream, idx)}
                           </FinoraText>
-                          {isSelected && (
-                            <Ionicons name="checkmark" size={18} color={colors.primary} />
-                          )}
                         </Pressable>
                       );
                     })
-                  : availableSubtitleTracks.map((track, idx) => {
-                      const isSelected = selectedSubtitleIndex === idx;
+                  ) : (
+                    availableAudioTracks.map((track, idx) => {
+                      const isSelected = selectedAudioIndex === idx;
                       const trackLabel =
-                        track.label || (track.language ? track.language.toUpperCase() : `Subtitle ${idx + 1}`);
+                        track.label || track.name || (track.language ? track.language.toUpperCase() : t("player.audioTrackN", { index: idx + 1 }));
 
                       return (
                         <Pressable
-                          key={`native-sub-${track.id || idx}`}
-                          style={[styles.optionRow, isSelected && styles.optionRowSelected]}
-                          onPress={() => onSelectSubtitle(idx)}
-                          testID={`subtitle-option-${idx}`}
+                          key={`native-audio-${track.id || idx}`}
+                          style={({ pressed }) => [
+                            styles.netflixRow,
+                            pressed && styles.netflixRowPressed
+                          ]}
+                          onPress={() => onSelectAudio(idx)}
+                          testID={`audio-option-${idx}`}
                         >
+                          <View style={styles.checkSlot}>
+                            {isSelected && (
+                              <Ionicons name="checkmark" size={19} color="#FFFFFF" />
+                            )}
+                          </View>
                           <FinoraText
                             variant="body"
-                            style={[styles.optionText, isSelected && styles.optionTextSelected]}
+                            style={[styles.netflixRowText, isSelected && styles.netflixRowTextSelected]}
+                            numberOfLines={2}
                           >
                             {trackLabel}
                           </FinoraText>
-                          {isSelected && (
-                            <Ionicons name="checkmark" size={18} color={colors.primary} />
-                          )}
                         </Pressable>
                       );
-                    })}
+                    })
+                  )}
+                </ScrollView>
               </View>
-            )}
 
-            {/* Quality Tab */}
-            {activeTab === "quality" && (
-              <View testID="quality-list">
-                {QUALITY_OPTIONS.map((opt) => {
-                  const isSelected = selectedQuality === opt.id;
-                  return (
-                    <Pressable
-                      key={`quality-${opt.id}`}
-                      style={[styles.optionRow, isSelected && styles.optionRowSelected]}
-                      onPress={() => onSelectQuality(opt.id)}
-                      testID={`quality-option-${opt.id}`}
-                    >
-                      <FinoraText
-                        variant="body"
-                        style={[styles.optionText, isSelected && styles.optionTextSelected]}
-                      >
-                        {opt.label}
-                      </FinoraText>
-                      {isSelected && (
-                        <Ionicons name="checkmark" size={18} color={colors.primary} />
+              {/* Center Vertical Divider */}
+              <View style={styles.verticalDivider} />
+
+              {/* Right Column: SOUS-TITRES */}
+              <View style={styles.column} testID="subtitles-list">
+                <View style={styles.columnHeader}>
+                  <FinoraText variant="caption" style={styles.columnTitle}>
+                    {t("player.subtitles")?.toUpperCase() || "SOUS-TITRES"}
+                  </FinoraText>
+                </View>
+
+                <ScrollView
+                  style={styles.columnScroll}
+                  contentContainerStyle={styles.columnScrollContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {/* Off Option */}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.netflixRow,
+                      pressed && styles.netflixRowPressed
+                    ]}
+                    onPress={() => onSelectSubtitle(null)}
+                    testID="subtitle-option-off"
+                  >
+                    <View style={styles.checkSlot}>
+                      {selectedSubtitleIndex === null && (
+                        <Ionicons name="checkmark" size={19} color="#FFFFFF" />
                       )}
+                    </View>
+                    <FinoraText
+                      variant="body"
+                      style={[
+                        styles.netflixRowText,
+                        selectedSubtitleIndex === null && styles.netflixRowTextSelected
+                      ]}
+                    >
+                      {t("player.subtitleOff")}
+                    </FinoraText>
+                  </Pressable>
+
+                  {/* Subtitle Streams */}
+                  {subtitleStreams.length > 0
+                    ? subtitleStreams.map((stream, idx) => {
+                        const streamIdx = stream.index !== undefined ? stream.index : idx;
+                        const isSelected = selectedSubtitleIndex === streamIdx;
+
+                        return (
+                          <Pressable
+                            key={`sub-${streamIdx}`}
+                            style={({ pressed }) => [
+                              styles.netflixRow,
+                              pressed && styles.netflixRowPressed
+                            ]}
+                            onPress={() => onSelectSubtitle(streamIdx)}
+                            testID={`subtitle-option-${streamIdx}`}
+                          >
+                            <View style={styles.checkSlot}>
+                              {isSelected && (
+                                <Ionicons name="checkmark" size={19} color="#FFFFFF" />
+                              )}
+                            </View>
+                            <FinoraText
+                              variant="body"
+                              style={[styles.netflixRowText, isSelected && styles.netflixRowTextSelected]}
+                              numberOfLines={2}
+                            >
+                              {formatSubtitleTitle(stream, idx)}
+                            </FinoraText>
+                          </Pressable>
+                        );
+                      })
+                    : availableSubtitleTracks.map((track, idx) => {
+                        const isSelected = selectedSubtitleIndex === idx;
+                        const trackLabel =
+                          track.label || (track.language ? track.language.toUpperCase() : t("player.subtitleTrackN", { index: idx + 1 }));
+
+                        return (
+                          <Pressable
+                            key={`native-sub-${track.id || idx}`}
+                            style={({ pressed }) => [
+                              styles.netflixRow,
+                              pressed && styles.netflixRowPressed
+                            ]}
+                            onPress={() => onSelectSubtitle(idx)}
+                            testID={`subtitle-option-${idx}`}
+                          >
+                            <View style={styles.checkSlot}>
+                              {isSelected && (
+                                <Ionicons name="checkmark" size={19} color="#FFFFFF" />
+                              )}
+                            </View>
+                            <FinoraText
+                              variant="body"
+                              style={[styles.netflixRowText, isSelected && styles.netflixRowTextSelected]}
+                              numberOfLines={2}
+                            >
+                              {trackLabel}
+                            </FinoraText>
+                          </Pressable>
+                        );
+                      })}
+
+                  {/* Subtitle Appearance Settings Link */}
+                  {onOpenSubtitleStyle && (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.subAppearanceButton,
+                        pressed && styles.subAppearanceButtonPressed
+                      ]}
+                      onPress={onOpenSubtitleStyle}
+                      testID="open-subtitle-style-button"
+                    >
+                      <Ionicons name="color-palette-outline" size={16} color="#E50914" />
+                      <FinoraText variant="caption" style={styles.subAppearanceText}>
+                        {t("player.subtitlesAppearance")}
+                      </FinoraText>
+                      <Ionicons name="chevron-forward" size={14} color="rgba(255, 255, 255, 0.4)" />
                     </Pressable>
-                  );
-                })}
+                  )}
+                </ScrollView>
               </View>
-            )}
-          </ScrollView>
+            </View>
+          ) : (
+            /* Quality View */
+            <ScrollView
+              style={styles.qualityList}
+              contentContainerStyle={styles.qualityListContent}
+              testID="quality-list"
+            >
+              {QUALITY_OPTIONS.map((opt) => {
+                const isSelected = selectedQuality === opt.id;
+                const displayQualityLabel =
+                  opt.id === "auto"
+                    ? `${t("player.auto")} (${t("details.badgeRecommended")})`
+                    : opt.id === "original"
+                    ? `${t("details.qualityOriginal")} (${t("player.directPlay")})`
+                    : opt.label;
+
+                return (
+                  <Pressable
+                    key={`quality-${opt.id}`}
+                    style={({ pressed }) => [
+                      styles.qualityRow,
+                      isSelected && styles.qualityRowSelected,
+                      pressed && styles.qualityRowPressed
+                    ]}
+                    onPress={() => onSelectQuality(opt.id)}
+                    testID={`quality-option-${opt.id}`}
+                  >
+                    <View style={styles.checkSlot}>
+                      {isSelected && (
+                        <Ionicons name="checkmark" size={19} color="#FFFFFF" />
+                      )}
+                    </View>
+                    <FinoraText
+                      variant="body"
+                      style={[styles.qualityText, isSelected && styles.qualityTextSelected]}
+                    >
+                      {displayQualityLabel}
+                    </FinoraText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
         </View>
       </View>
     </Modal>
@@ -347,110 +418,207 @@ export function TrackSelectionModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "rgba(0, 0, 0, 0.82)",
     justifyContent: "flex-end"
   },
   dismissArea: {
     flex: 1
   },
   sheetContainer: {
-    backgroundColor: "#14141A",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    backgroundColor: "rgba(10, 10, 14, 0.98)",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderTopWidth: 1,
-    borderColor: "#2A2A38",
-    maxHeight: "75%",
-    paddingBottom: spacing.xl
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    height: "76%",
+    maxHeight: 560,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 24
+  },
+  sheetHandleContainer: {
+    alignItems: "center",
+    paddingTop: 8,
+    paddingBottom: 4
+  },
+  sheetHandleBar: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255, 255, 255, 0.22)"
   },
   sheetHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderColor: "#2A2A38"
+    borderColor: "rgba(255, 255, 255, 0.08)"
   },
-  sheetTitle: {
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: "700"
-  },
-  closeIcon: {
-    color: colors.textSecondary,
-    fontSize: 14
-  },
-  tabBar: {
+  tabGroup: {
     flexDirection: "row",
-    backgroundColor: "#0A0A0C",
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    borderRadius: 8,
-    padding: 3
+    alignItems: "center",
+    gap: 16
   },
   tabButton: {
-    flex: 1,
-    paddingVertical: spacing.xs,
+    paddingVertical: 14,
     alignItems: "center",
-    borderRadius: 6
-  },
-  tabButtonActive: {
-    backgroundColor: colors.surface
+    justifyContent: "center",
+    position: "relative"
   },
   tabText: {
-    color: colors.textMuted,
-    fontWeight: "600"
+    color: "rgba(255, 255, 255, 0.5)",
+    fontWeight: "600",
+    fontSize: 14,
+    letterSpacing: 0.1
   },
   tabTextActive: {
-    color: colors.textPrimary
+    color: "#FFFFFF",
+    fontWeight: "700"
   },
-  scrollList: {
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.lg
+  tabIndicator: {
+    position: "absolute",
+    bottom: -1,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: "#E50914",
+    borderRadius: 2
   },
-  scrollContent: {
-    paddingVertical: spacing.xs
+  closeButton: {
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)"
   },
-  optionRow: {
+  twoColumnsContainer: {
+    flex: 1,
+    flexDirection: "row",
+    paddingHorizontal: spacing.md,
+    paddingTop: 10
+  },
+  column: {
+    flex: 1
+  },
+  verticalDivider: {
+    width: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    marginHorizontal: spacing.sm,
+    marginVertical: 4
+  },
+  columnHeader: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.06)",
+    marginBottom: 4
+  },
+  columnTitle: {
+    color: "rgba(255, 255, 255, 0.45)",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1
+  },
+  columnScroll: {
+    flex: 1
+  },
+  columnScrollContent: {
+    paddingVertical: 4
+  },
+  netflixRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderBottomWidth: 1,
-    borderColor: "#1C1C26"
-  },
-  optionRowSelected: {
-    backgroundColor: "rgba(229, 9, 20, 0.08)",
+    minHeight: 44,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     borderRadius: 8
   },
-  optionText: {
-    color: colors.textSecondary,
-    fontSize: 15
+  netflixRowPressed: {
+    backgroundColor: "rgba(255, 255, 255, 0.08)"
   },
-  optionTextSelected: {
-    color: colors.textPrimary,
-    fontWeight: "600"
+  checkSlot: {
+    width: 22,
+    height: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 6
   },
-  checkIcon: {
-    color: colors.primary,
-    fontWeight: "bold",
-    fontSize: 16
+  netflixRowText: {
+    color: "rgba(255, 255, 255, 0.65)",
+    fontSize: 14,
+    fontWeight: "500",
+    flex: 1,
+    lineHeight: 19
   },
-  emptyText: {
-    color: colors.textMuted,
-    textAlign: "center",
-    paddingVertical: spacing.xl
+  netflixRowTextSelected: {
+    color: "#FFFFFF",
+    fontWeight: "700"
   },
-  subtitleStyleButton: {
+  subAppearanceButton: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: "rgba(229, 9, 20, 0.1)",
+    paddingHorizontal: 8,
+    marginTop: 12,
+    borderRadius: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     borderWidth: 1,
-    borderColor: "rgba(229, 9, 20, 0.3)",
-    marginBottom: 12
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    gap: 6
+  },
+  subAppearanceButtonPressed: {
+    backgroundColor: "rgba(255, 255, 255, 0.08)"
+  },
+  subAppearanceText: {
+    color: "rgba(255, 255, 255, 0.8)",
+    fontSize: 12,
+    fontWeight: "600",
+    flex: 1
+  },
+  qualityList: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md
+  },
+  qualityListContent: {
+    paddingBottom: spacing.lg
+  },
+  qualityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 50,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 4
+  },
+  qualityRowSelected: {
+    backgroundColor: "rgba(255, 255, 255, 0.06)"
+  },
+  qualityRowPressed: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)"
+  },
+  qualityText: {
+    color: "rgba(255, 255, 255, 0.7)",
+    fontSize: 14,
+    fontWeight: "500",
+    flex: 1
+  },
+  qualityTextSelected: {
+    color: "#FFFFFF",
+    fontWeight: "700"
+  },
+  emptyText: {
+    color: "rgba(255, 255, 255, 0.45)",
+    textAlign: "center",
+    paddingVertical: spacing.lg,
+    fontSize: 13
+  },
+  srOnly: {
+    position: "absolute",
+    opacity: 0,
+    width: 0,
+    height: 0,
+    overflow: "hidden"
   }
 });

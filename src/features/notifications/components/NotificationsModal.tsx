@@ -18,6 +18,7 @@ import {
 } from "../../../stores/notificationStore";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { useTranslation } from "../../../i18n";
 
 interface NotificationsModalProps {
   visible: boolean;
@@ -27,17 +28,20 @@ interface NotificationsModalProps {
 
 type FilterTab = "all" | "series" | "movies";
 
-function formatRelativeTime(timestamp: number): string {
+function formatRelativeTime(
+  timestamp: number,
+  t: (key: any, params?: Record<string, any>) => string
+): string {
   const diffMs = Date.now() - timestamp;
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return "À l'instant";
-  if (diffMins < 60) return `Il y a ${diffMins} min`;
-  if (diffHours < 24) return `Il y a ${diffHours} h`;
-  if (diffDays === 1) return "Hier";
-  if (diffDays < 7) return `Il y a ${diffDays} j`;
+  if (diffMins < 1) return t("notifications.timeJustNow");
+  if (diffMins < 60) return t("notifications.timeMinutesAgo", { mins: diffMins });
+  if (diffHours < 24) return t("notifications.timeHoursAgo", { hours: diffHours });
+  if (diffDays === 1) return t("notifications.timeYesterday");
+  if (diffDays < 7) return t("notifications.timeDaysAgo", { days: diffDays });
 
   const date = new Date(timestamp);
   return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
@@ -45,7 +49,10 @@ function formatRelativeTime(timestamp: number): string {
     .padStart(2, "0")}`;
 }
 
-function getNotificationVisuals(type: NotificationType): {
+function getNotificationVisuals(
+  type: NotificationType,
+  t: (key: any, params?: Record<string, any>) => string
+): {
   iconName: keyof typeof Ionicons.glyphMap;
   iconColor: string;
   badgeBg: string;
@@ -59,7 +66,7 @@ function getNotificationVisuals(type: NotificationType): {
         iconColor: "#A78BFA",
         badgeBg: "rgba(167, 139, 250, 0.16)",
         badgeBorder: "rgba(167, 139, 250, 0.35)",
-        typeLabel: "ÉPISODE"
+        typeLabel: t("notifications.badgeEpisode")
       };
     case "new_movie":
       return {
@@ -67,7 +74,7 @@ function getNotificationVisuals(type: NotificationType): {
         iconColor: "#FBBF24",
         badgeBg: "rgba(251, 191, 36, 0.16)",
         badgeBorder: "rgba(251, 191, 36, 0.35)",
-        typeLabel: "FILM"
+        typeLabel: t("notifications.badgeMovie")
       };
     case "new_series":
       return {
@@ -75,7 +82,7 @@ function getNotificationVisuals(type: NotificationType): {
         iconColor: "#E50914",
         badgeBg: "rgba(229, 9, 20, 0.16)",
         badgeBorder: "rgba(229, 9, 20, 0.35)",
-        typeLabel: "SÉRIE"
+        typeLabel: t("notifications.badgeSeries")
       };
     case "download_completed":
       return {
@@ -83,7 +90,7 @@ function getNotificationVisuals(type: NotificationType): {
         iconColor: "#34D399",
         badgeBg: "rgba(52, 211, 153, 0.16)",
         badgeBorder: "rgba(52, 211, 153, 0.35)",
-        typeLabel: "TÉLÉCHARGÉ"
+        typeLabel: t("notifications.badgeDownloaded")
       };
     case "test":
     default:
@@ -92,7 +99,7 @@ function getNotificationVisuals(type: NotificationType): {
         iconColor: "#E2E8F0",
         badgeBg: "rgba(255, 255, 255, 0.12)",
         badgeBorder: "rgba(255, 255, 255, 0.25)",
-        typeLabel: "SYSTÈME"
+        typeLabel: t("notifications.badgeSystem")
       };
   }
 }
@@ -102,6 +109,7 @@ export function NotificationsModal({
   onClose,
   onSelectMedia
 }: NotificationsModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const notifications = useNotificationStore((state) => state.notifications);
   const unreadCount = useNotificationStore((state) => state.unreadCount);
@@ -135,12 +143,12 @@ export function NotificationsModal({
   const handleClearAll = () => {
     hapticService.impactLight();
     Alert.alert(
-      "Effacer les notifications ?",
-      "L'historique des notifications de ce compte sera supprimé.",
+      t("notifications.clearConfirmTitle"),
+      t("notifications.clearConfirmDesc"),
       [
-        { text: "Annuler", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Effacer",
+          text: t("notifications.clearButton"),
           style: "destructive",
           onPress: () => clearAll()
         }
@@ -149,7 +157,7 @@ export function NotificationsModal({
   };
 
   const renderItem = ({ item }: { item: FinoraNotification }) => {
-    const visuals = getNotificationVisuals(item.type);
+    const visuals = getNotificationVisuals(item.type, t);
 
     return (
       <Pressable
@@ -195,7 +203,7 @@ export function NotificationsModal({
               </Text>
             </View>
             <FinoraText variant="caption" color="textSecondary" style={styles.timeText}>
-              {formatRelativeTime(item.timestamp)}
+              {formatRelativeTime(item.timestamp, t)}
             </FinoraText>
           </View>
 
@@ -234,7 +242,7 @@ export function NotificationsModal({
       onRequestClose={onClose}
     >
       <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Fermer les notifications" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t("common.close")} />
 
         <View
           style={[
@@ -250,7 +258,7 @@ export function NotificationsModal({
           <View style={styles.headerRow}>
             <View style={styles.headerLeft}>
               <FinoraText variant="title" weight="800" color="textPrimary" style={styles.titleText}>
-                Notifications
+                {t("notifications.title")}
               </FinoraText>
               {unreadCount > 0 && (
                 <View style={styles.countBadge}>
@@ -269,7 +277,7 @@ export function NotificationsModal({
                     markAllAsRead();
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel="Tout marquer comme lu"
+                  accessibilityLabel={t("notifications.markAllRead")}
                 >
                   <Ionicons name="checkmark-done" size={19} color="#FFFFFF" />
                 </Pressable>
@@ -281,7 +289,7 @@ export function NotificationsModal({
                   hitSlop={4}
                   onPress={handleClearAll}
                   accessibilityRole="button"
-                  accessibilityLabel="Effacer l'historique"
+                  accessibilityLabel={t("notifications.clearAll")}
                 >
                   <Ionicons name="trash-outline" size={18} color="#A0A0B2" />
                 </Pressable>
@@ -292,7 +300,7 @@ export function NotificationsModal({
                 hitSlop={4}
                 onPress={onClose}
                 accessibilityRole="button"
-                accessibilityLabel="Fermer"
+                accessibilityLabel={t("common.close")}
               >
                 <Ionicons name="close" size={20} color="#FFFFFF" />
               </Pressable>
@@ -311,7 +319,7 @@ export function NotificationsModal({
                 accessibilityState={{ selected: activeTab === "all" }}
               >
                 <Text style={[styles.filterPillText, activeTab === "all" && styles.filterPillTextActive]}>
-                  Tous ({notifications.length})
+                  {t("notifications.tabAllWithCount", { count: notifications.length })}
                 </Text>
               </Pressable>
 
@@ -325,7 +333,7 @@ export function NotificationsModal({
                 accessibilityState={{ selected: activeTab === "series" }}
               >
                 <Text style={[styles.filterPillText, activeTab === "series" && styles.filterPillTextActive]}>
-                  Séries
+                  {t("notifications.tabSeries")}
                 </Text>
               </Pressable>
 
@@ -339,7 +347,7 @@ export function NotificationsModal({
                 accessibilityState={{ selected: activeTab === "movies" }}
               >
                 <Text style={[styles.filterPillText, activeTab === "movies" && styles.filterPillTextActive]}>
-                  Films
+                  {t("notifications.tabMovies")}
                 </Text>
               </Pressable>
             </View>
@@ -351,16 +359,16 @@ export function NotificationsModal({
                 <Ionicons name="notifications-outline" size={32} color="rgba(255, 255, 255, 0.42)" />
               </View>
               <FinoraText variant="title" weight="700" color="textPrimary" style={styles.emptyTitle}>
-                Tout est à jour
+                {t("notifications.emptyTitle")}
               </FinoraText>
               <FinoraText variant="body" color="textSecondary" style={styles.emptySubtitle}>
-                Les nouveaux épisodes, films et séries apparaîtront ici.
+                {t("notifications.emptyDesc")}
               </FinoraText>
             </View>
           ) : filteredNotifications.length === 0 ? (
             <View style={styles.emptyContainer}>
               <FinoraText variant="body" color="textSecondary" style={styles.emptySubtitle}>
-                Aucune notification dans cette catégorie.
+                {t("notifications.emptyCategoryDesc")}
               </FinoraText>
             </View>
           ) : (
@@ -448,12 +456,12 @@ const styles = StyleSheet.create({
     gap: 6
   },
   headerIconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255, 255, 255, 0.07)",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#1C1C26",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderColor: "#282836",
     alignItems: "center",
     justifyContent: "center"
   },
@@ -465,19 +473,19 @@ const styles = StyleSheet.create({
   },
   filterPill: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 40,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 10,
+    backgroundColor: "#161622",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.10)",
+    borderColor: "#262634",
     alignItems: "center",
     justifyContent: "center"
   },
   filterPillActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.14)",
-    borderColor: "rgba(255, 255, 255, 0.28)"
+    backgroundColor: "#E50914",
+    borderColor: "#E50914"
   },
   filterPillText: {
     color: "#A0A0B2",
@@ -498,14 +506,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     minHeight: 84,
     padding: 12,
-    borderRadius: 14,
-    backgroundColor: "#1A1A26",
+    borderRadius: 12,
+    backgroundColor: "#14141C",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.10)"
+    borderColor: "#22222E"
   },
   glassCardUnread: {
-    backgroundColor: "#20202E",
-    borderColor: "rgba(229, 9, 20, 0.32)"
+    backgroundColor: "#1A1A24",
+    borderColor: "rgba(229, 9, 20, 0.4)"
   },
   glassCardPressed: {
     opacity: 0.82,

@@ -474,7 +474,20 @@ export const fr: Translations = {
     playbackSpeedA11y: "Vitesse de lecture {speed}",
     nextEpisodeA11y: "Passer à l'épisode suivant",
     pipA11y: "Mode Image dans l'image (PiP)",
-    pipNotSupported: "Le mode PiP n'est pas supporté sur cet appareil"
+    pipNotSupported: "Le mode PiP n'est pas supporté sur cet appareil",
+    audioSubtitles: "Audio & Sous-titres",
+    audioSubtitlesShort: "Audio & Sous-titres",
+    audio: "Audio",
+    subtitles: "Sous-titres",
+    moreOptions: "Plus",
+    moreOptionsTitle: "Plus d'options",
+    directPlayDesc: "Flux d'origine Jellyfin sans perte ni conversion",
+    directStreamDesc: "Audio ou conteneur adapté à votre appareil",
+    transcodeDesc: "Flux transcodé en direct par le serveur",
+    portraitModeDesc: "Basculer l'affichage à la verticale",
+    landscapeModeDesc: "Plein écran horizontal cinéma",
+    technicalInfoDesc: "Statistiques détaillées, bitrate, codecs et buffers",
+    episodes: "Épisodes"
   },
   settings: {
     title: "Paramètres",

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -12,6 +12,7 @@ import { FinoraText } from "../../../design-system/components/FinoraText";
 import { FinoraIconButton } from "../../../design-system/components/FinoraIconButton";
 import { colors, spacing } from "../../../design-system/tokens";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { useTranslation } from "../../../i18n";
 import {
   useSubtitleSettingsStore,
   SubtitleSize,
@@ -28,48 +29,49 @@ interface SubtitleStyleModalProps {
   onClose: () => void;
 }
 
-const COLOR_OPTIONS: { label: string; value: SubtitleColor; hex: string }[] = [
-  { label: "Blanc", value: "#FFFFFF", hex: "#FFFFFF" },
-  { label: "Jaune", value: "#FFE600", hex: "#FFE600" },
-  { label: "Cyan", value: "#00E5FF", hex: "#00E5FF" },
-  { label: "Vert", value: "#A7F3D0", hex: "#A7F3D0" }
-];
-
-const SIZE_OPTIONS: { label: string; value: SubtitleSize; sizeLabel: string }[] = [
-  { label: "Petite", value: "small", sizeLabel: "16px" },
-  { label: "Moyenne", value: "medium", sizeLabel: "20px" },
-  { label: "Grande", value: "large", sizeLabel: "26px" },
-  { label: "Très grande", value: "extraLarge", sizeLabel: "32px" }
-];
-
-const BACKGROUND_OPTIONS: { label: string; value: SubtitleBackground; icon: string }[] = [
-  { label: "Aucun", value: "none", icon: "ban-outline" },
-  { label: "Encart semi-noir", value: "semi_black", icon: "square-outline" },
-  { label: "Carré opaque", value: "solid_black", icon: "square" },
-  { label: "Bulle moderne", value: "pill", icon: "ellipse-outline" }
-];
-
-const SHADOW_OPTIONS: { label: string; value: SubtitleShadow }[] = [
-  { label: "Ombre Netflix", value: "netflix_shadow" },
-  { label: "Contour fort", value: "thick_outline" },
-  { label: "Sans ombre", value: "none" }
-];
-
-const POSITION_OPTIONS: { label: string; value: SubtitlePosition }[] = [
-  { label: "Standard (Bas)", value: "standard" },
-  { label: "Rehaussé", value: "elevated" }
-];
-
-const PRESETS: { key: SubtitlePreset; label: string; subtitle: string }[] = [
-  { key: "netflix", label: "Netflix Standard", subtitle: "Blanc net & ombre portée" },
-  { key: "netflix_box", label: "Netflix avec Encart", subtitle: "Bandeau noir translucide" },
-  { key: "cinema_yellow", label: "Cinéma Jaune", subtitle: "Jaune classique haute visibilité" },
-  { key: "high_contrast", label: "Contraste Élevé", subtitle: "Grand texte sur fond noir opaque" }
-];
-
 export function SubtitleStyleModal({ visible, onClose }: SubtitleStyleModalProps) {
+  const { t } = useTranslation();
   const { settings, updateSettings, applyPreset, resetToDefaults } = useSubtitleSettingsStore();
   const [previewDarkScene, setPreviewDarkScene] = useState(true);
+
+  const colorOptions = useMemo<{ label: string; value: SubtitleColor; hex: string }[]>(() => [
+    { label: t("player.colorWhite"), value: "#FFFFFF", hex: "#FFFFFF" },
+    { label: t("player.colorYellow"), value: "#FFE600", hex: "#FFE600" },
+    { label: t("player.colorCyan"), value: "#00E5FF", hex: "#00E5FF" },
+    { label: t("player.colorGreen"), value: "#A7F3D0", hex: "#A7F3D0" }
+  ], [t]);
+
+  const sizeOptions = useMemo<{ label: string; value: SubtitleSize; sizeLabel: string }[]>(() => [
+    { label: t("player.sizeSmall"), value: "small", sizeLabel: "16px" },
+    { label: t("player.sizeMedium"), value: "medium", sizeLabel: "20px" },
+    { label: t("player.sizeLarge"), value: "large", sizeLabel: "26px" },
+    { label: t("player.sizeExtraLarge"), value: "extraLarge", sizeLabel: "32px" }
+  ], [t]);
+
+  const backgroundOptions = useMemo<{ label: string; value: SubtitleBackground; icon: string }[]>(() => [
+    { label: t("player.bgNone"), value: "none", icon: "ban-outline" },
+    { label: t("player.bgSemiBlack"), value: "semi_black", icon: "square-outline" },
+    { label: t("player.bgSolidBlack"), value: "solid_black", icon: "square" },
+    { label: t("player.bgPill"), value: "pill", icon: "ellipse-outline" }
+  ], [t]);
+
+  const shadowOptions = useMemo<{ label: string; value: SubtitleShadow }[]>(() => [
+    { label: t("player.shadowNetflix"), value: "netflix_shadow" },
+    { label: t("player.shadowOutline"), value: "thick_outline" },
+    { label: t("player.shadowNone"), value: "none" }
+  ], [t]);
+
+  const positionOptions = useMemo<{ label: string; value: SubtitlePosition }[]>(() => [
+    { label: t("player.positionStandard"), value: "standard" },
+    { label: t("player.positionElevated"), value: "elevated" }
+  ], [t]);
+
+  const presets = useMemo<{ key: SubtitlePreset; label: string; subtitle: string }[]>(() => [
+    { key: "netflix", label: t("player.presetNetflix"), subtitle: t("player.presetNetflixDesc") },
+    { key: "netflix_box", label: t("player.presetNetflixBox"), subtitle: t("player.presetNetflixBoxDesc") },
+    { key: "cinema_yellow", label: t("player.presetCinemaYellow"), subtitle: t("player.presetCinemaYellowDesc") },
+    { key: "high_contrast", label: t("player.presetHighContrast"), subtitle: t("player.presetHighContrastDesc") }
+  ], [t]);
 
   if (!visible) return null;
 
@@ -121,10 +123,10 @@ export function SubtitleStyleModal({ visible, onClose }: SubtitleStyleModalProps
           <View style={styles.header}>
             <View>
               <FinoraText variant="title" weight="700" color="textPrimary">
-                Style des sous-titres
+                {t("player.subtitleStyle")}
               </FinoraText>
               <FinoraText variant="caption" color="textSecondary">
-                Personnalisation du rendu à la Netflix
+                {t("player.subtitlesAppearanceDesc")}
               </FinoraText>
             </View>
 
@@ -136,12 +138,12 @@ export function SubtitleStyleModal({ visible, onClose }: SubtitleStyleModalProps
               >
                 <Ionicons name="refresh-outline" size={14} color={colors.textMuted} />
                 <FinoraText variant="caption" color="textMuted" style={{ marginLeft: 4 }}>
-                  Défaut
+                  {t("common.default")}
                 </FinoraText>
               </TouchableOpacity>
 
               <FinoraIconButton
-                accessibilityLabel="Fermer"
+                accessibilityLabel={t("common.close")}
                 onPress={onClose}
                 size={36}
                 backgroundColor={colors.surface}
@@ -157,7 +159,7 @@ export function SubtitleStyleModal({ visible, onClose }: SubtitleStyleModalProps
             <View style={styles.previewSection}>
               <View style={styles.previewHeader}>
                 <FinoraText variant="caption" color="textSecondary" weight="700">
-                  APERÇU EN DIRECT
+                  {t("player.livePreview")}
                 </FinoraText>
                 <Pressable
                   onPress={() => setPreviewDarkScene(!previewDarkScene)}
@@ -170,7 +172,7 @@ export function SubtitleStyleModal({ visible, onClose }: SubtitleStyleModalProps
                     color="#FFFFFF"
                   />
                   <FinoraText variant="caption" color="textPrimary" style={{ marginLeft: 4, fontSize: 11 }}>
-                    {previewDarkScene ? "Tester fond clair" : "Tester fond sombre"}
+                    {previewDarkScene ? t("player.testLightScene") : t("player.testDarkScene")}
                   </FinoraText>
                 </Pressable>
               </View>
@@ -200,7 +202,7 @@ export function SubtitleStyleModal({ visible, onClose }: SubtitleStyleModalProps
                         previewShadowStyle
                       ]}
                     >
-                      FINORA — Voici l'aperçu de vos sous-titres.
+                      {t("player.previewSampleText")}
                     </FinoraText>
                   </View>
                 </View>
@@ -210,10 +212,10 @@ export function SubtitleStyleModal({ visible, onClose }: SubtitleStyleModalProps
             {/* 1-Click Presets */}
             <View style={styles.section}>
               <FinoraText variant="caption" color="textSecondary" weight="700" style={styles.sectionTitle}>
-                MODÈLES PRÉDÉFINIS (PRESETS)
+                {t("player.presets")}
               </FinoraText>
               <View style={styles.presetGrid}>
-                {PRESETS.map((p) => (
+                {presets.map((p) => (
                   <TouchableOpacity
                     key={p.key}
                     style={styles.presetCard}
@@ -235,10 +237,10 @@ export function SubtitleStyleModal({ visible, onClose }: SubtitleStyleModalProps
             {/* Text Color Selection */}
             <View style={styles.section}>
               <FinoraText variant="caption" color="textSecondary" weight="700" style={styles.sectionTitle}>
-                COULEUR DU TEXTE
+                {t("player.textColor")}
               </FinoraText>
               <View style={styles.optionsRow}>
-                {COLOR_OPTIONS.map((c) => {
+                {colorOptions.map((c) => {
                   const selected = settings.textColor === c.value;
                   return (
                     <TouchableOpacity
@@ -264,10 +266,10 @@ export function SubtitleStyleModal({ visible, onClose }: SubtitleStyleModalProps
             {/* Font Size Selection */}
             <View style={styles.section}>
               <FinoraText variant="caption" color="textSecondary" weight="700" style={styles.sectionTitle}>
-                TAILLE DU TEXTE
+                {t("player.textSize")}
               </FinoraText>
               <View style={styles.optionsRow}>
-                {SIZE_OPTIONS.map((s) => {
+                {sizeOptions.map((s) => {
                   const selected = settings.size === s.value;
                   return (
                     <TouchableOpacity
@@ -292,10 +294,10 @@ export function SubtitleStyleModal({ visible, onClose }: SubtitleStyleModalProps
             {/* Background / Box ("Carré derrière") */}
             <View style={styles.section}>
               <FinoraText variant="caption" color="textSecondary" weight="700" style={styles.sectionTitle}>
-                ARRIÈRE-PLAN / CARRÉ ("BOX")
+                {t("player.textBackground")}
               </FinoraText>
               <View style={styles.optionsRow}>
-                {BACKGROUND_OPTIONS.map((b) => {
+                {backgroundOptions.map((b) => {
                   const selected = settings.background === b.value;
                   return (
                     <TouchableOpacity
@@ -326,10 +328,10 @@ export function SubtitleStyleModal({ visible, onClose }: SubtitleStyleModalProps
             {/* Shadow & Outline */}
             <View style={styles.section}>
               <FinoraText variant="caption" color="textSecondary" weight="700" style={styles.sectionTitle}>
-                EFFET DE CONTOUR & OMBRE
+                {t("player.textShadow")}
               </FinoraText>
               <View style={styles.optionsRow}>
-                {SHADOW_OPTIONS.map((sh) => {
+                {shadowOptions.map((sh) => {
                   const selected = settings.shadow === sh.value;
                   return (
                     <TouchableOpacity
@@ -354,10 +356,10 @@ export function SubtitleStyleModal({ visible, onClose }: SubtitleStyleModalProps
             {/* Position */}
             <View style={styles.section}>
               <FinoraText variant="caption" color="textSecondary" weight="700" style={styles.sectionTitle}>
-                POSITION VERTICALE
+                {t("player.textPosition")}
               </FinoraText>
               <View style={styles.optionsRow}>
-                {POSITION_OPTIONS.map((pos) => {
+                {positionOptions.map((pos) => {
                   const selected = settings.position === pos.value;
                   return (
                     <TouchableOpacity

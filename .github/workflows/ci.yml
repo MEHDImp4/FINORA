@@ -38,6 +38,9 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Check i18n parity
+        run: npm run i18n:check
+
       - name: Expo doctor check
         run: npx expo-doctor
 

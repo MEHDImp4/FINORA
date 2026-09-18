@@ -5,6 +5,7 @@ import { MediaItem } from "../../../types/media";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { PosterGridSkeleton } from "../../../design-system/components/PosterGridSkeleton";
 import { colors, spacing } from "../../../design-system/tokens";
+import { useTranslation } from "../../../i18n";
 
 interface LibraryGridViewProps {
   items: MediaItem[];
@@ -17,6 +18,7 @@ interface LibraryGridViewProps {
   loadingMessage?: string;
   onEndReached?: () => void;
   isFetchingMore?: boolean;
+  ListHeaderComponent?: React.ReactElement | null;
 }
 
 const HORIZONTAL_PADDING = spacing.md; // 16
@@ -28,12 +30,18 @@ export const LibraryGridView = React.memo(function LibraryGridView({
   isLoading,
   onItemPress,
   onItemLongPress,
-  emptyTitle = "No Items",
-  emptyMessage = "No media found in this library",
-  loadingMessage = "Loading library items...",
+  emptyTitle,
+  emptyMessage,
+  loadingMessage,
   onEndReached,
-  isFetchingMore = false
+  isFetchingMore = false,
+  ListHeaderComponent
 }: LibraryGridViewProps) {
+  const { t } = useTranslation();
+  const displayEmptyTitle = emptyTitle ?? t("library.emptyTitle");
+  const displayEmptyMessage = emptyMessage ?? t("library.emptyDesc");
+  const displayLoadingMessage = loadingMessage ?? t("library.loadingMedia");
+
   const screenWidth = Dimensions.get("window").width || 375;
   const cardWidth = Math.max(90, Math.floor((screenWidth - (HORIZONTAL_PADDING * 2) - (GRID_GAP * 2)) / 3));
   const cardHeight = Math.round(cardWidth * 1.5);
@@ -62,7 +70,7 @@ export const LibraryGridView = React.memo(function LibraryGridView({
       <View style={styles.loadingContainer}>
         <PosterGridSkeleton rows={4} />
         <FinoraText variant="caption" style={styles.loadingText}>
-          {loadingMessage}
+          {displayLoadingMessage}
         </FinoraText>
       </View>
     );
@@ -82,6 +90,7 @@ export const LibraryGridView = React.memo(function LibraryGridView({
       removeClippedSubviews={true}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.6}
+      ListHeaderComponent={ListHeaderComponent}
       ListFooterComponent={
         isFetchingMore ? (
           <ActivityIndicator
@@ -96,10 +105,10 @@ export const LibraryGridView = React.memo(function LibraryGridView({
         !isLoading ? (
           <View style={styles.centerContainer}>
             <FinoraText variant="title" style={styles.emptyTitle}>
-              {emptyTitle}
+              {displayEmptyTitle}
             </FinoraText>
             <FinoraText variant="caption" style={styles.emptySubtitle}>
-              {emptyMessage}
+              {displayEmptyMessage}
             </FinoraText>
           </View>
         ) : null

@@ -12,18 +12,13 @@ export interface DownloadQualityProfile {
 
 export const DOWNLOAD_QUALITIES: DownloadQualityProfile[] = [
   {
-    id: "original",
-    title: "Qualité d'origine",
-    description: "Fichier brut complet du serveur sans transcodage, lecture fluide garantie",
-    badge: "Recommandé"
-  },
-  {
     id: "1080p",
     title: "1080p Full HD",
-    description: "Haute fidélité pour grand écran ou tablette",
+    description: "Qualité optimale et compacte (~2-3 Go par film), 1080p Full HD",
+    badge: "Recommandé",
     maxHeight: 1080,
     maxWidth: 1920,
-    videoBitRate: 7500000
+    videoBitRate: 3000000
   },
   {
     id: "720p",
@@ -31,7 +26,7 @@ export const DOWNLOAD_QUALITIES: DownloadQualityProfile[] = [
     description: "Qualité optimale pour smartphone, taille et temps réduits",
     maxHeight: 720,
     maxWidth: 1280,
-    videoBitRate: 3500000
+    videoBitRate: 1800000
   },
   {
     id: "480p",
@@ -39,7 +34,12 @@ export const DOWNLOAD_QUALITIES: DownloadQualityProfile[] = [
     description: "Économiseur d'espace et téléchargement ultra rapide",
     maxHeight: 480,
     maxWidth: 854,
-    videoBitRate: 1500000
+    videoBitRate: 1000000
+  },
+  {
+    id: "original",
+    title: "Qualité d'origine",
+    description: "Fichier brut complet du serveur sans transcodage, lecture fluide garantie"
   }
 ];
 

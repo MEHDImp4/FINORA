@@ -6,6 +6,7 @@ import { DownloadItem } from "../types";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
 import { getPosterUrl } from "../../../core/repositories/imageUrlBuilder";
+import { useTranslation } from "../../../i18n";
 
 import {
   formatBytes,
@@ -36,6 +37,7 @@ export function DownloadProgressCard({
   onPause,
   onResume
 }: DownloadProgressCardProps) {
+  const { t } = useTranslation();
   const isFailed = download.status === "failed";
   const isQueued = download.status === "queued";
   const isPaused = download.status === "paused";
@@ -76,8 +78,8 @@ export function DownloadProgressCard({
         }`
       : download.title
     : download.year
-    ? `Film • ${download.year}`
-    : "Film";
+    ? `${t("common.movie")} • ${download.year}`
+    : t("common.movie");
 
   return (
     <View style={styles.card} testID={`download-progress-card-${download.itemId}`}>
@@ -109,7 +111,7 @@ export function DownloadProgressCard({
           </FinoraText>
           <View style={[styles.typeBadge, isEpisode ? styles.seriesBadge : styles.movieBadge]}>
             <FinoraText variant="caption" weight="700" style={styles.typeBadgeText}>
-              {isEpisode ? "SÉRIE" : "FILM"}
+              {isEpisode ? t("common.series").toUpperCase() : t("common.movie").toUpperCase()}
             </FinoraText>
           </View>
         </View>
@@ -122,14 +124,14 @@ export function DownloadProgressCard({
           <View style={styles.errorNotice}>
             <Ionicons name="alert-circle" size={13} color="#E50914" style={{ marginRight: 4 }} />
             <FinoraText variant="caption" style={styles.errorText} numberOfLines={1}>
-              {download.error || "Échec du téléchargement"}
+              {download.error || t("downloads.statusFailed")}
             </FinoraText>
           </View>
         ) : isQueued ? (
           <View style={styles.queuedNotice}>
             <Ionicons name="hourglass-outline" size={13} color="#4A90E2" style={{ marginRight: 4 }} />
             <FinoraText variant="caption" style={styles.queuedText}>
-              En file d'attente
+              {t("downloads.statusQueued")}
             </FinoraText>
           </View>
         ) : (
@@ -150,14 +152,14 @@ export function DownloadProgressCard({
             <View style={styles.progressStatusRow}>
               <FinoraText variant="caption" style={styles.progressMeta} numberOfLines={1}>
                 {isFinalizing
-                  ? "Finalisation..."
+                  ? t("downloads.statusFinalizing")
                   : hasRealTotal
                   ? `${formatBytes(download.bytesDownloaded)} / ${formatBytes(download.totalBytes)}`
                   : isEstimated
                   ? `${formatBytes(download.bytesDownloaded)} / ~${formatBytes(displayTotal)}`
                   : download.bytesDownloaded > 0
-                  ? `${formatBytes(download.bytesDownloaded)} reçus`
-                  : "Connexion..."}
+                  ? t("downloads.bytesReceived", { bytes: formatBytes(download.bytesDownloaded) })
+                  : t("downloads.statusConnecting")}
                 {download.speedBytesPerSecond ? ` • ${formatSpeed(download.speedBytesPerSecond)}` : ""}
                 {download.estimatedSecondsRemaining
                   ? ` • ${formatTimeRemaining(download.estimatedSecondsRemaining)}`
@@ -178,7 +180,7 @@ export function DownloadProgressCard({
             style={styles.retryButton}
             onPress={() => onRetry(download.itemId)}
             accessibilityRole="button"
-            accessibilityLabel={`Réessayer ${mainTitle}`}
+            accessibilityLabel={t("downloads.retryTitle", { title: mainTitle })}
             hitSlop={6}
           >
             <Ionicons name="refresh" size={14} color="#FFFFFF" />
@@ -189,7 +191,7 @@ export function DownloadProgressCard({
             style={styles.pauseButton}
             onPress={() => onPause(download.itemId)}
             accessibilityRole="button"
-            accessibilityLabel={`Mettre en pause ${mainTitle}`}
+            accessibilityLabel={t("downloads.pauseTitle", { title: mainTitle })}
             hitSlop={6}
           >
             <Ionicons name="pause" size={16} color="#FFFFFF" />
@@ -200,7 +202,7 @@ export function DownloadProgressCard({
             style={styles.resumeButton}
             onPress={() => onResume(download.itemId)}
             accessibilityRole="button"
-            accessibilityLabel={`Reprendre ${mainTitle}`}
+            accessibilityLabel={t("downloads.resumeTitle", { title: mainTitle })}
             hitSlop={6}
           >
             <Ionicons name="play" size={14} color="#FFFFFF" />
@@ -210,7 +212,7 @@ export function DownloadProgressCard({
           style={styles.cancelButton}
           onPress={() => onCancel(download.itemId)}
           accessibilityRole="button"
-          accessibilityLabel={`Annuler ${mainTitle}`}
+          accessibilityLabel={t("downloads.cancelTitle", { title: mainTitle })}
           hitSlop={6}
         >
           <Ionicons name="close-circle" size={20} color={colors.textSecondary} />

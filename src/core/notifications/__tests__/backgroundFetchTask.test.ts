@@ -25,6 +25,7 @@ jest.mock("../../../core/network/logger", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
 
+import Constants from "expo-constants";
 import { authRepository } from "../../../core/jellyfin/authRepository";
 import { syncNewMediaNotifications } from "../../../features/notifications/useNotificationSync";
 import { useNotificationStore, DEFAULT_NOTIFICATION_PREFERENCES } from "../../../stores/notificationStore";
@@ -32,11 +33,14 @@ import {
   BACKGROUND_NOTIFICATION_INTERVAL_MINUTES,
   FINORA_BG_FETCH_TASK,
   registerBackgroundFetch,
-  unregisterBackgroundFetch
+  unregisterBackgroundFetch,
+  isExpoGoEnvironment,
+  safeUnregisterTask
 } from "../backgroundFetchTask";
 
 const mockDefineTask = TaskManager.defineTask as jest.Mock;
 const mockIsTaskRegisteredAsync = TaskManager.isTaskRegisteredAsync as jest.Mock;
+const mockTaskManagerUnregister = TaskManager.unregisterTaskAsync as jest.Mock;
 const mockRegisterTaskAsync = BackgroundTask.registerTaskAsync as jest.Mock;
 const mockUnregisterTaskAsync = BackgroundTask.unregisterTaskAsync as jest.Mock;
 const mockRestoreSession = authRepository.restoreSession as jest.Mock;
@@ -152,10 +156,88 @@ describe("backgroundFetchTask", () => {
     });
   });
 
+  describe("isExpoGoEnvironment", () => {
+    afterEach(() => {
+      (Constants as any).appOwnership = null;
+      (Constants as any).executionEnvironment = "bare";
+    });
+
+    it("returns true when appOwnership is expo", () => {
+      (Constants as any).appOwnership = "expo";
+      expect(isExpoGoEnvironment()).toBe(true);
+    });
+
+    it("returns true when executionEnvironment is storeClient", () => {
+      (Constants as any).executionEnvironment = "storeClient";
+      expect(isExpoGoEnvironment()).toBe(true);
+    });
+
+    it("returns false in bare or standalone build", () => {
+      (Constants as any).appOwnership = "standalone";
+      (Constants as any).executionEnvironment = "standalone";
+      expect(isExpoGoEnvironment()).toBe(false);
+    });
+  });
+
+  describe("safeUnregisterTask", () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it("unregisters using BackgroundTask.unregisterTaskAsync if successful", async () => {
+      mockUnregisterTaskAsync.mockResolvedValueOnce(undefined);
+
+      await safeUnregisterTask(FINORA_BG_FETCH_TASK);
+
+      expect(mockUnregisterTaskAsync).toHaveBeenCalledWith(FINORA_BG_FETCH_TASK);
+      expect(mockTaskManagerUnregister).not.toHaveBeenCalled();
+    });
+
+    it("falls back to TaskManager.unregisterTaskAsync if BackgroundTask throws", async () => {
+      mockUnregisterTaskAsync.mockRejectedValueOnce(
+        new Error(
+          "Invalid task consumer. Cannot unregister task with name 'FINORA_BACKGROUND_CONTENT_CHECK' because it is associated with different consumer class."
+        )
+      );
+      mockTaskManagerUnregister.mockResolvedValueOnce(undefined);
+
+      await safeUnregisterTask(FINORA_BG_FETCH_TASK);
+
+      expect(mockUnregisterTaskAsync).toHaveBeenCalledWith(FINORA_BG_FETCH_TASK);
+      expect(mockTaskManagerUnregister).toHaveBeenCalledWith(FINORA_BG_FETCH_TASK);
+    });
+
+    it("rethrows error if both BackgroundTask and TaskManager unregister fail", async () => {
+      mockUnregisterTaskAsync.mockRejectedValueOnce(new Error("original error"));
+      mockTaskManagerUnregister.mockRejectedValueOnce(new Error("fallback error"));
+
+      await expect(safeUnregisterTask(FINORA_BG_FETCH_TASK)).rejects.toThrow("original error");
+    });
+  });
+
   describe("registerBackgroundFetch", () => {
     beforeEach(async () => {
       jest.clearAllMocks();
       await AsyncStorage.clear();
+      (Constants as any).appOwnership = null;
+      (Constants as any).executionEnvironment = "bare";
+    });
+
+    afterEach(() => {
+      (Constants as any).appOwnership = null;
+      (Constants as any).executionEnvironment = "bare";
+    });
+
+    it("skips native registration in Expo Go and unregisters any stale task via TaskManager", async () => {
+      (Constants as any).appOwnership = "expo";
+      mockIsTaskRegisteredAsync.mockResolvedValueOnce(true);
+      mockTaskManagerUnregister.mockResolvedValueOnce(undefined);
+
+      await registerBackgroundFetch();
+
+      expect(mockUnregisterTaskAsync).not.toHaveBeenCalled();
+      expect(mockRegisterTaskAsync).not.toHaveBeenCalled();
+      expect(mockTaskManagerUnregister).toHaveBeenCalledWith(FINORA_BG_FETCH_TASK);
     });
 
     it("skips registration only when the current config version is already registered", async () => {
@@ -208,6 +290,25 @@ describe("backgroundFetchTask", () => {
     beforeEach(async () => {
       jest.clearAllMocks();
       await AsyncStorage.clear();
+      (Constants as any).appOwnership = null;
+      (Constants as any).executionEnvironment = "bare";
+    });
+
+    afterEach(() => {
+      (Constants as any).appOwnership = null;
+      (Constants as any).executionEnvironment = "bare";
+    });
+
+    it("in Expo Go, directly calls TaskManager.unregisterTaskAsync and skips BackgroundTask", async () => {
+      (Constants as any).appOwnership = "expo";
+      mockIsTaskRegisteredAsync.mockResolvedValueOnce(true);
+      mockTaskManagerUnregister.mockResolvedValueOnce(undefined);
+
+      await unregisterBackgroundFetch();
+
+      expect(mockUnregisterTaskAsync).not.toHaveBeenCalled();
+      expect(mockTaskManagerUnregister).toHaveBeenCalledWith(FINORA_BG_FETCH_TASK);
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith(expect.any(String));
     });
 
     it("does not call native unregister when the task is absent", async () => {
@@ -227,9 +328,26 @@ describe("backgroundFetchTask", () => {
       expect(mockUnregisterTaskAsync).toHaveBeenCalledWith(FINORA_BG_FETCH_TASK);
     });
 
+    it("uses safeUnregisterTask fallback when BackgroundTask unregister rejects due to different consumer class", async () => {
+      mockIsTaskRegisteredAsync.mockResolvedValueOnce(true);
+      mockUnregisterTaskAsync.mockRejectedValueOnce(
+        new Error(
+          "Invalid task consumer. Cannot unregister task because it is associated with different consumer class."
+        )
+      );
+      mockTaskManagerUnregister.mockResolvedValueOnce(undefined);
+
+      await unregisterBackgroundFetch();
+
+      expect(mockUnregisterTaskAsync).toHaveBeenCalledWith(FINORA_BG_FETCH_TASK);
+      expect(mockTaskManagerUnregister).toHaveBeenCalledWith(FINORA_BG_FETCH_TASK);
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith(expect.any(String));
+    });
+
     it("does not throw when native unregister rejects", async () => {
       mockIsTaskRegisteredAsync.mockResolvedValueOnce(true);
       mockUnregisterTaskAsync.mockRejectedValueOnce(new Error("unreg failed"));
+      mockTaskManagerUnregister.mockRejectedValueOnce(new Error("task manager unreg also failed"));
 
       await expect(unregisterBackgroundFetch()).resolves.toBeUndefined();
     });

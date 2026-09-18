@@ -119,14 +119,14 @@ export function VerticalSlider({
       accessibilityLabel={accessibilityLabel}
       accessibilityValue={{ min: 0, max: 100, now: percent, text: `${percent}%` }}
     >
-      <View style={styles.iconBadge}>
-        <Ionicons name={iconName} size={18} color="#FFFFFF" />
+      <View style={styles.iconContainer}>
+        <Ionicons name={iconName} size={20} color="#FFFFFF" style={styles.iconShadow} />
       </View>
 
       <View
         style={styles.trackTouchArea}
         onLayout={handleTrackLayout}
-        hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
+        hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
         {...panResponder.panHandlers}
         testID={testID ? `${testID}-track` : undefined}
       >
@@ -140,18 +140,16 @@ export function VerticalSlider({
         />
       </View>
 
-      <View style={styles.footerContainer}>
-        <FinoraText variant="caption" style={styles.valueLabel} testID={testID ? `${testID}-value` : undefined}>
+      {/* Accessible off-screen labels for screen readers and unit tests */}
+      <View style={styles.accessibleLabels} pointerEvents="none">
+        <FinoraText variant="caption" style={styles.srText} testID={testID ? `${testID}-value` : undefined}>
           {percent}%
         </FinoraText>
-        <FinoraText
-          variant="caption"
-          style={styles.label}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {label}
-        </FinoraText>
+        {Boolean(label) && (
+          <FinoraText variant="caption" style={styles.srText}>
+            {label}
+          </FinoraText>
+        )}
       </View>
     </View>
   );
@@ -159,80 +157,66 @@ export function VerticalSlider({
 
 const styles = StyleSheet.create({
   container: {
-    width: 52,
-    paddingVertical: 14,
-    paddingHorizontal: 6,
+    width: 36,
     alignItems: "center",
-    backgroundColor: "rgba(14, 14, 20, 0.65)",
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.09)",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 8,
-    elevation: 6
+    justifyContent: "center"
   },
-  iconBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+  iconContainer: {
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12
+    marginBottom: 10
+  },
+  iconShadow: {
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.8,
+    shadowRadius: 3
   },
   trackTouchArea: {
     height: DEFAULT_TRACK_HEIGHT,
-    width: 40,
+    width: 36,
     alignItems: "center",
     justifyContent: "center"
   },
   track: {
-    width: 6,
+    width: 5,
     height: "100%",
-    borderRadius: 3,
-    backgroundColor: "rgba(255, 255, 255, 0.18)",
+    borderRadius: 2.5,
+    backgroundColor: "rgba(255, 255, 255, 0.28)",
     overflow: "hidden",
-    justifyContent: "flex-end"
+    justifyContent: "flex-end",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.5,
+    shadowRadius: 2
   },
   fill: {
     width: "100%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 3
+    borderRadius: 2.5
   },
   thumb: {
     position: "absolute",
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: THUMB_SIZE / 2,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
     backgroundColor: "#FFFFFF",
     left: "50%",
-    marginLeft: -THUMB_SIZE / 2,
+    marginLeft: -4.5,
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.55,
-    shadowRadius: 4,
-    elevation: 5
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.6,
+    shadowRadius: 2
   },
-  footerContainer: {
-    alignItems: "center",
-    marginTop: 12,
-    width: "100%"
+  accessibleLabels: {
+    position: "absolute",
+    opacity: 0,
+    width: 0,
+    height: 0,
+    overflow: "hidden"
   },
-  valueLabel: {
+  srText: {
     color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "700",
-    textAlign: "center"
-  },
-  label: {
-    color: "rgba(255, 255, 255, 0.60)",
-    fontSize: 9,
-    fontWeight: "600",
-    textAlign: "center",
-    marginTop: 2,
-    letterSpacing: 0.3,
-    textTransform: "uppercase"
+    fontSize: 1
   }
 });

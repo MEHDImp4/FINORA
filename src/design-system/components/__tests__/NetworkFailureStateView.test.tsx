@@ -1,6 +1,7 @@
 import React from "react";
 import ReactTestRenderer, { act } from "react-test-renderer";
 import { NetworkFailureStateView } from "../NetworkFailureStateView";
+import { translate } from "../../../i18n";
 
 const mockPush = jest.fn();
 jest.mock("expo-router", () => ({
@@ -26,8 +27,8 @@ describe("NetworkFailureStateView", () => {
 
     const root = tree.root;
     const texts = root.findAllByType("Text" as any).map((t: any) => t.props.children);
-    expect(texts).toContain("MODE HORS-LIGNE");
-    expect(texts).toContain("Aucune connexion Internet");
+    expect(texts).toContain(translate("errors.badgeOffline"));
+    expect(texts).toContain(translate("errors.networkFailureTitle"));
   });
 
   it("renders 'server_unreachable' state with appropriate badge and title", async () => {
@@ -40,8 +41,8 @@ describe("NetworkFailureStateView", () => {
 
     const root = tree.root;
     const texts = root.findAllByType("Text" as any).map((t: any) => t.props.children);
-    expect(texts).toContain("SERVEUR INDISPONIBLE");
-    expect(texts).toContain("Serveur Jellyfin injoignable");
+    expect(texts).toContain(translate("errors.badgeServerDown"));
+    expect(texts).toContain(translate("errors.serverUnreachableTitle"));
   });
 
   it("navigates to downloads screen when clicking 'Regarder hors-ligne'", async () => {

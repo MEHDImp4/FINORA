@@ -36,7 +36,7 @@ export const DEFAULT_PLAYBACK_PREFERENCES: PlaybackPreferences = {
   autoSkipIntro: true,
   playbackSpeed: 1.0,
   downloadWifiOnly: true,
-  defaultDownloadQuality: "original",
+  defaultDownloadQuality: "1080p",
   hapticsEnabled: true,
   seriesPreferences: {}
 };

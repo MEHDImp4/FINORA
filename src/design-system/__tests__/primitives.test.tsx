@@ -63,6 +63,11 @@ describe("Finora Design System Primitives", () => {
       const tree = renderer.create(<FinoraButton label="Loading..." loading={true} />).toJSON();
       expect(tree).toBeTruthy();
     });
+
+    it("renders optional badge beside label", () => {
+      const component = renderer.create(<FinoraButton label="Resume" badge="42%" />);
+      expect(component.root.findByProps({ children: "42%" })).toBeTruthy();
+    });
   });
 
   describe("FinoraIconButton", () => {

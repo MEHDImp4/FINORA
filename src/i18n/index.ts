@@ -29,13 +29,14 @@ function getNestedValue(obj: unknown, path: string): unknown {
 export function translate(
   key: string,
   params?: Record<string, string | number>,
-  lang: SupportedLanguage = DEFAULT_LANGUAGE
+  lang?: SupportedLanguage
 ): string {
-  const dictionary = translations[lang] || translations[DEFAULT_LANGUAGE];
+  const currentLang = lang || useLanguageStore.getState().language || DEFAULT_LANGUAGE;
+  const dictionary = translations[currentLang] || translations[DEFAULT_LANGUAGE];
   let rawValue = getNestedValue(dictionary, key);
 
   // Fallback to default language (English) if missing in current dictionary
-  if (typeof rawValue !== "string" && lang !== DEFAULT_LANGUAGE) {
+  if (typeof rawValue !== "string" && currentLang !== DEFAULT_LANGUAGE) {
     rawValue = getNestedValue(translations[DEFAULT_LANGUAGE], key);
   }
 
@@ -47,9 +48,15 @@ export function translate(
     return rawValue;
   }
 
+  const effectiveParams = { ...params };
+  if ("count" in effectiveParams && !("plural" in effectiveParams)) {
+    const num = Number(effectiveParams.count);
+    effectiveParams.plural = !isNaN(num) && num > 1 ? "s" : "";
+  }
+
   let result = rawValue;
-  for (const [paramKey, val] of Object.entries(params)) {
-    result = result.replace(new RegExp(`\\{${paramKey}\\}`, "g"), String(val));
+  for (const [paramKey, val] of Object.entries(effectiveParams)) {
+    result = result.replace(new RegExp(`\\{{1,2}${paramKey}\\}{1,2}`, "g"), String(val));
   }
   return result;
 }

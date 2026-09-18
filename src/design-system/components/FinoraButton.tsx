@@ -1,6 +1,7 @@
 import React from "react";
 import {
   Pressable,
+  View,
   ActivityIndicator,
   StyleSheet,
   ViewStyle,
@@ -15,6 +16,7 @@ export type ButtonSize = "sm" | "md" | "lg";
 
 export interface FinoraButtonProps extends Omit<PressableProps, "style"> {
   label: string;
+  badge?: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;
@@ -26,6 +28,7 @@ export interface FinoraButtonProps extends Omit<PressableProps, "style"> {
 
 export function FinoraButton({
   label,
+  badge,
   variant = "primary",
   size = "md",
   loading = false,
@@ -121,6 +124,18 @@ export function FinoraButton({
           >
             {label}
           </FinoraText>
+          {badge ? (
+            <View style={styles.badge}>
+              <FinoraText
+                variant="caption"
+                color={getTextColor()}
+                weight="700"
+                style={styles.badgeText}
+              >
+                {badge}
+              </FinoraText>
+            </View>
+          ) : null}
           {rightIcon}
         </>
       )}
@@ -138,6 +153,17 @@ const styles = StyleSheet.create({
   },
   label: {
     flexShrink: 0,
-    paddingRight: 4
+    paddingRight: 2
+  },
+  badge: {
+    backgroundColor: "rgba(255, 255, 255, 0.22)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: 2
+  },
+  badgeText: {
+    fontSize: 11,
+    lineHeight: 14
   }
 });

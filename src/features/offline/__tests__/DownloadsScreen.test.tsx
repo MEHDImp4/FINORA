@@ -10,6 +10,7 @@ import {
 import { offlineStorageService } from "../offlineStorage";
 import { downloadManager } from "../downloadManager";
 import { OfflineMediaRecord } from "../types";
+import { translate } from "../../../i18n";
 
 const mockPush = jest.fn();
 jest.mock("expo-router", () => ({
@@ -86,7 +87,7 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     });
 
     const playButton = tree.root.findByProps({
-      accessibilityLabel: "Lire hors-ligne Blade Runner"
+      accessibilityLabel: translate("downloads.playOfflineTitle", { title: "Blade Runner" })
     });
     expect(playButton).toBeTruthy();
 
@@ -106,7 +107,7 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     });
 
     const deleteButton = tree.root.findByProps({
-      accessibilityLabel: "Supprimer Blade Runner"
+      accessibilityLabel: translate("downloads.deleteMediaA11y", { title: "Blade Runner" })
     });
     expect(deleteButton).toBeTruthy();
 
@@ -207,7 +208,7 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     });
 
     const seriesCard = tree.root.findByProps({
-      accessibilityLabel: "Parcourir Breaking Bad, 2 épisodes téléchargés"
+      accessibilityLabel: translate("downloads.browseSeriesA11y", { name: "Breaking Bad", count: 2 })
     });
     expect(seriesCard).toBeTruthy();
 
@@ -219,19 +220,23 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     expect(tree.root.findByProps({ testID: "series-episode-item-ep-1" })).toBeTruthy();
     expect(tree.root.findByProps({ testID: "series-episode-item-ep-2" })).toBeTruthy();
 
-    const ep1PlayBtn = tree.root.findByProps({ accessibilityLabel: "Play offline Breaking Bad - Pilot" });
+    const ep1PlayBtn = tree.root.findByProps({
+      accessibilityLabel: translate("downloads.playOfflineTitle", { title: "Breaking Bad - Pilot" })
+    });
     act(() => {
       ep1PlayBtn.props.onPress();
     });
     expect(mockOnPlay).toHaveBeenCalledWith(expect.objectContaining({ itemId: "ep-1" }));
 
-    const backBtn = tree.root.findByProps({ accessibilityLabel: "Retour aux téléchargements" });
+    const backBtn = tree.root.findByProps({
+      accessibilityLabel: translate("downloads.backToDownloads")
+    });
     await act(async () => {
       backBtn.props.onPress();
     });
 
     expect(tree.root.findByProps({
-      accessibilityLabel: "Parcourir Breaking Bad, 2 épisodes téléchargés"
+      accessibilityLabel: translate("downloads.browseSeriesA11y", { name: "Breaking Bad", count: 2 })
     })).toBeTruthy();
   });
 

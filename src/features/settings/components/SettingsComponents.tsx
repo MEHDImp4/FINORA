@@ -189,15 +189,11 @@ const styles = StyleSheet.create({
     lineHeight: 18
   },
   card: {
-    backgroundColor: "rgba(20, 20, 28, 0.82)",
-    borderRadius: 14,
+    backgroundColor: colors.card,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.09)",
-    overflow: "hidden",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 10
+    borderColor: colors.border,
+    overflow: "hidden"
   },
   rowContainer: {
     minHeight: 58,

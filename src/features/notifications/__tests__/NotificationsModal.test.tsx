@@ -2,6 +2,7 @@ import React from "react";
 import ReactTestRenderer from "react-test-renderer";
 import { NotificationsModal } from "../components/NotificationsModal";
 import { useNotificationStore, FinoraNotification } from "../../../stores/notificationStore";
+import { translate } from "../../../i18n";
 
 describe("NotificationsModal", () => {
   const sampleNotifications: FinoraNotification[] = [
@@ -66,7 +67,7 @@ describe("NotificationsModal", () => {
     });
 
     const root = component!.root;
-    const seriesText = root.findByProps({ children: "Séries" });
+    const seriesText = root.findByProps({ children: translate("notifications.tabSeries") });
     const seriesPressable = seriesText.parent;
 
     expect(seriesPressable).toBeDefined();
@@ -122,7 +123,7 @@ describe("NotificationsModal", () => {
 
     const root = component!.root;
     const markAllPressable = root.findAllByType("Pressable" as any).find(
-      (p) => p.props.accessibilityLabel === "Tout marquer comme lu"
+      (p) => p.props.accessibilityLabel === translate("notifications.markAllRead")
     );
 
     expect(markAllPressable).toBeDefined();
@@ -145,6 +146,6 @@ describe("NotificationsModal", () => {
       );
     });
 
-    expect(component!.root.findByProps({ children: "Tout est à jour" })).toBeDefined();
+    expect(component!.root.findByProps({ children: translate("notifications.emptyTitle") })).toBeDefined();
   });
 });

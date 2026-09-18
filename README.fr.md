@@ -62,7 +62,7 @@ Développé avec Expo SDK 57, React Native 0.86 et TypeScript, il associe lectur
 > **Ouvrez FINORA → Parcourez instantanément → Choisissez un contenu → Lancez la lecture → Visionnez en toute fluidité → Reprenez n'importe où.**
 
 - **Navigation Fluide** : Optimisée pour les écrans à haut rafraîchissement (jusqu'à 120 Hz) grâce à la Nouvelle Architecture React Native (moteur de rendu Fabric et runtime Hermes).
-- **Design Sombre & Liquid Glass** : Esthétique sombre épurée, barre de navigation en verre translucide, légère profondeur visuelle et cartes responsives.
+- **Design Sombre Cinématique** : Esthétique sombre OLED soignée, navigation fluide inspirée de Netflix, cartes épurées et hiérarchie visuelle claire.
 - **Moteur Vidéo Natif** : Propulsé par `expo-video` (basé sur AndroidX Media3 / ExoPlayer sur Android et AVPlayer sur iOS) avec négociation automatisée des flux.
 - **Confidentialité par Défaut** : Jetons d'authentification stockés dans le Keystore matériel selon les capacités de l'appareil, mots de passe purgés de la mémoire après connexion et zéro traceur tiers.
 
@@ -258,7 +258,7 @@ FINORA/
 │   │   ├── search/       # Recherche en direct, historique, suggestions
 │   │   └── settings/     # Diagnostics serveur, préférences de lecture et sous-titres
 │   ├── stores/           # Stores atomiques Zustand (lecteur, réglages, téléchargements)
-│   └── components/       # Composants du système de design FINORA (cartes Liquid Glass, modales)
+│   └── components/       # Composants du système de design FINORA (cartes FinoraCard, modales)
 ├── .github/              # Modèles d'issues, de PR et workflows d'intégration continue
 └── package.json
 ```

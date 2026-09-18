@@ -1,8 +1,9 @@
 import React from "react";
-import { View, Pressable, StyleSheet } from "react-native";
+import { View, ScrollView, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
+import { useTranslation } from "../../../i18n";
 
 interface SearchHistoryListProps {
   history: string[];
@@ -17,6 +18,8 @@ export function SearchHistoryList({
   onRemoveTerm,
   onClearAll
 }: SearchHistoryListProps) {
+  const { t } = useTranslation();
+
   if (history.length === 0) {
     return null;
   }
@@ -24,37 +27,42 @@ export function SearchHistoryList({
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <FinoraText variant="body" style={styles.headerTitle}>
-          Recherches récentes
+        <FinoraText variant="caption" weight="600" color="textSecondary" style={styles.headerTitle}>
+          {t("search.recentSearches")}
         </FinoraText>
         <Pressable
           onPress={onClearAll}
           style={styles.clearAllButton}
           accessibilityRole="button"
-          accessibilityLabel="Effacer tout l'historique de recherche"
+          accessibilityLabel={t("search.clearHistory")}
+          hitSlop={8}
         >
           <FinoraText variant="caption" style={styles.clearAllText}>
-            Tout effacer
+            {t("search.clearHistory")}
           </FinoraText>
         </Pressable>
       </View>
 
-      <View style={styles.itemsList}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {history.map((term) => (
-          <View key={term} style={styles.historyRow}>
+          <View key={term} style={styles.chip}>
             <Pressable
-              style={styles.termButton}
+              style={styles.termPressable}
               onPress={() => onSelectTerm(term)}
               accessibilityRole="button"
-              accessibilityLabel={`Rechercher ${term}`}
+              accessibilityLabel={term}
             >
               <Ionicons
                 name="time-outline"
-                size={18}
+                size={13}
                 color={colors.textSecondary}
                 style={styles.clockIcon}
               />
-              <FinoraText variant="body" style={styles.termText} numberOfLines={1}>
+              <FinoraText variant="caption" style={styles.termText} numberOfLines={1}>
                 {term}
               </FinoraText>
             </Pressable>
@@ -62,71 +70,77 @@ export function SearchHistoryList({
               onPress={() => onRemoveTerm(term)}
               style={styles.removeButton}
               accessibilityRole="button"
-              accessibilityLabel={`Retirer ${term} de l'historique`}
+              accessibilityLabel={t("search.deleteHistoryTermA11y", { term })}
+              hitSlop={6}
             >
-              <Ionicons name="close" size={18} color={colors.textSecondary} />
+              <Ionicons name="close" size={13} color={colors.textSecondary} />
             </Pressable>
           </View>
         ))}
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.md
+    marginVertical: spacing.xs
   },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: spacing.sm
+    paddingHorizontal: spacing.md,
+    marginBottom: 6
   },
   headerTitle: {
-    fontWeight: "700",
-    color: colors.textPrimary
+    textTransform: "uppercase",
+    fontSize: 11,
+    letterSpacing: 0.5
   },
   clearAllButton: {
-    minHeight: 44,
-    paddingHorizontal: 8,
-    alignItems: "center",
-    justifyContent: "center"
+    paddingVertical: 2,
+    paddingHorizontal: 4
   },
   clearAllText: {
     color: colors.primary,
-    fontWeight: "600"
+    fontWeight: "600",
+    fontSize: 12
   },
-  itemsList: {
-    gap: spacing.xs
-  },
-  historyRow: {
-    minHeight: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#1F1F2E"
-  },
-  termButton: {
-    minHeight: 48,
-    flex: 1,
-    flexDirection: "row",
+  scrollContent: {
+    paddingHorizontal: spacing.md,
+    gap: spacing.xs,
     alignItems: "center"
   },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#161622",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#28283C",
+    paddingLeft: 10,
+    paddingRight: 6,
+    height: 32
+  },
+  termPressable: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 4
+  },
   clockIcon: {
-    marginRight: spacing.sm
+    marginRight: 4
   },
   termText: {
-    flex: 1,
-    color: colors.textSecondary
+    color: colors.textPrimary,
+    fontWeight: "500"
   },
   removeButton: {
-    width: 44,
-    height: 44,
-    marginLeft: spacing.sm,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center"
   }
 });
+

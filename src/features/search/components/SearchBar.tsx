@@ -3,6 +3,8 @@ import { View, TextInput, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../../../design-system/tokens";
 
+import { useTranslation } from "../../../i18n";
+
 interface SearchBarProps {
   value: string;
   onChangeText: (text: string) => void;
@@ -17,33 +19,37 @@ export function SearchBar({
   onChangeText,
   onClear,
   onSubmitEditing,
-  placeholder = "Rechercher des films, séries, collections...",
+  placeholder,
   autoFocus = false
 }: SearchBarProps) {
+  const { t } = useTranslation();
+  const effectivePlaceholder = placeholder ?? t("search.placeholder");
+
   return (
     <View style={styles.container}>
-      <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+      <Ionicons name="search" size={18} color={colors.textSecondary} style={styles.searchIcon} />
       <TextInput
         style={styles.input}
         value={value}
         onChangeText={onChangeText}
-        placeholder={placeholder}
+        placeholder={effectivePlaceholder}
         placeholderTextColor={colors.textMuted}
         returnKeyType="search"
         onSubmitEditing={onSubmitEditing}
         autoFocus={autoFocus}
         autoCapitalize="none"
         autoCorrect={false}
-        accessibilityLabel="Recherche"
+        accessibilityLabel={t("common.search")}
       />
       {value.length > 0 && (
         <Pressable
           onPress={onClear}
           style={styles.clearButton}
           accessibilityRole="button"
-          accessibilityLabel="Effacer la recherche"
+          accessibilityLabel={t("search.clearHistory")}
+          hitSlop={8}
         >
-          <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+          <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
         </Pressable>
       )}
     </View>
@@ -54,27 +60,29 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1C1C26",
-    borderRadius: 12,
-    paddingLeft: spacing.md,
-    minHeight: 48,
+    backgroundColor: "#181824",
+    borderRadius: 20,
+    paddingLeft: 12,
+    paddingRight: 6,
+    height: 40,
     borderWidth: 1,
-    borderColor: "#2C2C3E"
+    borderColor: "#28283C"
   },
   searchIcon: {
-    marginRight: spacing.sm
+    marginRight: spacing.xs
   },
   input: {
     flex: 1,
     color: colors.textPrimary,
-    fontSize: 16,
-    minHeight: 48,
+    fontSize: 15,
+    height: 40,
     paddingVertical: 0
   },
   clearButton: {
-    width: 44,
-    height: 44,
+    width: 32,
+    height: 32,
     alignItems: "center",
     justifyContent: "center"
   }
 });
+

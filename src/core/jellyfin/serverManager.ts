@@ -13,12 +13,24 @@ export interface SavedAccount {
   serverId: string;
   serverName: string;
   serverUrl: string;
+  localUrl?: string;
+  remoteUrl?: string;
   userId: string;
   userName: string;
   lastUsedAt: number;
 }
 
+export interface SavedServer {
+  id: string;
+  name: string;
+  url: string;
+  localUrl?: string;
+  remoteUrl?: string;
+  lastUsedAt: number;
+}
+
 export const SAVED_ACCOUNTS_STORAGE_KEY = "finora_saved_accounts";
+export const SAVED_SERVERS_STORAGE_KEY = "finora_saved_servers";
 
 export class ServerManager {
   private client: JellyfinClient;
@@ -40,6 +52,93 @@ export class ServerManager {
     return accounts || [];
   }
 
+  public async getSavedServers(): Promise<SavedServer[]> {
+    const saved = await this.prefStorage.getItem<SavedServer[]>(SAVED_SERVERS_STORAGE_KEY);
+    if (saved && saved.length > 0) {
+      return [...saved].sort((a, b) => b.lastUsedAt - a.lastUsedAt);
+    }
+
+    // Auto-migration from saved accounts if no dedicated server list exists yet
+    const accounts = await this.getSavedAccounts();
+    const map = new Map<string, SavedServer>();
+    for (const acc of accounts) {
+      const normalizedUrl = acc.serverUrl ? acc.serverUrl.replace(/\/+$/, "") : "";
+      if (normalizedUrl && !map.has(normalizedUrl)) {
+        map.set(normalizedUrl, {
+          id: acc.serverId || normalizedUrl,
+          name: acc.serverName || "Jellyfin Server",
+          url: acc.serverUrl,
+          lastUsedAt: acc.lastUsedAt || Date.now()
+        });
+      }
+    }
+    const migrated = Array.from(map.values()).sort((a, b) => b.lastUsedAt - a.lastUsedAt);
+    if (migrated.length > 0) {
+      await this.prefStorage.setItem(SAVED_SERVERS_STORAGE_KEY, migrated);
+    }
+    return migrated;
+  }
+
+  public async saveServer(server: SavedServer): Promise<void> {
+    const servers = await this.getSavedServers();
+    const normalizedTarget = server.url.replace(/\/+$/, "");
+    const existingIndex = servers.findIndex(
+      (s) => s.id === server.id || (s.url && s.url.replace(/\/+$/, "") === normalizedTarget)
+    );
+
+    const updatedServer: SavedServer = {
+      ...server,
+      url: server.url,
+      lastUsedAt: Date.now()
+    };
+
+    if (existingIndex >= 0) {
+      servers[existingIndex] = updatedServer;
+    } else {
+      servers.unshift(updatedServer);
+    }
+
+    await this.prefStorage.setItem(SAVED_SERVERS_STORAGE_KEY, servers);
+  }
+
+  public async removeServer(serverId: string): Promise<void> {
+    const servers = await this.getSavedServers();
+    const target = servers.find((s) => s.id === serverId || s.url.replace(/\/+$/, "") === serverId.replace(/\/+$/, ""));
+    const filteredServers = servers.filter(
+      (s) => s.id !== serverId && s.url.replace(/\/+$/, "") !== serverId.replace(/\/+$/, "")
+    );
+    await this.prefStorage.setItem(SAVED_SERVERS_STORAGE_KEY, filteredServers);
+
+    // Remove accounts associated with this server
+    const targetUrlNorm = target?.url ? target.url.replace(/\/+$/, "") : serverId.replace(/\/+$/, "");
+    const accounts = await this.getSavedAccounts();
+    const remainingAccounts: SavedAccount[] = [];
+    for (const acc of accounts) {
+      const isAssociated =
+        (target && acc.serverId === target.id) ||
+        (acc.serverUrl && acc.serverUrl.replace(/\/+$/, "") === targetUrlNorm);
+      if (isAssociated) {
+        const tokenKey = getAuthTokenStorageKey(acc.serverId, acc.userId);
+        await this.secureStorage.deleteToken(tokenKey);
+      } else {
+        remainingAccounts.push(acc);
+      }
+    }
+    await this.prefStorage.setItem(SAVED_ACCOUNTS_STORAGE_KEY, remainingAccounts);
+
+    const active = await this.prefStorage.getItem<{ serverId: string; serverUrl?: string }>(
+      ACTIVE_SESSION_STORAGE_KEY
+    );
+    if (
+      active &&
+      (active.serverId === serverId ||
+        (targetUrlNorm && active.serverUrl && active.serverUrl.replace(/\/+$/, "") === targetUrlNorm))
+    ) {
+      await this.prefStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+      this.client.setAuthToken(null);
+    }
+  }
+
   public async saveAccount(account: SavedAccount): Promise<void> {
     const accounts = await this.getSavedAccounts();
     const existingIndex = accounts.findIndex(
@@ -53,6 +152,18 @@ export class ServerManager {
     }
 
     await this.prefStorage.setItem(SAVED_ACCOUNTS_STORAGE_KEY, accounts);
+
+    // Synchronize server into saved servers list
+    if (account.serverUrl) {
+      await this.saveServer({
+        id: account.serverId,
+        name: account.serverName,
+        url: account.serverUrl,
+        localUrl: account.localUrl,
+        remoteUrl: account.remoteUrl,
+        lastUsedAt: Date.now()
+      });
+    }
   }
 
   public async switchAccount(serverId: string, userId: string): Promise<AuthSession> {

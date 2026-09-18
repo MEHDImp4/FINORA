@@ -19,6 +19,7 @@ import {
   DOWNLOAD_QUALITIES
 } from "../../offline/downloadQuality";
 import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
+import { useTranslation } from "../../../i18n";
 
 export interface DownloadSeriesModalProps {
   visible: boolean;
@@ -39,6 +40,7 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
   userId,
   onConfirmDownload
 }) => {
+  const { t } = useTranslation();
   const defaultDownloadQuality =
     usePlaybackPreferencesStore((s) => s.preferences.defaultDownloadQuality) || "original";
   const [mode, setMode] = useState<SelectionMode>("seasons");
@@ -185,7 +187,7 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
               <FinoraText variant="title" style={styles.title}>
-                Télécharger la série
+                {t("details.downloadSeriesModalTitle")}
               </FinoraText>
               <FinoraText variant="caption" style={styles.subtitle} numberOfLines={1}>
                 {series.name}
@@ -196,7 +198,7 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
               style={styles.closeButton}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Fermer"
+              accessibilityLabel={t("common.close")}
             >
               <Ionicons name="close" size={22} color={colors.textSecondary} />
             </Pressable>
@@ -220,7 +222,7 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
                 variant="body"
                 style={[styles.tabText, mode === "seasons" && styles.activeTabText]}
               >
-                Par saisons
+                {t("details.bySeasons")}
               </FinoraText>
             </Pressable>
 
@@ -240,7 +242,7 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
                 variant="body"
                 style={[styles.tabText, mode === "count" && styles.activeTabText]}
               >
-                Nombre d'épisodes
+                {t("details.episodeCountMode")}
               </FinoraText>
             </Pressable>
           </View>
@@ -250,7 +252,7 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.primary} />
               <FinoraText variant="caption" style={styles.loadingText}>
-                Vérification des épisodes non visionnés...
+                {t("details.checkingUnplayedEpisodes")}
               </FinoraText>
             </View>
           ) : (
@@ -264,12 +266,12 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
                   <View style={styles.seasonActionsBar}>
                     <Pressable onPress={selectAllSeasons} hitSlop={6}>
                       <FinoraText variant="caption" color={colors.primary}>
-                        Tout sélectionner
+                        {t("details.selectAll")}
                       </FinoraText>
                     </Pressable>
                     <Pressable onPress={clearSeasonSelection} hitSlop={6}>
                       <FinoraText variant="caption" color={colors.textSecondary}>
-                        Tout désélectionner
+                        {t("details.clearSelection")}
                       </FinoraText>
                     </Pressable>
                   </View>
@@ -299,10 +301,11 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
                           </FinoraText>
                           <FinoraText variant="caption" style={styles.seasonCount}>
                             {allWatched
-                              ? "Tous les épisodes ont été visionnés"
-                              : `${stats.unplayed.length} non visionné${
-                                  stats.unplayed.length > 1 ? "s" : ""
-                                } sur ${stats.total.length || 0}`}
+                              ? t("details.allEpisodesWatched")
+                              : t("details.unplayedOutOfTotal", {
+                                  unplayed: stats.unplayed.length,
+                                  total: stats.total.length || 0
+                                })}
                           </FinoraText>
                         </View>
 
@@ -330,23 +333,23 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
               ) : (
                 <View style={styles.countModeContainer}>
                   <FinoraText variant="caption" style={styles.countHelperText}>
-                    Choisissez combien de prochains épisodes non visionnés télécharger :
+                    {t("details.chooseEpisodesToDownload")}
                   </FinoraText>
 
                   <View style={styles.countOptionsGrid}>
                     {[
-                      { label: "3 épisodes", value: 3 },
-                      { label: "5 épisodes", value: 5 },
-                      { label: "10 épisodes", value: 10 },
+                      { label: t("details.episodeCountN", { count: 3 }), value: 3 },
+                      { label: t("details.episodeCountN", { count: 5 }), value: 5 },
+                      { label: t("details.episodeCountN", { count: 10 }), value: 10 },
                       {
-                        label: `Tous les non vus (${allUnplayedEpisodes.length})`,
+                        label: t("details.allUnplayedEpisodesCount", { count: allUnplayedEpisodes.length }),
                         value: 0
                       }
                     ].map((opt) => {
                       const isChosen = episodeCountLimit === opt.value;
                       return (
                         <Pressable
-                          key={opt.label}
+                          key={opt.value}
                           style={[
                             styles.countChip,
                             isChosen && styles.countChipActive
@@ -379,7 +382,7 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
             {/* Quality Selector */}
             <View style={styles.qualitySelectorRow}>
               <FinoraText variant="caption" style={styles.qualityLabelText}>
-                Qualité vidéo :
+                {t("details.videoQuality")}
               </FinoraText>
               <View style={styles.qualityChipsContainer}>
                 {DOWNLOAD_QUALITIES.map((q) => {
@@ -403,7 +406,7 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
                           isSelected && styles.qualityMiniChipTextSelected
                         ]}
                       >
-                        {q.id === "original" ? "Source" : q.id}
+                        {q.id === "original" ? t("details.sourceQuality") : q.id}
                       </FinoraText>
                     </Pressable>
                   );
@@ -420,18 +423,14 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
               />
               <FinoraText variant="caption" style={styles.summaryText}>
                 {episodesToDownload.length > 0
-                  ? `${episodesToDownload.length} épisode${
-                      episodesToDownload.length > 1 ? "s" : ""
-                    } non visionné${episodesToDownload.length > 1 ? "s" : ""} prêt${
-                      episodesToDownload.length > 1 ? "s" : ""
-                    }`
-                  : "Aucun épisode non visionné sélectionné"}
+                  ? t("details.episodesReadyToDownload", { count: episodesToDownload.length })
+                  : t("details.noEpisodesSelected")}
               </FinoraText>
             </View>
 
             <View style={styles.footerActions}>
               <FinoraButton
-                label="Annuler"
+                label={t("common.cancel")}
                 variant="secondary"
                 size="md"
                 onPress={onClose}
@@ -441,8 +440,8 @@ export const DownloadSeriesModal: React.FC<DownloadSeriesModalProps> = ({
                 testID="confirm-download-button"
                 label={
                   episodesToDownload.length > 0
-                    ? `Télécharger (${episodesToDownload.length})`
-                    : "Télécharger"
+                    ? t("details.downloadWithCount", { count: episodesToDownload.length })
+                    : t("details.download")
                 }
                 variant="primary"
                 size="md"

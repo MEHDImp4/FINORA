@@ -5,6 +5,7 @@ import { Person } from "../../../types/media";
 import { getPersonImageUrl } from "../../../core/repositories/imageUrlBuilder";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
+import { useTranslation } from "../../../i18n";
 
 export interface CastListProps {
   people: Person[];
@@ -14,6 +15,7 @@ export interface CastListProps {
 const AVATAR_SIZE = 72;
 
 export const CastList: React.FC<CastListProps> = React.memo(({ people, serverUrl }) => {
+  const { t } = useTranslation();
   if (!people || people.length === 0) {
     return null;
   }
@@ -64,7 +66,7 @@ export const CastList: React.FC<CastListProps> = React.memo(({ people, serverUrl
   return (
     <View style={styles.sectionContainer}>
       <FinoraText variant="title" style={styles.sectionTitle}>
-        Cast & Crew
+        {t("details.castAndCrew")}
       </FinoraText>
       <FlatList
         data={people}

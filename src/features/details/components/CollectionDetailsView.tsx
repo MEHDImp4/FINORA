@@ -22,6 +22,7 @@ import { FinoraText } from "../../../design-system/components/FinoraText";
 import { FinoraButton } from "../../../design-system/components/FinoraButton";
 import { colors, spacing } from "../../../design-system/tokens";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { useTranslation } from "../../../i18n";
 
 export interface CollectionDetailsViewProps {
   collection: MediaItem;
@@ -51,6 +52,7 @@ function CollectionMovieRow({
   onPlay: (item: MediaItem) => void;
   onSelect: (item: MediaItem) => void;
 }) {
+  const { t } = useTranslation();
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
 
   const posterUri = item.primaryImageTag
@@ -87,7 +89,7 @@ function CollectionMovieRow({
       }}
       onPress={() => onSelect(item)}
       accessibilityRole="button"
-      accessibilityLabel={`${item.name}, film ${index + 1}`}
+      accessibilityLabel={t("details.collectionItemIndexA11y", { name: item.name, index: index + 1 })}
     >
       <Animated.View style={[styles.movieCard, { transform: [{ scale: scaleAnim }] }]}>
         <View style={styles.movieIndexBadge}>
@@ -144,7 +146,7 @@ function CollectionMovieRow({
             onPlay(item);
           }}
           accessibilityRole="button"
-          accessibilityLabel={`Lire ${item.name}`}
+          accessibilityLabel={t("details.playItemA11y", { name: item.name })}
           hitSlop={8}
         >
           <Ionicons name="play" size={18} color="#FFFFFF" />
@@ -165,6 +167,7 @@ export const CollectionDetailsView: React.FC<CollectionDetailsViewProps> = React
     onToggleFavorite
   }) => {
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation();
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
 
     const { data: collectionItems = [], isLoading } = useQuery({
@@ -252,7 +255,7 @@ export const CollectionDetailsView: React.FC<CollectionDetailsViewProps> = React
                   onBack();
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="Retour"
+                accessibilityLabel={t("common.back")}
               >
                 <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
               </Pressable>
@@ -265,7 +268,7 @@ export const CollectionDetailsView: React.FC<CollectionDetailsViewProps> = React
                     onToggleFavorite(collection);
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel="Ajouter aux favoris"
+                  accessibilityLabel={collection.isFavorite ? t("details.removeFromMyList") : t("details.addToMyList")}
                 >
                   <Ionicons
                     name={collection.isFavorite ? "heart" : "heart-outline"}
@@ -281,7 +284,7 @@ export const CollectionDetailsView: React.FC<CollectionDetailsViewProps> = React
               <View style={styles.collectionBadge}>
                 <Ionicons name="albums" size={12} color="#FFFFFF" style={{ marginRight: 5 }} />
                 <FinoraText variant="caption" color="textPrimary" weight="700">
-                  COLLECTION SAGA
+                  {t("details.collectionSagaBadge")}
                 </FinoraText>
               </View>
 
@@ -291,8 +294,8 @@ export const CollectionDetailsView: React.FC<CollectionDetailsViewProps> = React
 
               <FinoraText variant="caption" color="textSecondary" weight="600" style={styles.itemCountText}>
                 {collectionItems.length > 0
-                  ? `${collectionItems.length} titre${collectionItems.length > 1 ? "s" : ""}`
-                  : "Collection"}
+                  ? `${collectionItems.length} ${collectionItems.length > 1 ? t("library.itemCountMultiple") : t("library.itemCountSingle")}`
+                  : t("common.collection")}
               </FinoraText>
             </View>
           </View>
@@ -313,7 +316,7 @@ export const CollectionDetailsView: React.FC<CollectionDetailsViewProps> = React
               </FinoraText>
               {collection.overview.length > 140 ? (
                 <FinoraText variant="caption" color="primary" weight="600" style={{ marginTop: 4 }}>
-                  {isOverviewExpanded ? "Voir moins" : "Lire la suite"}
+                  {isOverviewExpanded ? t("common.seeLess") : t("common.seeMore")}
                 </FinoraText>
               ) : null}
             </Pressable>
@@ -323,7 +326,7 @@ export const CollectionDetailsView: React.FC<CollectionDetailsViewProps> = React
           {collectionItems.length > 0 ? (
             <View style={styles.primaryActionRow}>
               <FinoraButton
-                label={`Commencer (${collectionItems[0].name})`}
+                label={t("details.startCollection", { title: collectionItems[0].name })}
                 variant="primary"
                 size="md"
                 leftIcon={<Ionicons name="play" size={16} color="#FFFFFF" />}
@@ -336,7 +339,7 @@ export const CollectionDetailsView: React.FC<CollectionDetailsViewProps> = React
           {/* Section: Films dans cette collection */}
           <View style={styles.sectionHeader}>
             <FinoraText variant="title" color="textPrimary" weight="700" style={styles.sectionTitle}>
-              Œuvres de la collection
+              {t("details.collectionItems")}
             </FinoraText>
           </View>
 
@@ -344,13 +347,13 @@ export const CollectionDetailsView: React.FC<CollectionDetailsViewProps> = React
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={colors.primary} />
               <FinoraText variant="caption" color="textSecondary" style={{ marginTop: spacing.sm }}>
-                Chargement des œuvres...
+                {t("details.loadingCollection")}
               </FinoraText>
             </View>
           ) : collectionItems.length === 0 ? (
             <View style={styles.emptyContainer}>
               <FinoraText variant="caption" color="textMuted">
-                Aucun média trouvé dans cette collection.
+                {t("details.emptyCollection")}
               </FinoraText>
             </View>
           ) : (

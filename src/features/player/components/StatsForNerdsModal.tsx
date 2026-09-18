@@ -13,6 +13,7 @@ import { FinoraText } from "../../../design-system/components/FinoraText";
 import { FinoraIconButton } from "../../../design-system/components/FinoraIconButton";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing } from "../../../design-system/tokens";
+import { useTranslation } from "../../../i18n";
 
 export interface StatsForNerdsModalProps {
   visible: boolean;
@@ -29,6 +30,7 @@ export function StatsForNerdsModal({
   plan,
   snapshot
 }: StatsForNerdsModalProps) {
+  const { t } = useTranslation();
   if (!visible) return null;
 
   const videoStream = item.mediaStreams?.find((s) => s.type === "Video");
@@ -77,10 +79,10 @@ export function StatsForNerdsModal({
         <View style={styles.card} testID="stats-card">
           <View style={styles.header}>
             <FinoraText variant="title" style={styles.title}>
-              Stats for Nerds
+              {t("player.statsForNerds")}
             </FinoraText>
             <FinoraIconButton
-              accessibilityLabel="Close stats"
+              accessibilityLabel={t("player.closeStatsA11y")}
               onPress={onClose}
               size={32}
               backgroundColor={colors.surface}
@@ -115,7 +117,7 @@ export function StatsForNerdsModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    backgroundColor: "rgba(0, 0, 0, 0.78)",
     justifyContent: "center",
     alignItems: "center",
     padding: spacing.md
@@ -126,17 +128,17 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     maxWidth: 500,
-    maxHeight: "80%",
-    backgroundColor: "rgba(20, 20, 26, 0.95)",
-    borderRadius: 12,
+    maxHeight: "82%",
+    backgroundColor: "rgba(16, 16, 24, 0.96)",
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#2A2A38",
-    padding: spacing.md,
+    borderColor: "rgba(255, 255, 255, 0.14)",
+    padding: spacing.lg,
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
-    elevation: 12
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 16
   },
   header: {
     flexDirection: "row",
@@ -144,23 +146,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: spacing.md,
     borderBottomWidth: 1,
-    borderColor: "#2A2A38",
-    paddingBottom: spacing.xs
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    paddingBottom: spacing.sm
   },
   title: {
-    color: colors.textPrimary,
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "bold"
-  },
-  closeGlyph: {
-    color: colors.textSecondary,
-    fontSize: 12
+    fontWeight: "700",
+    letterSpacing: 0.3
   },
   statsScroll: {
     maxHeight: 400
   },
   row: {
-    marginBottom: spacing.xs
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.04)"
   },
   label: {
     color: colors.primary,
@@ -168,8 +172,10 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   value: {
-    color: colors.textSecondary,
+    color: "rgba(255, 255, 255, 0.85)",
     fontSize: 12,
-    fontFamily: "monospace"
+    fontFamily: "monospace",
+    maxWidth: "60%",
+    textAlign: "right"
   }
 });

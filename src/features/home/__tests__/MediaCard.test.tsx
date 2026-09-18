@@ -112,7 +112,7 @@ describe("MediaCard", () => {
 
     const root = component!.root;
     let image = root.findByProps({ contentFit: "cover" });
-    expect(image.props.source.uri).toContain("series-poster-tag");
+    expect(image.props.source.uri).toContain("ep-still-tag");
     expect(image.props.contentPosition).toBe("center");
 
     // Trigger onError

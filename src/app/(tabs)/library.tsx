@@ -6,8 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   useLibraries,
   useInfiniteLibraryItems,
-  useWatchlistItems,
-  useGenres
+  useWatchlistItems
 } from "../../hooks/useMediaQueries";
 import { useAuthStore } from "../../stores/authStore";
 import { LibraryFilterBar } from "../../features/library/components/LibraryFilterBar";
@@ -15,14 +14,14 @@ import { LibraryGridView } from "../../features/library/components/LibraryGridVi
 import { SortOptionsModal } from "../../features/library/components/SortOptionsModal";
 import {
   AVAILABLE_SORT_OPTIONS,
-  SortOption
+  SortOption,
+  getSortOptionLabel
 } from "../../features/library/types";
 import { MediaItem } from "../../types/media";
 import { FinoraText } from "../../design-system/components/FinoraText";
 import { colors, spacing } from "../../design-system/tokens";
 import { useNetworkDiagnostic } from "../../core/network/networkStatusService";
 import { NetworkFailureStateView } from "../../design-system/components/NetworkFailureStateView";
-import { SearchBar } from "../../features/search/components/SearchBar";
 import { hapticService } from "../../core/feedback/hapticService";
 import {
   useToggleFavorite,
@@ -30,38 +29,22 @@ import {
   useRemoveFromResume
 } from "../../hooks/useUserDataMutations";
 import { MediaQuickActionsModal } from "../../features/home/components/MediaQuickActionsModal";
+import { useTranslation } from "../../i18n";
+import { getLocalizedLibraryName } from "../../features/library/libraryLocalization";
 
 const WATCHLIST_ID = "watchlist";
 
 export default function LibraryScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ tab?: string; q?: string }>();
+  const { t } = useTranslation();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const session = useAuthStore((s) => s.session);
   const currentUserId = session?.userId;
   const serverUrl = session?.serverUrl || "";
 
-  const [isSearchOpen, setIsSearchOpen] = useState(Boolean(params.q));
-  const [searchQuery, setSearchQuery] = useState(params.q || "");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(params.q || "");
-
   const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(
     params.tab === "watchlist" ? WATCHLIST_ID : params.tab || null
   );
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 250);
-    return () => clearTimeout(handler);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    if (params.q) {
-      setIsSearchOpen(true);
-      setSearchQuery(params.q);
-      setDebouncedSearchQuery(params.q);
-    }
-  }, [params.q]);
 
   useEffect(() => {
     if (!params.tab) return;
@@ -70,14 +53,12 @@ export default function LibraryScreen() {
     } else {
       setSelectedLibraryId(params.tab);
     }
-    setSelectedGenre(null);
   }, [params.tab]);
 
   const [currentSort, setCurrentSort] = useState<SortOption>(
     AVAILABLE_SORT_OPTIONS[0]
   );
   const [sortModalVisible, setSortModalVisible] = useState(false);
-  const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
 
   const isWatchlist = selectedLibraryId === WATCHLIST_ID;
 
@@ -140,11 +121,6 @@ export default function LibraryScreen() {
     return ["Movie", "Series"];
   }, [activeLibrary, isCollectionTab]);
 
-  const { data: genres = [] } = useGenres(
-    currentUserId,
-    isWatchlist ? undefined : activeLibraryId
-  );
-
   const {
     data: libraryItemsPages,
     isLoading: isItemsLoading,
@@ -159,9 +135,7 @@ export default function LibraryScreen() {
     {
       sortBy: currentSort.sortBy,
       sortOrder: currentSort.sortOrder,
-      genres: selectedGenre ? [selectedGenre] : undefined,
-      includeItemTypes,
-      searchTerm: debouncedSearchQuery.trim().length >= 2 ? debouncedSearchQuery.trim() : undefined
+      includeItemTypes
     }
   );
 
@@ -172,7 +146,7 @@ export default function LibraryScreen() {
   const libraryItemTotal = libraryItemsPages?.pages?.[0]?.total ?? libraryItems.length;
 
   const {
-    data: rawWatchlistItems = [],
+    data: watchlistItems = [],
     isLoading: isWatchlistLoading,
     isError: isWatchlistError,
     refetch: refetchWatchlist
@@ -181,23 +155,10 @@ export default function LibraryScreen() {
     isWatchlist
       ? {
           sortBy: currentSort.sortBy,
-          sortOrder: currentSort.sortOrder,
-          genres: selectedGenre ? [selectedGenre] : undefined
+          sortOrder: currentSort.sortOrder
         }
       : undefined
   );
-
-  const watchlistItems = useMemo(() => {
-    if (!debouncedSearchQuery.trim() || debouncedSearchQuery.trim().length < 2) {
-      return rawWatchlistItems;
-    }
-    const q = debouncedSearchQuery.trim().toLowerCase();
-    return rawWatchlistItems.filter(
-      (item) =>
-        item.name.toLowerCase().includes(q) ||
-        (item.seriesName && item.seriesName.toLowerCase().includes(q))
-    );
-  }, [rawWatchlistItems, debouncedSearchQuery]);
 
   const items = isWatchlist ? watchlistItems : libraryItems;
   const itemCount = isWatchlist ? watchlistItems.length : libraryItemTotal;
@@ -227,7 +188,6 @@ export default function LibraryScreen() {
   const handleLibrarySelect = useCallback((libraryId: string) => {
     hapticService.selection();
     setSelectedLibraryId(libraryId);
-    setSelectedGenre(null);
   }, []);
 
   const toggleFavorite = useToggleFavorite(currentUserId || "");
@@ -299,7 +259,7 @@ export default function LibraryScreen() {
             ]}
             onPress={() => handleLibrarySelect(WATCHLIST_ID)}
             accessibilityRole="button"
-            accessibilityLabel="Sélectionner Ma liste"
+            accessibilityLabel={t("home.myList")}
             accessibilityState={{ selected: isWatchlist }}
           >
             <Ionicons
@@ -315,12 +275,13 @@ export default function LibraryScreen() {
                 isWatchlist && styles.libraryTabTextSelected
               ]}
             >
-              Ma liste
+              {t("home.myList")}
             </FinoraText>
           </Pressable>
 
           {libraries.map((lib) => {
             const isSelected = !isWatchlist && lib.id === activeLibraryId;
+            const displayName = getLocalizedLibraryName(lib, t);
             return (
               <Pressable
                 key={lib.id}
@@ -330,7 +291,7 @@ export default function LibraryScreen() {
                 ]}
                 onPress={() => handleLibrarySelect(lib.id)}
                 accessibilityRole="button"
-                accessibilityLabel={`Sélectionner la bibliothèque ${lib.name}`}
+                accessibilityLabel={displayName}
                 accessibilityState={{ selected: isSelected }}
               >
                 <FinoraText
@@ -340,7 +301,7 @@ export default function LibraryScreen() {
                     isSelected && styles.libraryTabTextSelected
                   ]}
                 >
-                  {lib.name}
+                  {displayName}
                 </FinoraText>
               </Pressable>
             );
@@ -355,7 +316,7 @@ export default function LibraryScreen() {
               ]}
               onPress={() => handleLibrarySelect("collections")}
               accessibilityRole="button"
-              accessibilityLabel="Sélectionner Collections"
+              accessibilityLabel={t("common.collections")}
               accessibilityState={{ selected: isCollectionTab }}
             >
               <Ionicons
@@ -371,93 +332,17 @@ export default function LibraryScreen() {
                   isCollectionTab && styles.libraryTabTextSelected
                 ]}
               >
-                Collections
+                {t("common.collections")}
               </FinoraText>
             </Pressable>
           ) : null}
         </ScrollView>
       </View>
 
-      <View style={styles.actionBar}>
-        <View style={styles.actionBarLeft}>
-          <Pressable
-            style={[styles.actionIconButton, isSearchOpen && styles.actionIconButtonActive]}
-            onPress={() => {
-              hapticService.selection();
-              if (isSearchOpen && searchQuery) {
-                setSearchQuery("");
-                setDebouncedSearchQuery("");
-              }
-              setIsSearchOpen((prev) => !prev);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={isSearchOpen ? "Fermer la recherche" : "Rechercher dans cette bibliothèque"}
-          >
-            <Ionicons
-              name={isSearchOpen ? "close" : "search-outline"}
-              size={19}
-              color={isSearchOpen ? colors.primary : colors.textPrimary}
-            />
-          </Pressable>
-
-          <FinoraText variant="caption" style={styles.resultsCount} numberOfLines={1}>
-            {itemCount}{" "}
-            {isWatchlist
-              ? itemCount <= 1
-                ? "titre dans la liste"
-                : "titres dans la liste"
-              : isCollectionTab
-              ? itemCount <= 1
-                ? "collection"
-                : "collections"
-              : itemCount <= 1
-              ? "titre"
-              : "titres"}
-            {debouncedSearchQuery.trim() ? ` pour « ${debouncedSearchQuery.trim()} »` : ""}
-          </FinoraText>
-        </View>
-
-        <Pressable
-          style={styles.sortButton}
-          onPress={() => setSortModalVisible(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Ouvrir les options de tri"
-        >
-          <Ionicons name="swap-vertical" size={16} color={colors.textPrimary} />
-          <FinoraText variant="caption" style={styles.sortButtonText} numberOfLines={1}>
-            {currentSort.label}
-          </FinoraText>
-        </Pressable>
-      </View>
-
-      {isSearchOpen && (
-        <View style={styles.searchBarWrapper}>
-          <SearchBar
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onClear={() => {
-              setSearchQuery("");
-              setDebouncedSearchQuery("");
-            }}
-            placeholder={
-              isWatchlist
-                ? "Rechercher dans Ma liste..."
-                : isCollectionTab
-                ? "Rechercher une collection..."
-                : `Rechercher dans ${activeLibrary?.name || "la bibliothèque"}...`
-            }
-            autoFocus={true}
-          />
-        </View>
-      )}
-
-      {!isWatchlist && !isCollectionTab && (
-        <LibraryFilterBar
-          genres={genres}
-          selectedGenre={selectedGenre}
-          onSelectGenre={setSelectedGenre}
-        />
-      )}
+      <LibraryFilterBar
+        currentSort={currentSort}
+        onOpenSortModal={() => setSortModalVisible(true)}
+      />
 
       {items.length === 0 && (isAnyError || failureType !== null) ? (
         <NetworkFailureStateView
@@ -466,17 +351,17 @@ export default function LibraryScreen() {
           isRetrying={isDiagChecking || isLoading}
           customTitle={
             failureType === "no_internet"
-              ? "Bibliothèque indisponible hors-ligne"
+              ? t("library.offlineUnavailableTitle")
               : failureType === "server_unreachable"
-              ? "Serveur Jellyfin indisponible"
-              : "Impossible de charger la bibliothèque"
+              ? t("library.serverUnreachableTitle")
+              : t("common.error")
           }
           customMessage={
             failureType === "no_internet"
-              ? "La navigation dans votre catalogue complet nécessite une connexion réseau. Retrouvez vos contenus prêts à regarder dans vos téléchargements."
+              ? t("library.offlineUnavailableDesc")
               : failureType === "server_unreachable"
-              ? "Le serveur Jellyfin est éteint ou inaccessible. Visionnez vos films et séries téléchargés."
-              : "Une erreur réseau est survenue lors du chargement des médias."
+              ? t("library.serverUnreachableDesc")
+              : t("search.searchErrorDesc")
           }
         />
       ) : (
@@ -488,20 +373,20 @@ export default function LibraryScreen() {
           onItemLongPress={handleItemLongPress}
           onEndReached={handleLoadMoreItems}
           isFetchingMore={!isWatchlist && isFetchingNextLibraryPage}
-          loadingMessage="Chargement de vos médias..."
+          loadingMessage={t("library.loadingMedia")}
           emptyTitle={
             isWatchlist
-              ? "Ma liste est vide"
+              ? t("library.emptyWatchlistTitle")
               : isCollectionTab
-              ? "Aucune collection trouvée"
-              : "Aucun média trouvé"
+              ? t("library.emptyCollectionsTitle")
+              : t("library.emptyTitle")
           }
           emptyMessage={
             isWatchlist
-              ? "Ajoutez des films et séries depuis l'accueil ou la recherche pour les retrouver rapidement ici."
+              ? t("library.emptyWatchlistDesc")
               : isCollectionTab
-              ? "Aucune saga ou collection n'a été trouvée sur votre serveur Jellyfin."
-              : "Aucun film ou série ne correspond à vos filtres dans cette bibliothèque."
+              ? t("library.emptyCollectionsDesc")
+              : t("library.emptyDesc")
           }
         />
       )}
@@ -561,62 +446,6 @@ const styles = StyleSheet.create({
   },
   libraryTabTextSelected: {
     color: colors.textPrimary
-  },
-  actionBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    gap: spacing.sm
-  },
-  actionBarLeft: {
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    flex: 1
-  },
-  actionIconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "#161622",
-    borderWidth: 1,
-    borderColor: "#262638",
-    justifyContent: "center",
-    alignItems: "center"
-  },
-  actionIconButtonActive: {
-    borderColor: colors.primary,
-    backgroundColor: "rgba(229, 9, 20, 0.15)"
-  },
-  searchBarWrapper: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    marginBottom: spacing.xs
-  },
-  resultsCount: {
-    flex: 1,
-    minWidth: 0,
-    color: colors.textSecondary
-  },
-  sortButton: {
-    minHeight: 44,
-    maxWidth: "42%",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: "#161622",
-    borderWidth: 1,
-    borderColor: "#262638",
-    gap: 5
-  },
-  sortButtonText: {
-    color: colors.textPrimary,
-    fontWeight: "600",
-    flexShrink: 1
   }
 });
+

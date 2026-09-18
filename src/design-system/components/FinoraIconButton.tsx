@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, StyleSheet, ViewStyle, PressableProps } from "react-native";
+import { Pressable, StyleSheet, ViewStyle, StyleProp, PressableProps } from "react-native";
 import { colors } from "../tokens";
 
 export interface FinoraIconButtonProps extends Omit<PressableProps, "style"> {
@@ -7,7 +7,7 @@ export interface FinoraIconButtonProps extends Omit<PressableProps, "style"> {
   size?: number;
   backgroundColor?: string;
   accessibilityLabel: string;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function FinoraIconButton({

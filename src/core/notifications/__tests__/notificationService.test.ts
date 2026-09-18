@@ -1,6 +1,7 @@
 import { notificationService } from "../notificationService";
 import { useNotificationStore, DEFAULT_NOTIFICATION_PREFERENCES } from "../../../stores/notificationStore";
 import * as Notifications from "expo-notifications";
+import { translate } from "../../../i18n";
 
 describe("NotificationService", () => {
   beforeEach(() => {
@@ -39,7 +40,7 @@ describe("NotificationService", () => {
     expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith(
       expect.objectContaining({
         content: expect.objectContaining({
-          title: "Nouvel épisode disponible",
+          title: translate("notifications.newEpisodeTitle"),
           body: "Severance — S02E01 : Chikhai Bardo"
         })
       })
@@ -137,7 +138,7 @@ describe("NotificationService", () => {
       // Still added to in-app store
       expect(notifId).toBeTruthy();
       const notifs = useNotificationStore.getState().notifications;
-      expect(notifs.some((n) => n.title === "Nouvel épisode disponible")).toBe(true);
+      expect(notifs.some((n) => n.title === translate("notifications.newEpisodeTitle"))).toBe(true);
     } finally {
       Constants.default.appOwnership = null;
       require("react-native").Platform.OS = originalOS;

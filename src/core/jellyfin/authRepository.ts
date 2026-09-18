@@ -13,6 +13,8 @@ import {
 } from "../security/storage";
 import { AuthenticationError, FinoraError } from "../errors";
 import { logger } from "../network/logger";
+import { translate } from "../../i18n";
+import { formatAuthorizationHeader, getOrCreateDeviceId } from "./clientInfo";
 
 export interface LoginCredentials {
   username: string;
@@ -23,6 +25,14 @@ export interface UserSummary {
   id: string;
   name: string;
   serverId: string;
+  hasPassword?: boolean;
+}
+
+export interface PublicUser {
+  id: string;
+  name: string;
+  serverId?: string;
+  primaryImageTag?: string;
   hasPassword?: boolean;
 }
 
@@ -69,16 +79,16 @@ export function confirmLocalHttpConnection(serverUrl: string): Promise<boolean> 
     };
 
     Alert.alert(
-      "Connexion HTTP non chiffrée",
-      `Le serveur ${serverUrl} utilise HTTP sur votre réseau local. Votre mot de passe, votre token Jellyfin et le trafic peuvent être visibles par d'autres appareils présents sur ce réseau. Continuez uniquement si vous faites confiance à ce réseau.`,
+      translate("auth.unencryptedHttpTitle"),
+      translate("auth.unencryptedHttpDesc", { serverUrl }),
       [
         {
-          text: "Annuler",
+          text: translate("auth.cancel"),
           style: "cancel",
           onPress: () => finish(false)
         },
         {
-          text: "Continuer",
+          text: translate("auth.continue"),
           style: "destructive",
           onPress: () => finish(true)
         }
@@ -125,7 +135,7 @@ export class AuthRepository {
       const approved = await this.confirmInsecureHttp(targetUrl);
       if (!approved) {
         throw new AuthenticationError(
-          "Connexion HTTP non chiffrée annulée. Utilisez HTTPS ou confirmez explicitement la connexion locale."
+          translate("auth.unencryptedHttpCancelled")
         );
       }
     }
@@ -284,6 +294,117 @@ export class AuthRepository {
     } catch (error) {
       return null;
     }
+  }
+
+  public async getPublicUsers(
+    serverUrl: string,
+    httpClient?: HttpClient
+  ): Promise<PublicUser[]> {
+    if (!serverUrl || !serverUrl.trim()) return [];
+
+    let targetUrl: string;
+    try {
+      const normalized = normalizeServerUrlForCredentials(serverUrl);
+      targetUrl = normalized.url;
+    } catch {
+      return [];
+    }
+
+    let clientHttp = httpClient;
+    if (!clientHttp) {
+      const deviceId = await getOrCreateDeviceId(this.secureStorage);
+      clientHttp = new HttpClient({
+        baseUrl: targetUrl,
+        defaultTimeoutMs: 7000,
+        defaultRetries: 1,
+        defaultHeaders: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "X-Emby-Authorization": formatAuthorizationHeader(deviceId)
+        }
+      });
+    }
+
+    try {
+      const response = await clientHttp.request<any[]>(`${targetUrl}/Users/Public`, {
+        timeoutMs: 7000,
+        retries: 1
+      });
+
+      if (!Array.isArray(response)) {
+        return [];
+      }
+
+      return response
+        .map((u) => ({
+          id: u.Id || u.id || "",
+          name: u.Name || u.name || "User",
+          serverId: u.ServerId || u.serverId,
+          primaryImageTag: u.PrimaryImageTag || u.primaryImageTag,
+          hasPassword:
+            u.HasPassword ??
+            u.hasPassword ??
+            u.HasConfiguredPassword ??
+            u.hasConfiguredPassword ??
+            false
+        }))
+        .filter((u) => Boolean(u.id));
+    } catch (error) {
+      logger.warn("[AuthRepository] Failed to fetch public users:", error);
+      return [];
+    }
+  }
+
+  public async getAvailableUsers(
+    serverUrl: string,
+    isAuthenticated: boolean = false,
+    httpClient?: HttpClient
+  ): Promise<PublicUser[]> {
+    const publicUsers = await this.getPublicUsers(serverUrl, httpClient);
+
+    if (isAuthenticated) {
+      try {
+        const authClient = httpClient || this.client.getHttpClient();
+        const normalized = normalizeServerUrlForCredentials(serverUrl);
+        const authedUsers = await authClient.request<any[]>(`${normalized.url}/Users`, {
+          timeoutMs: 5000,
+          retries: 0
+        });
+
+        if (Array.isArray(authedUsers)) {
+          const mappedAuthed: PublicUser[] = authedUsers
+            .map((u) => ({
+              id: u.Id || u.id || "",
+              name: u.Name || u.name || "User",
+              serverId: u.ServerId || u.serverId,
+              primaryImageTag: u.PrimaryImageTag || u.primaryImageTag,
+              hasPassword:
+                u.HasPassword ??
+                u.hasPassword ??
+                u.HasConfiguredPassword ??
+                u.hasConfiguredPassword ??
+                false
+            }))
+            .filter((u) => Boolean(u.id));
+
+          const userMap = new Map<string, PublicUser>();
+          for (const u of publicUsers) {
+            userMap.set(u.id, u);
+          }
+          for (const u of mappedAuthed) {
+            userMap.set(u.id, u);
+          }
+          return Array.from(userMap.values());
+        }
+      } catch (error) {
+        logger.debug(
+          "[AuthRepository] Authenticated /Users endpoint unreachable or forbidden, using public users only:",
+          error
+        );
+      }
+    }
+
+    return publicUsers;
   }
 
   public async logout(serverId: string, userId: string, httpClient?: HttpClient): Promise<void> {

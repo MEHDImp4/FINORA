@@ -84,6 +84,8 @@ const mockEpisodes: MediaItem[] = [
   }
 ];
 
+import { translate } from "../../../i18n";
+
 describe("SeriesDetailsView", () => {
   beforeEach(() => {
     (useSeasons as jest.Mock).mockReturnValue({ data: mockSeasons, isLoading: false });
@@ -107,7 +109,7 @@ describe("SeriesDetailsView", () => {
 
     const instance = root!.root;
     expect(instance.findByProps({ children: 2008 })).toBeTruthy();
-    expect(instance.findByProps({ children: "2 saisons" })).toBeTruthy();
+    expect(instance.findByProps({ children: translate("details.seasonCount", { count: 2 }) })).toBeTruthy();
     expect(instance.findByProps({ children: 9.5 })).toBeTruthy();
     expect(instance.findByProps({ children: "Season 1" })).toBeTruthy();
     expect(instance.findByProps({ children: "Season 2" })).toBeTruthy();
@@ -130,7 +132,7 @@ describe("SeriesDetailsView", () => {
       );
     });
 
-    const playButton = root!.root.findByProps({ label: "Lire S1:E1" });
+    const playButton = root!.root.findByProps({ label: `${translate("details.play")} S1:E1` });
     act(() => {
       playButton.props.onPress();
     });
@@ -154,11 +156,42 @@ describe("SeriesDetailsView", () => {
       );
     });
 
-    const backButton = root!.root.findByProps({ accessibilityLabel: "Retour" });
+    const backButton = root!.root.findByProps({ accessibilityLabel: translate("common.back") });
     act(() => {
       backButton.props.onPress();
     });
-
     expect(onBack).toHaveBeenCalled();
+  });
+
+  it("triggers onDownloadEpisodes with defaultDownloadQuality on episode download press and opens modal on long-press", () => {
+    const onDownloadEpisodes = jest.fn();
+
+    let root: renderer.ReactTestRenderer;
+    act(() => {
+      root = renderer.create(
+        <SeriesDetailsView
+          series={mockSeries}
+          serverUrl="https://jellyfin.example.com"
+          userId="user-123"
+          onPlayEpisode={jest.fn()}
+          onBack={jest.fn()}
+          onDownloadEpisodes={onDownloadEpisodes}
+        />
+      );
+    });
+
+    const epDownloadButton = root!.root.findByProps({ testID: "download-button-ep-101" });
+    // Direct press
+    act(() => {
+      epDownloadButton.props.onPress({ stopPropagation: jest.fn() });
+    });
+    expect(onDownloadEpisodes).toHaveBeenCalledWith([mockEpisodes[0]], "1080p");
+
+    // Long press
+    act(() => {
+      epDownloadButton.props.onLongPress({ stopPropagation: jest.fn() });
+    });
+    const modal = root!.root.findByProps({ testID: "download-quality-modal" });
+    expect(modal).toBeTruthy();
   });
 });

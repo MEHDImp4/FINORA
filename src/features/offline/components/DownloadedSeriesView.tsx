@@ -8,6 +8,7 @@ import { colors, spacing } from "../../../design-system/tokens";
 import { getPosterUrl } from "../../../core/repositories/imageUrlBuilder";
 import { hapticService } from "../../../core/feedback/hapticService";
 import { formatBytes, getRetentionLabel } from "../offlineFormatting";
+import { useTranslation } from "../../../i18n";
 
 interface DownloadedSeriesViewProps {
   seriesName: string;
@@ -34,6 +35,8 @@ export function DownloadedSeriesView({
   onDeleteEpisode,
   onDeleteSeries
 }: DownloadedSeriesViewProps) {
+  const { t } = useTranslation();
+
   // Sort episodes by season then episode number
   const sortedEpisodes = useMemo(() => {
     return [...episodes].sort((a, b) => {
@@ -67,12 +70,12 @@ export function DownloadedSeriesView({
   const handleConfirmDeleteSeries = () => {
     hapticService.impactHeavy();
     Alert.alert(
-      "Supprimer la série",
-      `Voulez-vous supprimer tous les épisodes téléchargés de "${seriesName}" (${formatBytes(totalBytes)}) ?`,
+      t("downloads.deleteSeriesTitle"),
+      t("downloads.deleteSeriesDesc", { title: seriesName, size: formatBytes(totalBytes) }),
       [
-        { text: "Annuler", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Supprimer",
+          text: t("common.delete"),
           style: "destructive",
           onPress: () => {
             onDeleteSeries(seriesId || seriesName);
@@ -94,12 +97,12 @@ export function DownloadedSeriesView({
             onBack();
           }}
           accessibilityRole="button"
-          accessibilityLabel="Retour aux téléchargements"
+          accessibilityLabel={t("downloads.backToDownloads")}
           hitSlop={8}
         >
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
           <FinoraText variant="body" weight="600" style={styles.backText}>
-            Téléchargements
+            {t("downloads.backToDownloads")}
           </FinoraText>
         </Pressable>
 
@@ -107,7 +110,7 @@ export function DownloadedSeriesView({
           style={styles.deleteSeriesButton}
           onPress={handleConfirmDeleteSeries}
           accessibilityRole="button"
-          accessibilityLabel={`Supprimer tous les épisodes de ${seriesName}`}
+          accessibilityLabel={t("downloads.deleteAllEpisodesOf", { name: seriesName })}
           hitSlop={8}
         >
           <Ionicons name="trash-outline" size={20} color="#E50914" />
@@ -133,7 +136,7 @@ export function DownloadedSeriesView({
             </FinoraText>
 
             <FinoraText variant="caption" style={styles.seriesMeta}>
-              {`${episodes.length} ${episodes.length <= 1 ? "épisode" : "épisodes"} • ${formatBytes(totalBytes)}`}
+              {`${episodes.length} ${episodes.length <= 1 ? t("downloads.episodeSingle") : t("downloads.episodeMultiple")} • ${formatBytes(totalBytes)}`}
             </FinoraText>
 
             {nextToPlay && (
@@ -144,11 +147,11 @@ export function DownloadedSeriesView({
                   onPlayEpisode(nextToPlay);
                 }}
                 accessibilityRole="button"
-                accessibilityLabel={`Lire ${nextToPlay.title}`}
+                accessibilityLabel={t("downloads.playTitle", { title: nextToPlay.title })}
               >
                 <Ionicons name="play" size={16} color="#FFFFFF" />
                 <FinoraText variant="caption" weight="700" style={styles.playAllText}>
-                  {nextToPlay.playbackPositionTicks > 0 ? "Reprendre" : "Lire"}
+                  {nextToPlay.playbackPositionTicks > 0 ? t("common.resume") : t("common.play")}
                 </FinoraText>
               </Pressable>
             )}
@@ -158,14 +161,14 @@ export function DownloadedSeriesView({
         {/* Episodes Section Title */}
         <View style={styles.sectionHeader}>
           <FinoraText variant="caption" weight="700" style={styles.sectionTitle}>
-            ÉPISODES TÉLÉCHARGÉS ({sortedEpisodes.length})
+            {t("downloads.downloadedEpisodesCount", { count: sortedEpisodes.length })}
           </FinoraText>
         </View>
 
         {/* Episode Items List */}
         {sortedEpisodes.map((ep) => {
           const isMissing = ep.fileExists === false;
-          const retentionLabel = getRetentionLabel(ep);
+          const retentionLabel = getRetentionLabel(ep, t);
 
           // Episode title cleanup: remove series prefix if present
           let epTitle = ep.title;
@@ -200,7 +203,7 @@ export function DownloadedSeriesView({
 
                     {hasProgress && (
                       <FinoraText variant="caption" style={styles.watchProgressText}>
-                        {`${progressPercent}% vu`}
+                        {t("downloads.percentWatched", { percent: progressPercent })}
                       </FinoraText>
                     )}
 
@@ -208,7 +211,7 @@ export function DownloadedSeriesView({
                       <View style={styles.missingBadge}>
                         <Ionicons name="alert-circle" size={11} color="#E50914" style={{ marginRight: 2 }} />
                         <FinoraText variant="caption" style={styles.missingText}>
-                          Fichier manquant
+                          {t("downloads.missingFile")}
                         </FinoraText>
                       </View>
                     )}
@@ -241,7 +244,7 @@ export function DownloadedSeriesView({
                         onPlayEpisode(ep);
                       }}
                       accessibilityRole="button"
-                      accessibilityLabel={`Play offline ${ep.title}`}
+                      accessibilityLabel={t("downloads.playOfflineTitle", { title: ep.title })}
                     >
                       <Ionicons name="play" size={14} color="#FFFFFF" />
                     </Pressable>
@@ -254,7 +257,7 @@ export function DownloadedSeriesView({
                       onDeleteEpisode(ep);
                     }}
                     accessibilityRole="button"
-                    accessibilityLabel={`Delete ${ep.title}`}
+                    accessibilityLabel={t("downloads.deleteEpisodeTitle", { title: ep.title })}
                     hitSlop={8}
                   >
                     <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />

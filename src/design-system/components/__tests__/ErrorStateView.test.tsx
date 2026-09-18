@@ -2,6 +2,7 @@ import React from "react";
 import ReactTestRenderer, { act } from "react-test-renderer";
 import { ErrorStateView } from "../ErrorStateView";
 import { OfflineBanner } from "../OfflineBanner";
+import { translate } from "../../../i18n";
 
 describe("ErrorStateView & OfflineBanner", () => {
   it("renders ErrorStateView with title, message, and calls onRetry", async () => {
@@ -57,7 +58,7 @@ describe("ErrorStateView & OfflineBanner", () => {
       );
     });
 
-    const closeBtn = tree.root.findByProps({ accessibilityLabel: "Fermer le message" });
+    const closeBtn = tree.root.findByProps({ accessibilityLabel: translate("common.closeA11y") });
     expect(closeBtn).toBeTruthy();
 
     act(() => {

@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   StyleSheet,
-  Pressable
+  Pressable,
+  Animated,
+  Modal
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -149,39 +151,50 @@ export function CinematicOverlay({
     onVolumeChange(value);
   };
 
-  if (!visible) {
-    return null;
-  }
+  const opacityAnim = useRef(new Animated.Value(visible ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(opacityAnim, {
+      toValue: visible ? 1 : 0,
+      duration: 180,
+      useNativeDriver: true
+    }).start();
+  }, [visible]);
+
+  const formattedHeaderTitle = seriesTitle ? `${seriesTitle} "${title}"` : title;
 
   return (
-    <View
-      pointerEvents="box-none"
-      style={styles.overlayContainer}
+    <Animated.View
+      pointerEvents={visible ? "box-none" : "none"}
+      style={[styles.overlayContainer, { opacity: opacityAnim }]}
       testID="cinematic-overlay"
     >
+      {/* Global Fullscreen Dimming Scrim (Netflix style: smooth dimming to make all buttons pop) */}
+      <View style={styles.backdropScrim} pointerEvents="none" />
+
       {/* Top Vignette Gradient */}
       <LinearGradient
-        colors={["rgba(6, 6, 10, 0.88)", "rgba(8, 8, 12, 0.65)", "rgba(8, 8, 12, 0.0)"]}
+        colors={["rgba(4, 4, 8, 0.75)", "rgba(6, 6, 10, 0.35)", "rgba(6, 6, 10, 0.0)"]}
         locations={[0, 0.6, 1]}
         style={[
           styles.topGradient,
-          { height: Math.max(insets.top, spacing.md) + 80 }
+          { height: Math.max(insets.top, spacing.md) + 90 }
         ]}
         pointerEvents="none"
       />
 
       {/* Bottom Vignette Gradient */}
       <LinearGradient
-        colors={["rgba(8, 8, 12, 0.0)", "rgba(8, 8, 12, 0.65)", "rgba(6, 6, 10, 0.92)"]}
-        locations={[0, 0.45, 1]}
+        colors={["rgba(6, 6, 10, 0.0)", "rgba(6, 6, 10, 0.45)", "rgba(4, 4, 8, 0.85)"]}
+        locations={[0, 0.4, 1]}
         style={[
           styles.bottomGradient,
-          { height: Math.max(insets.bottom, spacing.md) + 110 }
+          { height: Math.max(insets.bottom, spacing.md) + 130 }
         ]}
         pointerEvents="none"
       />
 
-      {/* ZONE HAUTE : Header Top Bar */}
+      {/* ZONE HAUTE : Header Top Bar (Netflix style: Back left, Centered Title, Symmetric right spacer) */}
       <View
         style={[
           styles.topBar,
@@ -198,172 +211,25 @@ export function CinematicOverlay({
           accessibilityLabel={t("player.backA11y")}
           onPress={onBack}
           size={42}
-          backgroundColor="rgba(18, 18, 24, 0.65)"
-          style={styles.glassButton}
+          backgroundColor="transparent"
+          style={styles.topTransparentButton}
           testID="overlay-back-button"
         >
-          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+          <Ionicons name="arrow-back" size={26} color="#FFFFFF" style={styles.iconShadow} />
         </FinoraIconButton>
 
+        {/* Centered Title */}
         <View style={styles.titleColumn} pointerEvents="none">
-          {Boolean(seriesTitle) && (
-            <View style={styles.seriesRow}>
-              <View style={styles.seriesDot} />
-              <FinoraText variant="caption" style={styles.seriesText} numberOfLines={1}>
-                {seriesTitle}
-              </FinoraText>
-            </View>
-          )}
-          <FinoraText variant="body" style={styles.titleText} numberOfLines={1}>
-            {title}
+          <FinoraText variant="body" style={styles.netflixTitleText} numberOfLines={1}>
+            {formattedHeaderTitle}
           </FinoraText>
         </View>
 
-        <View style={styles.headerActions} pointerEvents="box-none">
-          {Boolean(onCycleSpeed) && (
-            <FinoraIconButton
-              accessibilityLabel={t("player.playbackSpeedA11y", { speed: `${playbackRate || 1}x` })}
-              onPress={() => {
-                resetTimer();
-                onCycleSpeed?.();
-              }}
-              size={42}
-              backgroundColor="rgba(18, 18, 24, 0.65)"
-              style={styles.glassButton}
-              testID="overlay-speed-button"
-            >
-              <View style={styles.speedBadge}>
-                <FinoraText variant="caption" style={styles.speedText}>
-                  {playbackRate || 1}x
-                </FinoraText>
-              </View>
-            </FinoraIconButton>
-          )}
-
-          {Boolean(hasNextEpisode && onPlayNextEpisode) && (
-            <FinoraIconButton
-              accessibilityLabel={t("player.nextEpisodeA11y")}
-              onPress={() => {
-                resetTimer();
-                onPlayNextEpisode?.();
-              }}
-              size={42}
-              backgroundColor="rgba(18, 18, 24, 0.65)"
-              style={styles.glassButton}
-              testID="overlay-next-episode-button"
-            >
-              <Ionicons name="play-skip-forward" size={20} color="#FFFFFF" />
-            </FinoraIconButton>
-          )}
-
-          <FinoraIconButton
-            accessibilityLabel={t("player.tracksA11y")}
-            onPress={() => {
-              resetTimer();
-              setMoreOpen(false);
-              onOpenTracks();
-            }}
-            size={42}
-            backgroundColor="rgba(18, 18, 24, 0.65)"
-            style={styles.glassButton}
-            testID="overlay-tracks-button"
-          >
-            <Ionicons name="chatbubble-ellipses-outline" size={20} color="#FFFFFF" />
-          </FinoraIconButton>
-
-          {Boolean(onTogglePiP) && (
-            <FinoraIconButton
-              accessibilityLabel={t("player.pipA11y")}
-              onPress={() => {
-                resetTimer();
-                setMoreOpen(false);
-                onTogglePiP?.();
-              }}
-              size={42}
-              backgroundColor="rgba(18, 18, 24, 0.65)"
-              style={styles.glassButton}
-              testID="overlay-pip-button"
-            >
-              <Ionicons name="copy-outline" size={20} color="#FFFFFF" />
-            </FinoraIconButton>
-          )}
-
-          {(onOpenStats || onToggleOrientation) && (
-            <FinoraIconButton
-              accessibilityLabel={t("player.moreOptionsA11y")}
-              accessibilityState={{ expanded: moreOpen }}
-              onPress={() => {
-                if (timerRef.current) clearTimeout(timerRef.current);
-                setMoreOpen((prev) => !prev);
-              }}
-              size={42}
-              backgroundColor={moreOpen ? "rgba(255, 255, 255, 0.22)" : "rgba(18, 18, 24, 0.65)"}
-              style={styles.glassButton}
-              testID="overlay-more-button"
-            >
-              <Ionicons name="ellipsis-horizontal" size={20} color="#FFFFFF" />
-            </FinoraIconButton>
-          )}
-
-          {moreOpen && (
-            <View style={styles.moreMenu} testID="overlay-more-menu">
-              <View style={styles.modeRow}>
-                <View
-                  style={[
-                    styles.modeDot,
-                    playbackMode === "transcode" && styles.modeDotTranscode
-                  ]}
-                />
-                <FinoraText variant="caption" style={styles.modeText} numberOfLines={1}>
-                  {getPlaybackModeLabel(playbackMode, t)}
-                </FinoraText>
-              </View>
-
-              {Boolean(onToggleOrientation) && (
-                <Pressable
-                  style={({ pressed }) => [styles.moreMenuRow, pressed && styles.moreMenuRowPressed]}
-                  onPress={() => {
-                    setMoreOpen(false);
-                    onToggleOrientation?.();
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={isLandscape ? t("player.portraitMode") : t("player.landscapeMode")}
-                  testID="overlay-orientation-button"
-                >
-                  <Ionicons
-                    name={isLandscape ? "phone-portrait-outline" : "scan-outline"}
-                    size={20}
-                    color="#FFFFFF"
-                  />
-                  <FinoraText variant="body" style={styles.moreMenuLabel}>
-                    {isLandscape ? t("player.portraitMode") : t("player.landscapeMode")}
-                  </FinoraText>
-                </Pressable>
-              )}
-
-              {Boolean(onOpenStats) && (
-                <Pressable
-                  style={({ pressed }) => [styles.moreMenuRow, pressed && styles.moreMenuRowPressed]}
-                  onPress={() => {
-                    setMoreOpen(false);
-                    onOpenStats?.();
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("player.technicalInfo")}
-                  testID="overlay-stats-button"
-                >
-                  <Ionicons name="information-circle-outline" size={20} color="#FFFFFF" />
-                  <FinoraText variant="body" style={styles.moreMenuLabel}>
-                    {t("player.technicalInfo")}
-                  </FinoraText>
-                </Pressable>
-              )}
-            </View>
-          )}
-        </View>
+        {/* Right Symmetric Spacer to keep Title perfectly centered */}
+        <View style={styles.topBarSpacer} pointerEvents="none" />
       </View>
 
-      {/* ZONE CENTRALE : Hero Controls Triad */}
+      {/* ZONE CENTRALE : Hero Controls Triad (Clean, transparent, Netflix spacing) */}
       <View style={styles.centerControls} pointerEvents="box-none" testID="overlay-center-controls">
         {/* Seek Backward 10s */}
         <FinoraIconButton
@@ -372,41 +238,38 @@ export function CinematicOverlay({
             resetTimer();
             onSeekBy(-10);
           }}
-          size={56}
-          backgroundColor="rgba(16, 16, 24, 0.65)"
-          style={styles.heroSecondaryButton}
+          size={64}
+          backgroundColor="transparent"
+          style={styles.heroTransparentButton}
           testID="overlay-seek-back-button"
         >
           <View style={styles.skipContainer}>
-            <Ionicons name="arrow-undo" size={20} color="#FFFFFF" />
+            <Ionicons name="arrow-undo" size={26} color="#FFFFFF" style={styles.iconShadow} />
             <FinoraText variant="caption" style={styles.skipNumber}>
               10
             </FinoraText>
           </View>
         </FinoraIconButton>
 
-        {/* Hero Play / Pause with Glow Aura */}
-        <View style={styles.heroPlayPauseWrapper}>
-          <View style={[styles.heroPlayPauseGlow, !isPlaying && styles.heroPlayPauseGlowPaused]} pointerEvents="none" />
-          <FinoraIconButton
-            accessibilityLabel={isPlaying ? t("player.pauseA11y") : t("player.playA11y")}
-            onPress={() => {
-              resetTimer();
-              onPlayPause();
-            }}
-            size={74}
-            backgroundColor={colors.primary}
-            style={styles.playPauseButton}
-            testID="overlay-play-pause-button"
-          >
-            <Ionicons
-              name={isPlaying ? "pause" : "play"}
-              size={36}
-              color="#FFFFFF"
-              style={!isPlaying ? { marginLeft: 4 } : undefined}
-            />
-          </FinoraIconButton>
-        </View>
+        {/* Hero Play / Pause */}
+        <FinoraIconButton
+          accessibilityLabel={isPlaying ? t("player.pauseA11y") : t("player.playA11y")}
+          onPress={() => {
+            resetTimer();
+            onPlayPause();
+          }}
+          size={80}
+          backgroundColor="transparent"
+          style={styles.heroTransparentButton}
+          testID="overlay-play-pause-button"
+        >
+          <Ionicons
+            name={isPlaying ? "pause" : "play"}
+            size={52}
+            color="#FFFFFF"
+            style={[styles.iconShadow, !isPlaying ? { marginLeft: 6 } : undefined]}
+          />
+        </FinoraIconButton>
 
         {/* Seek Forward 10s */}
         <FinoraIconButton
@@ -415,13 +278,13 @@ export function CinematicOverlay({
             resetTimer();
             onSeekBy(10);
           }}
-          size={56}
-          backgroundColor="rgba(16, 16, 24, 0.65)"
-          style={styles.heroSecondaryButton}
+          size={64}
+          backgroundColor="transparent"
+          style={styles.heroTransparentButton}
           testID="overlay-seek-forward-button"
         >
           <View style={styles.skipContainer}>
-            <Ionicons name="arrow-redo" size={20} color="#FFFFFF" />
+            <Ionicons name="arrow-redo" size={26} color="#FFFFFF" style={styles.iconShadow} />
             <FinoraText variant="caption" style={styles.skipNumber}>
               10
             </FinoraText>
@@ -429,14 +292,14 @@ export function CinematicOverlay({
         </FinoraIconButton>
       </View>
 
-      {/* ZONE BASSE : Timeline & Actions */}
+      {/* ZONE BASSE : Timeline & Netflix Bottom Action Bar */}
       <View
         style={[
           styles.bottomBar,
           {
-            paddingBottom: Math.max(insets.bottom, spacing.md) + 2,
-            paddingLeft: Math.max(insets.left, spacing.lg) + 72,
-            paddingRight: Math.max(insets.right, spacing.lg) + 72
+            paddingBottom: Math.max(insets.bottom, spacing.sm) + (isLandscape ? 4 : 10),
+            paddingLeft: Math.max(insets.left, isLandscape ? spacing.lg + 16 : spacing.md),
+            paddingRight: Math.max(insets.right, isLandscape ? spacing.lg + 16 : spacing.md)
           }
         ]}
         pointerEvents="box-none"
@@ -461,18 +324,265 @@ export function CinematicOverlay({
           }}
           onScrubMove={onScrubMove}
         />
+
+        {/* Bottom Actions Bar (Adaptive Portrait / Landscape Netflix layout) */}
+        <View style={styles.bottomActionsRow} pointerEvents="box-none">
+          {Boolean(onCycleSpeed) && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.bottomActionItem,
+                !isLandscape && styles.bottomActionItemPortrait,
+                pressed && styles.actionItemPressed
+              ]}
+              onPress={() => {
+                resetTimer();
+                onCycleSpeed?.();
+              }}
+              accessibilityLabel={t("player.playbackSpeedA11y", { speed: `${playbackRate || 1}x` })}
+              testID="overlay-speed-button"
+            >
+              <Ionicons name="speedometer-outline" size={19} color="#FFFFFF" style={styles.iconShadow} />
+              <FinoraText
+                variant="caption"
+                style={isLandscape ? styles.bottomActionText : styles.bottomActionTextPortrait}
+              >
+                {playbackRate || 1}x
+              </FinoraText>
+            </Pressable>
+          )}
+
+          {Boolean(hasNextEpisode && onPlayNextEpisode) && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.bottomActionItem,
+                !isLandscape && styles.bottomActionItemPortrait,
+                pressed && styles.actionItemPressed
+              ]}
+              onPress={() => {
+                resetTimer();
+                onPlayNextEpisode?.();
+              }}
+              accessibilityLabel={t("player.nextEpisodeA11y")}
+              testID="overlay-next-episode-button"
+            >
+              <Ionicons name="play-skip-forward-outline" size={20} color="#FFFFFF" style={styles.iconShadow} />
+            </Pressable>
+          )}
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.bottomActionItem,
+              !isLandscape && styles.bottomActionItemPortrait,
+              pressed && styles.actionItemPressed
+            ]}
+            onPress={() => {
+              resetTimer();
+              setMoreOpen(false);
+              onOpenTracks();
+            }}
+            accessibilityLabel={t("player.tracksA11y")}
+            testID="overlay-tracks-button"
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={19} color="#FFFFFF" style={styles.iconShadow} />
+            <FinoraText
+              variant="caption"
+              style={isLandscape ? styles.bottomActionText : styles.bottomActionTextPortrait}
+              numberOfLines={2}
+            >
+              {t("player.audioSubtitles") || "Audio & Sous-titres"}
+            </FinoraText>
+          </Pressable>
+
+          {Boolean(onTogglePiP) && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.bottomActionItem,
+                !isLandscape && styles.bottomActionItemPortrait,
+                pressed && styles.actionItemPressed
+              ]}
+              onPress={() => {
+                resetTimer();
+                setMoreOpen(false);
+                onTogglePiP?.();
+              }}
+              accessibilityLabel={t("player.pipA11y")}
+              testID="overlay-pip-button"
+            >
+              <Ionicons name="copy-outline" size={19} color="#FFFFFF" style={styles.iconShadow} />
+              <FinoraText
+                variant="caption"
+                style={isLandscape ? styles.bottomActionText : styles.bottomActionTextPortrait}
+              >
+                PiP
+              </FinoraText>
+            </Pressable>
+          )}
+
+          {(onOpenStats || onToggleOrientation) && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.bottomActionItem,
+                !isLandscape && styles.bottomActionItemPortrait,
+                pressed && styles.actionItemPressed
+              ]}
+              onPress={() => {
+                if (timerRef.current) clearTimeout(timerRef.current);
+                setMoreOpen(true);
+              }}
+              accessibilityLabel={t("player.moreOptionsA11y")}
+              testID="overlay-more-button"
+            >
+              <Ionicons name="options-outline" size={19} color="#FFFFFF" style={styles.iconShadow} />
+              <FinoraText
+                variant="caption"
+                style={isLandscape ? styles.bottomActionText : styles.bottomActionTextPortrait}
+              >
+                {t("player.moreOptions") || "Plus"}
+              </FinoraText>
+            </Pressable>
+          )}
+        </View>
       </View>
 
-      {/* Rails latéraux : Luminosité & Volume tactiles */}
+      {/* Cinematic More Options Modal */}
+      <Modal
+        visible={moreOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMoreOpen(false)}
+        testID="more-options-modal"
+      >
+        <View style={styles.moreModalBackdrop}>
+          <Pressable
+            style={styles.moreModalDismiss}
+            onPress={() => setMoreOpen(false)}
+            testID="more-modal-backdrop-dismiss"
+          />
+
+          <View
+            style={[
+              styles.moreSheetContainer,
+              { paddingBottom: Math.max(insets.bottom, spacing.lg) + 8 }
+            ]}
+          >
+            <View style={styles.moreHandleContainer} pointerEvents="none">
+              <View style={styles.moreHandleBar} />
+            </View>
+
+            <View style={styles.moreSheetHeader}>
+              <FinoraText variant="title" style={styles.moreSheetTitle}>
+                {t("player.moreOptionsTitle") || "Plus d'options"}
+              </FinoraText>
+              <FinoraIconButton
+                accessibilityLabel={t("common.close")}
+                onPress={() => setMoreOpen(false)}
+                size={36}
+                backgroundColor="rgba(255, 255, 255, 0.08)"
+                style={styles.moreCloseButton}
+                testID="close-more-modal-button"
+              >
+                <Ionicons name="close" size={20} color="#FFFFFF" />
+              </FinoraIconButton>
+            </View>
+
+            {/* Playback Mode Stream Info Card */}
+            <View style={styles.modeCard}>
+              <View style={[styles.modeDot, playbackMode === "transcode" && styles.modeDotTranscode]} />
+              <View style={styles.modeTextCol}>
+                <FinoraText variant="body" weight="700" style={styles.modeCardTitle}>
+                  {getPlaybackModeLabel(playbackMode, t)}
+                </FinoraText>
+                <FinoraText variant="caption" style={styles.modeCardDesc}>
+                  {playbackMode === "direct-play"
+                    ? t("player.directPlayDesc")
+                    : playbackMode === "direct-stream"
+                    ? t("player.directStreamDesc")
+                    : t("player.transcodeDesc")}
+                </FinoraText>
+              </View>
+            </View>
+
+            {/* Options List */}
+            <View style={styles.moreActionsList}>
+              {Boolean(onToggleOrientation) && (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.moreActionRow,
+                    pressed && styles.moreActionRowPressed
+                  ]}
+                  onPress={() => {
+                    setMoreOpen(false);
+                    onToggleOrientation?.();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={isLandscape ? t("player.portraitMode") : t("player.landscapeMode")}
+                  testID="overlay-orientation-button"
+                >
+                  <View style={styles.moreIconBox}>
+                    <Ionicons
+                      name={isLandscape ? "phone-portrait-outline" : "scan-outline"}
+                      size={20}
+                      color="#FFFFFF"
+                    />
+                  </View>
+                  <View style={styles.moreActionTextCol}>
+                    <FinoraText variant="body" style={styles.moreActionLabel}>
+                      {isLandscape ? t("player.portraitMode") : t("player.landscapeMode")}
+                    </FinoraText>
+                    <FinoraText variant="caption" style={styles.moreActionSub}>
+                      {isLandscape ? t("player.portraitModeDesc") : t("player.landscapeModeDesc")}
+                    </FinoraText>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="rgba(255, 255, 255, 0.3)" />
+                </Pressable>
+              )}
+
+              {Boolean(onOpenStats) && (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.moreActionRow,
+                    pressed && styles.moreActionRowPressed
+                  ]}
+                  onPress={() => {
+                    setMoreOpen(false);
+                    onOpenStats?.();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("player.technicalInfo")}
+                  testID="overlay-stats-button"
+                >
+                  <View style={styles.moreIconBox}>
+                    <Ionicons name="information-circle-outline" size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.moreActionTextCol}>
+                    <FinoraText variant="body" style={styles.moreActionLabel}>
+                      {t("player.technicalInfo")}
+                    </FinoraText>
+                    <FinoraText variant="caption" style={styles.moreActionSub}>
+                      {t("player.technicalInfoDesc")}
+                    </FinoraText>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="rgba(255, 255, 255, 0.3)" />
+                </Pressable>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Rails latéraux décalés en hauteur : Luminosité (gauche) & Son (droite) */}
       <View
-        style={[styles.sideRail, { left: Math.max(insets.left + spacing.md, 24) }]}
+        style={[
+          styles.leftRail,
+          { left: Math.max(insets.left, isLandscape ? spacing.md + 8 : spacing.xs + 2) }
+        ]}
         pointerEvents="box-none"
       >
         <VerticalSlider
           value={brightness}
           onValueChange={handleBrightnessChange}
           onSlidingChange={handleSlidingChange}
-          iconName={brightness < 0.3 ? "sunny-outline" : "sunny"}
+          iconName="sunny"
           label={t("player.brightness")}
           accessibilityLabel={t("player.brightnessA11y")}
           testID="brightness-slider"
@@ -480,20 +590,23 @@ export function CinematicOverlay({
       </View>
 
       <View
-        style={[styles.sideRail, { right: Math.max(insets.right + spacing.md, 24) }]}
+        style={[
+          styles.rightRail,
+          { right: Math.max(insets.right, isLandscape ? spacing.md + 8 : spacing.xs + 2) }
+        ]}
         pointerEvents="box-none"
       >
         <VerticalSlider
           value={volume}
           onValueChange={handleVolumeChange}
           onSlidingChange={handleSlidingChange}
-          iconName={volume === 0 ? "volume-mute" : volume < 0.5 ? "volume-low" : "volume-high"}
+          iconName="volume-high"
           label={t("player.volume")}
           accessibilityLabel={t("player.volumeA11y")}
           testID="volume-slider"
         />
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -502,6 +615,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     justifyContent: "space-between",
     zIndex: 20
+  },
+  backdropScrim: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(0, 0, 0, 0.42)",
+    zIndex: 0
   },
   topGradient: {
     position: "absolute",
@@ -520,157 +638,54 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     position: "relative",
     zIndex: 30
   },
-  glassButton: {
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 4,
-    elevation: 3
+  topTransparentButton: {
+    width: 42,
+    height: 42,
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  topBarSpacer: {
+    width: 42,
+    height: 42
   },
   titleColumn: {
     flex: 1,
     minWidth: 0,
-    marginHorizontal: spacing.md
-  },
-  seriesRow: {
-    flexDirection: "row",
+    marginHorizontal: spacing.md,
     alignItems: "center",
-    marginBottom: 2
+    justifyContent: "center"
   },
-  seriesDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: colors.primary,
-    marginRight: 6
-  },
-  seriesText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: "600",
-    letterSpacing: 0.2
-  },
-  titleText: {
+  netflixTitleText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
-    letterSpacing: 0.2
-  },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    position: "relative"
-  },
-  speedBadge: {
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 4
-  },
-  speedText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "700"
-  },
-  moreMenu: {
-    position: "absolute",
-    top: 50,
-    right: 0,
-    width: 204,
-    padding: 8,
-    borderRadius: 16,
-    backgroundColor: "rgba(16, 16, 22, 0.96)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)",
+    letterSpacing: 0.2,
+    textAlign: "center",
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 16,
-    elevation: 20
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.8,
+    shadowRadius: 3
   },
-  modeRow: {
-    minHeight: 38,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.08)",
-    marginBottom: 6
-  },
-  modeDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: "#34C759",
-    marginRight: 8
-  },
-  modeDotTranscode: {
-    backgroundColor: "#FF9500"
-  },
-  modeText: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: "600"
-  },
-  moreMenuRow: {
-    minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    gap: 12
-  },
-  moreMenuRowPressed: {
-    backgroundColor: "rgba(255, 255, 255, 0.08)"
-  },
-  moreMenuLabel: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontSize: 13
+  iconShadow: {
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.7,
+    shadowRadius: 3
   },
   centerControls: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 40,
     zIndex: 25
   },
-  heroSecondaryButton: {
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6
-  },
-  heroPlayPauseWrapper: {
-    marginHorizontal: spacing.xl,
+  heroTransparentButton: {
     justifyContent: "center",
     alignItems: "center"
-  },
-  heroPlayPauseGlow: {
-    position: "absolute",
-    width: 86,
-    height: 86,
-    borderRadius: 43,
-    backgroundColor: colors.primary,
-    opacity: 0.25,
-    transform: [{ scale: 1.08 }]
-  },
-  heroPlayPauseGlowPaused: {
-    opacity: 0.15
-  },
-  playPauseButton: {
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 14,
-    elevation: 10
   },
   skipContainer: {
     alignItems: "center",
@@ -680,17 +695,204 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "800",
     color: "#FFFFFF",
-    marginTop: 1
+    marginTop: -2,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.8,
+    shadowRadius: 2
   },
   bottomBar: {
     width: "100%",
     zIndex: 30
   },
-  sideRail: {
+  bottomActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    marginTop: 8,
+    paddingTop: 4,
+    width: "100%"
+  },
+  bottomActionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 6
+  },
+  bottomActionItemPortrait: {
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    gap: 3,
+    minWidth: 44,
+    maxWidth: 86
+  },
+  actionItemPressed: {
+    backgroundColor: "rgba(255, 255, 255, 0.12)"
+  },
+  bottomActionText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 0.2,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.8,
+    shadowRadius: 2
+  },
+  bottomActionTextPortrait: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 0.1,
+    textAlign: "center",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.8,
+    shadowRadius: 2
+  },
+  leftRail: {
     position: "absolute",
-    top: 95,
-    bottom: 95,
+    top: 100,
+    bottom: 110,
     justifyContent: "center",
     zIndex: 28
+  },
+  rightRail: {
+    position: "absolute",
+    top: 100,
+    bottom: 110,
+    justifyContent: "center",
+    zIndex: 28
+  },
+  moreModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.78)",
+    justifyContent: "flex-end"
+  },
+  moreModalDismiss: {
+    flex: 1
+  },
+  moreSheetContainer: {
+    backgroundColor: "rgba(12, 12, 16, 0.98)",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderTopWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    paddingHorizontal: spacing.lg,
+    paddingTop: 8,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 24
+  },
+  moreHandleContainer: {
+    alignItems: "center",
+    paddingTop: 6,
+    paddingBottom: 6
+  },
+  moreHandleBar: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255, 255, 255, 0.22)"
+  },
+  moreSheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.06)",
+    marginBottom: spacing.md
+  },
+  moreSheetTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: 0.2
+  },
+  moreCloseButton: {
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)"
+  },
+  modeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    marginBottom: spacing.md
+  },
+  modeDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: "#34C759",
+    marginRight: 12
+  },
+  modeDotTranscode: {
+    backgroundColor: "#FF9500"
+  },
+  modeTextCol: {
+    flex: 1
+  },
+  modeCardTitle: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700"
+  },
+  modeCardDesc: {
+    color: "rgba(255, 255, 255, 0.55)",
+    fontSize: 12,
+    marginTop: 2
+  },
+  moreActionsList: {
+    gap: 8,
+    paddingBottom: spacing.sm
+  },
+  moreActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 56,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.06)"
+  },
+  moreActionRowPressed: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)"
+  },
+  moreIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14
+  },
+  moreActionTextCol: {
+    flex: 1
+  },
+  moreActionLabel: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "600"
+  },
+  moreActionSub: {
+    color: "rgba(255, 255, 255, 0.5)",
+    fontSize: 12,
+    marginTop: 2
   }
 });

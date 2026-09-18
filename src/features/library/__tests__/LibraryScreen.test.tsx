@@ -65,23 +65,24 @@ jest.mock("../../../hooks/useUserDataMutations", () => ({
   useRemoveFromResume: () => ({ mutate: jest.fn() })
 }));
 
+import { translate } from "../../../i18n";
+
 describe("LibraryScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = {};
   });
 
-  it("renders library tabs, sort action, genres filter bar, and media grid", async () => {
+  it("renders library tabs, sort action, and media grid without genre chips", async () => {
     let tree: any;
     await act(async () => {
       tree = ReactTestRenderer.create(<LibraryScreen />);
     });
 
-    expect(tree.root.findByProps({ accessibilityLabel: "Sélectionner la bibliothèque Movies" })).toBeTruthy();
-    expect(tree.root.findByProps({ accessibilityLabel: "Sélectionner la bibliothèque TV Shows" })).toBeTruthy();
-    expect(tree.root.findByProps({ accessibilityLabel: "Ouvrir les options de tri" })).toBeTruthy();
-    expect(tree.root.findByProps({ accessibilityLabel: "Afficher tous les genres" })).toBeTruthy();
-    expect(tree.root.findByProps({ accessibilityLabel: "Filtrer par genre Action" })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: translate("home.moviesCategory") })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: translate("home.seriesCategory") })).toBeTruthy();
+    expect(tree.root.findByProps({ accessibilityLabel: translate("library.sortBy") })).toBeTruthy();
+    expect(tree.root.findAllByProps({ accessibilityLabel: translate("library.allGenres") }).length).toBe(0);
 
     const mediaCard = tree.root.findByProps({ accessibilityLabel: "The Matrix, 1999" });
     expect(mediaCard).toBeTruthy();
@@ -99,12 +100,12 @@ describe("LibraryScreen", () => {
       tree = ReactTestRenderer.create(<LibraryScreen />);
     });
 
-    const sortBtn = tree.root.findByProps({ accessibilityLabel: "Ouvrir les options de tri" });
+    const sortBtn = tree.root.findByProps({ accessibilityLabel: translate("library.sortBy") });
     act(() => {
       sortBtn.props.onPress();
     });
 
-    const closeBtn = tree.root.findByProps({ accessibilityLabel: "Fermer les options de tri" });
+    const closeBtn = tree.root.findByProps({ accessibilityLabel: translate("common.close") });
     expect(closeBtn).toBeTruthy();
 
     act(() => {
@@ -118,7 +119,7 @@ describe("LibraryScreen", () => {
       tree = ReactTestRenderer.create(<LibraryScreen />);
     });
 
-    const watchlistTab = tree.root.findByProps({ accessibilityLabel: "Sélectionner Ma liste" });
+    const watchlistTab = tree.root.findByProps({ accessibilityLabel: translate("home.myList") });
     expect(watchlistTab).toBeTruthy();
 
     act(() => {
@@ -135,10 +136,10 @@ describe("LibraryScreen", () => {
       tree = ReactTestRenderer.create(<LibraryScreen />);
     });
 
-    const showsTab = tree.root.findByProps({ accessibilityLabel: "Sélectionner la bibliothèque TV Shows" });
+    const showsTab = tree.root.findByProps({ accessibilityLabel: translate("home.seriesCategory") });
     expect(showsTab.props.accessibilityState.selected).toBe(true);
 
-    const moviesTab = tree.root.findByProps({ accessibilityLabel: "Sélectionner la bibliothèque Movies" });
+    const moviesTab = tree.root.findByProps({ accessibilityLabel: translate("home.moviesCategory") });
     expect(moviesTab.props.accessibilityState.selected).toBe(false);
   });
 
@@ -149,30 +150,26 @@ describe("LibraryScreen", () => {
       tree = ReactTestRenderer.create(<LibraryScreen />);
     });
 
-    const showsTab = tree.root.findByProps({ accessibilityLabel: "Sélectionner la bibliothèque TV Shows" });
+    const showsTab = tree.root.findByProps({ accessibilityLabel: translate("home.seriesCategory") });
     expect(showsTab.props.accessibilityState.selected).toBe(true);
   });
 
-  it("toggles search bar and accepts search query input", async () => {
+  it("does not render search bar or genre chips, and renders clean sort bar", async () => {
     let tree: any;
     await act(async () => {
       tree = ReactTestRenderer.create(<LibraryScreen />);
     });
 
-    const searchToggle = tree.root.findByProps({ accessibilityLabel: "Rechercher dans cette bibliothèque" });
-    expect(searchToggle).toBeTruthy();
+    // Search bar / button was removed from Library to deduplicate with Search tab
+    const searchInputs = tree.root.findAllByProps({ placeholder: translate("common.search") });
+    expect(searchInputs.length).toBe(0);
 
-    await act(async () => {
-      searchToggle.props.onPress();
-    });
+    // Genre filter chips are removed to keep UI simple
+    expect(tree.root.findAllByProps({ accessibilityLabel: translate("library.allGenres") }).length).toBe(0);
 
-    const searchInput = tree.root.findByProps({ accessibilityLabel: "Recherche" });
-    expect(searchInput).toBeTruthy();
-
-    await act(async () => {
-      searchInput.props.onChangeText("Inception");
-    });
-
-    expect(tree.root.findByProps({ accessibilityLabel: "Fermer la recherche" })).toBeTruthy();
+    // Sort pill is present in the filter bar
+    expect(tree.root.findByProps({ accessibilityLabel: translate("library.sortBy") })).toBeTruthy();
   });
 });
+
+

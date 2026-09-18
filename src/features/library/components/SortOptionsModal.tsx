@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
-import { AVAILABLE_SORT_OPTIONS, SortOption } from "../types";
+import { AVAILABLE_SORT_OPTIONS, SortOption, getSortOptionLabel } from "../types";
+import { useTranslation } from "../../../i18n";
 
 interface SortOptionsModalProps {
   visible: boolean;
@@ -20,6 +21,8 @@ export function SortOptionsModal({
   onClose
 }: SortOptionsModalProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
+
   return (
     <Modal
       visible={visible}
@@ -37,13 +40,13 @@ export function SortOptionsModal({
         >
           <View style={styles.header}>
             <FinoraText variant="title" style={styles.title}>
-              Trier par
+              {t("library.sortBy")}
             </FinoraText>
             <Pressable
               onPress={onClose}
               style={styles.closeButton}
               accessibilityRole="button"
-              accessibilityLabel="Fermer les options de tri"
+              accessibilityLabel={t("common.close")}
             >
               <Ionicons name="close" size={24} color={colors.textSecondary} />
             </Pressable>
@@ -54,6 +57,7 @@ export function SortOptionsModal({
               const isSelected =
                 option.sortBy === currentSort.sortBy &&
                 option.sortOrder === currentSort.sortOrder;
+              const displayLabel = getSortOptionLabel(option.id, t);
 
               return (
                 <Pressable
@@ -63,11 +67,11 @@ export function SortOptionsModal({
                     isSelected && styles.optionRowSelected
                   ]}
                   onPress={() => {
-                    onSelectSort(option);
+                    onSelectSort({ ...option, label: displayLabel });
                     onClose();
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel={`Trier par ${option.label}`}
+                  accessibilityLabel={t("library.sortByOptionA11y", { option: displayLabel })}
                   accessibilityState={{ selected: isSelected }}
                 >
                   <FinoraText
@@ -77,7 +81,7 @@ export function SortOptionsModal({
                       isSelected && styles.optionLabelSelected
                     ]}
                   >
-                    {option.label}
+                    {displayLabel}
                   </FinoraText>
                   {isSelected && (
                     <Ionicons

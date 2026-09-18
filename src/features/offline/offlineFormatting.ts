@@ -1,4 +1,5 @@
 import { OfflineMediaRecord } from "./types";
+import { translate } from "../../i18n";
 
 /**
  * Formats byte size into human-readable MB or GB string.
@@ -45,19 +46,26 @@ export function formatTimeRemaining(seconds?: number): string {
 /**
  * Computes an expiration label based on retention policies.
  */
-export function getRetentionLabel(record: OfflineMediaRecord): string | null {
+export function getRetentionLabel(
+  record: OfflineMediaRecord,
+  t?: (key: any, params?: any) => string
+): string | null {
   if (!record.completedWatchedAt && !record.isPlayed) return null;
-  if (!record.completedWatchedAt) return "Vu • Suppression programmée";
+  const translator = t || translate;
+
+  if (!record.completedWatchedAt) {
+    return translator("downloads.watchedScheduledDelete");
+  }
 
   const elapsedMs = Date.now() - record.completedWatchedAt;
   const remainingHours = Math.max(0, 48 - Math.floor(elapsedMs / (3600 * 1000)));
 
   if (remainingHours >= 24) {
     const days = Math.ceil(remainingHours / 24);
-    return `Vu • Expire dans ${days}j`;
+    return translator("downloads.watchedExpiresInDays", { days });
   }
   if (remainingHours > 0) {
-    return `Vu • Expire dans ${remainingHours}h`;
+    return translator("downloads.watchedExpiresInHours", { hours: remainingHours });
   }
-  return "Vu • Expire bientôt";
+  return translator("downloads.watchedExpiresSoon");
 }

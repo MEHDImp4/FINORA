@@ -1,118 +1,71 @@
 import React from "react";
-import { View, ScrollView, Pressable, StyleSheet } from "react-native";
+import { View, Pressable, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
+import { useTranslation } from "../../../i18n";
+import { SortOption, getSortOptionLabel } from "../types";
 
 interface LibraryFilterBarProps {
-  genres: string[];
-  selectedGenre: string | null;
-  onSelectGenre: (genre: string | null) => void;
+  currentSort: SortOption;
+  onOpenSortModal: () => void;
 }
 
 export function LibraryFilterBar({
-  genres,
-  selectedGenre,
-  onSelectGenre
+  currentSort,
+  onOpenSortModal
 }: LibraryFilterBarProps) {
-  if (genres.length === 0) {
-    return null;
-  }
+  const { t } = useTranslation();
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+      <Pressable
+        style={styles.sortPill}
+        onPress={onOpenSortModal}
+        accessibilityRole="button"
+        accessibilityLabel={t("library.sortBy")}
       >
-        <Pressable
-          style={[
-            styles.chip,
-            selectedGenre === null ? styles.chipSelected : styles.chipUnselected
-          ]}
-          onPress={() => onSelectGenre(null)}
-          accessibilityRole="button"
-          accessibilityLabel="Afficher tous les genres"
-          accessibilityState={{ selected: selectedGenre === null }}
-        >
-          <FinoraText
-            variant="caption"
-            style={[
-              styles.chipText,
-              selectedGenre === null
-                ? styles.chipTextSelected
-                : styles.chipTextUnselected
-            ]}
-          >
-            Tous les genres
-          </FinoraText>
-        </Pressable>
-
-        {genres.map((genre) => {
-          const isSelected = selectedGenre === genre;
-          return (
-            <Pressable
-              key={genre}
-              style={[
-                styles.chip,
-                isSelected ? styles.chipSelected : styles.chipUnselected
-              ]}
-              onPress={() => onSelectGenre(isSelected ? null : genre)}
-              accessibilityRole="button"
-              accessibilityLabel={`Filtrer par genre ${genre}`}
-              accessibilityState={{ selected: isSelected }}
-            >
-              <FinoraText
-                variant="caption"
-                style={[
-                  styles.chipText,
-                  isSelected
-                    ? styles.chipTextSelected
-                    : styles.chipTextUnselected
-                ]}
-              >
-                {genre}
-              </FinoraText>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+        <Ionicons
+          name="swap-vertical"
+          size={14}
+          color={colors.textPrimary}
+          style={styles.sortIcon}
+        />
+        <FinoraText variant="caption" style={styles.sortPillText} numberOfLines={1}>
+          {getSortOptionLabel(currentSort.id, t)}
+        </FinoraText>
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: spacing.sm
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm
-  },
-  chip: {
-    minHeight: 44,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "flex-start",
+    paddingHorizontal: spacing.md,
+    marginVertical: spacing.xs,
+    height: 40
   },
-  chipSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary
-  },
-  chipUnselected: {
+  sortPill: {
+    height: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    borderRadius: 18,
     backgroundColor: "#161622",
-    borderColor: "#28283A"
+    borderWidth: 1,
+    borderColor: "#28283A",
+    maxWidth: 200
   },
-  chipText: {
+  sortIcon: {
+    marginRight: 4
+  },
+  sortPillText: {
+    color: colors.textPrimary,
     fontWeight: "600"
-  },
-  chipTextSelected: {
-    color: colors.textPrimary
-  },
-  chipTextUnselected: {
-    color: colors.textSecondary
   }
 });
+
+

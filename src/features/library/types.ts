@@ -46,3 +46,23 @@ export const AVAILABLE_SORT_OPTIONS: SortOption[] = [
     sortOrder: "Descending"
   }
 ];
+
+export function getSortOptionLabel(id: string, t: (key: any) => string): string {
+  switch (id) {
+    case "title-asc":
+      return t("library.sortTitleAsc");
+    case "title-desc":
+      return t("library.sortTitleDesc");
+    case "date-desc":
+      return t("library.sortDateDesc");
+    case "date-asc":
+      return t("library.sortDateAsc");
+    case "rating-desc":
+      return t("library.sortRatingDesc");
+    case "added-desc":
+      return t("library.sortAddedDesc");
+    default:
+      return id;
+  }
+}
+

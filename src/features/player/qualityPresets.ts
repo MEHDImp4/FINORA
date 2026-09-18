@@ -9,8 +9,8 @@ export interface QualityPreset {
 }
 
 export const QUALITY_OPTIONS: QualityPreset[] = [
-  { id: "auto", label: "Auto (Recommandé)" },
-  { id: "original", label: "Original (Direct)" },
+  { id: "auto", label: "Auto" },
+  { id: "original", label: "Original" },
   { id: "4k", label: "4K (2160p) - 40 Mbps", maxWidth: 3840, maxHeight: 2160, maxBitrate: 40000000 },
   { id: "1080p", label: "1080p HD - 10 Mbps", maxWidth: 1920, maxHeight: 1080, maxBitrate: 10000000 },
   { id: "720p", label: "720p HD - 4 Mbps", maxWidth: 1280, maxHeight: 720, maxBitrate: 4000000 },

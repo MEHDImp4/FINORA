@@ -490,6 +490,19 @@ export interface PlayerTranslations {
   nextEpisodeA11y: string;
   pipA11y: string;
   pipNotSupported: string;
+  audioSubtitles: string;
+  audioSubtitlesShort: string;
+  audio: string;
+  subtitles: string;
+  moreOptions: string;
+  moreOptionsTitle: string;
+  directPlayDesc: string;
+  directStreamDesc: string;
+  transcodeDesc: string;
+  portraitModeDesc: string;
+  landscapeModeDesc: string;
+  technicalInfoDesc: string;
+  episodes: string;
 }
 
 export interface SettingsTranslations {

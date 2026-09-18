@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { useNotificationStore, NotificationType } from "../../stores/notificationStore";
 import { logger } from "../network/logger";
+import { translate } from "../../i18n";
 
 let ExpoNotifications: typeof import("expo-notifications") | null = null;
 let isNativeSupported = true;
@@ -221,7 +222,7 @@ class NotificationService {
 
     return this.scheduleLocalNotification({
       type: "new_episode",
-      title: "Nouvel épisode disponible",
+      title: translate("notifications.newEpisodeTitle"),
       body,
       mediaId: params.episodeId,
       seriesId: params.seriesId,
@@ -239,11 +240,13 @@ class NotificationService {
     posterUrl?: string;
   }): Promise<string | null> {
     const yearStr = params.year ? ` (${params.year})` : "";
-    const body = `${params.movieTitle}${yearStr} est maintenant disponible sur votre serveur.`;
+    const body = translate("notifications.newMovieBody", {
+      title: `${params.movieTitle}${yearStr}`
+    });
 
     return this.scheduleLocalNotification({
       type: "new_movie",
-      title: "Nouveau film disponible",
+      title: translate("notifications.newMovieTitle"),
       body,
       mediaId: params.movieId,
       posterUrl: params.posterUrl
@@ -257,11 +260,13 @@ class NotificationService {
     posterUrl?: string;
   }): Promise<string | null> {
     const yearStr = params.year ? ` (${params.year})` : "";
-    const body = `${params.seriesTitle}${yearStr} a été ajoutée à votre médiathèque.`;
+    const body = translate("notifications.newSeriesBody", {
+      title: `${params.seriesTitle}${yearStr}`
+    });
 
     return this.scheduleLocalNotification({
       type: "new_series",
-      title: "Nouvelle série disponible",
+      title: translate("notifications.newSeriesTitle"),
       body,
       mediaId: params.seriesId,
       seriesId: params.seriesId,
@@ -275,11 +280,13 @@ class NotificationService {
     mediaId: string,
     type?: "Movie" | "Episode"
   ): Promise<string | null> {
-    const body = `${mediaTitle} est maintenant prêt pour le visionnage hors-connexion.`;
+    const body = translate("notifications.downloadCompleteBody", {
+      title: mediaTitle
+    });
 
     return this.scheduleLocalNotification({
       type: "download_completed",
-      title: "Téléchargement terminé",
+      title: translate("notifications.downloadCompleteTitle"),
       body,
       mediaId
     });
@@ -288,8 +295,8 @@ class NotificationService {
   public async sendTestNotification(): Promise<string | null> {
     return this.scheduleLocalNotification({
       type: "test",
-      title: "FINORA Notifications",
-      body: "Les notifications sont activées et fonctionnent parfaitement sur votre appareil !"
+      title: translate("notifications.testNotificationTitle"),
+      body: translate("notifications.testNotificationBody")
     });
   }
 }

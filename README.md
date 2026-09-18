@@ -62,7 +62,7 @@ Built with Expo SDK 57, React Native 0.86, and TypeScript, it combines native ha
 > **Open FINORA → Browse instantly → Choose content → Play → Watch smoothly → Resume anywhere.**
 
 - **Smooth Navigation**: Optimized for high-refresh-rate displays (up to 120 Hz) using React Native's New Architecture (Fabric renderer and Hermes engine).
-- **Modern Dark & Glass Aesthetic**: Refined dark theme with translucent glass navigation, subtle elevation, and responsive cards.
+- **Cinematic Dark Theme**: Refined OLED dark theme, Netflix-style navigation, subtle elevation, and responsive cards.
 - **Native Video Engine**: Built on modern `expo-video` (AndroidX Media3 / ExoPlayer on Android and AVPlayer on iOS) with automated stream negotiation.
 - **Privacy by Default**: Authentication tokens stored in hardware-backed keystores where supported by the platform, passwords discarded immediately after authentication, and zero third-party telemetry.
 
@@ -258,7 +258,7 @@ FINORA/
 │   │   ├── search/       # Live search, history, suggestions
 │   │   └── settings/     # Server diagnostics, playback & subtitle preferences
 │   ├── stores/           # Atomic Zustand stores (player, settings, downloads)
-│   └── components/       # Design system components, GlassCard, modals
+│   └── components/       # Design system components, FinoraCard, modals
 ├── .github/              # Issue templates, PR template, CI workflows
 └── package.json
 ```

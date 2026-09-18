@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CollectionDetailsView } from "../components/CollectionDetailsView";
 import { MediaItem } from "../../../types/media";
 import { mediaRepository } from "../../../core/repositories/mediaRepository";
+import { translate } from "../../../i18n";
 
 jest.mock("../../../core/repositories/mediaRepository", () => ({
   mediaRepository: {
@@ -109,7 +110,7 @@ describe("CollectionDetailsView", () => {
     });
 
     const root = component!.root;
-    const backBtn = root.findByProps({ accessibilityLabel: "Retour" });
+    const backBtn = root.findByProps({ accessibilityLabel: translate("common.back") });
     act(() => {
       backBtn.props.onPress();
     });
@@ -136,7 +137,7 @@ describe("CollectionDetailsView", () => {
     });
 
     const root = component!.root;
-    const favBtn = root.findByProps({ accessibilityLabel: "Ajouter aux favoris" });
+    const favBtn = root.findByProps({ accessibilityLabel: translate("details.addToMyList") });
     act(() => {
       favBtn.props.onPress();
     });

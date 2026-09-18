@@ -9,6 +9,7 @@ import {
   AccessibilityInfo
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTranslation } from "../../i18n";
 
 export interface ShimmerSkeletonProps {
   width?: number | string;
@@ -31,6 +32,7 @@ export function ShimmerSkeleton({
   borderRadius = 8,
   style
 }: ShimmerSkeletonProps) {
+  const { t } = useTranslation();
   const [reduceMotion, setReduceMotion] = useState(false);
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const progress = useRef(new Animated.Value(0)).current;
@@ -97,7 +99,7 @@ export function ShimmerSkeleton({
       ]}
       onLayout={handleLayout}
       accessibilityRole="none"
-      accessibilityLabel="Loading content"
+      accessibilityLabel={t("common.loadingContentA11y")}
     >
       {!reduceMotion && measuredWidth > 0 ? (
         <Animated.View

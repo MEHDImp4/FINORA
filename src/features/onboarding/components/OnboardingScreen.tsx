@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -41,6 +41,181 @@ export interface OnboardingScreenProps {
   onCompleted?: () => void;
 }
 
+interface AnimatedCardProps {
+  children: React.ReactNode;
+  style?: any;
+  containerStyle?: any;
+  onPress: () => void;
+  isSelected?: boolean;
+  scaleOnPress?: number;
+  accessibilityRole?: any;
+  accessibilityLabel?: string;
+  accessibilityState?: { selected?: boolean; checked?: boolean };
+}
+
+/**
+ * Animated interactive card with spring touch feedback and selection pop
+ */
+function AnimatedCard({
+  children,
+  style,
+  containerStyle,
+  onPress,
+  isSelected,
+  scaleOnPress = 0.96,
+  accessibilityRole = "button",
+  accessibilityLabel,
+  accessibilityState
+}: AnimatedCardProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const prevSelected = useRef(isSelected);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
+    if (isSelected && !prevSelected.current) {
+      Animated.sequence([
+        Animated.timing(scale, {
+          toValue: 1.025,
+          duration: 90,
+          useNativeDriver: true
+        }),
+        Animated.spring(scale, {
+          toValue: 1,
+          friction: 4,
+          tension: 140,
+          useNativeDriver: true
+        })
+      ]).start();
+    }
+    prevSelected.current = isSelected;
+  }, [isSelected, scale]);
+
+  const handlePressIn = () => {
+    if (process.env.NODE_ENV === "test") return;
+    Animated.spring(scale, {
+      toValue: scaleOnPress,
+      useNativeDriver: true,
+      friction: 6,
+      tension: 140
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    if (process.env.NODE_ENV === "test") return;
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 6,
+      tension: 100
+    }).start();
+  };
+
+  return (
+    <Animated.View style={[{ transform: [{ scale }] }, containerStyle]}>
+      <Pressable
+        style={style}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onPress={onPress}
+        accessibilityRole={accessibilityRole}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={accessibilityState}
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/**
+ * Animated selection radio dot popping into view
+ */
+function AnimatedRadioDot({ visible, dotStyle }: { visible: boolean; dotStyle: any }) {
+  const scale = useRef(new Animated.Value(visible ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
+    if (visible) {
+      scale.setValue(0);
+      Animated.spring(scale, {
+        toValue: 1,
+        friction: 4,
+        tension: 160,
+        useNativeDriver: true
+      }).start();
+    }
+  }, [visible, scale]);
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View
+      style={[
+        dotStyle,
+        { transform: [{ scale }] }
+      ]}
+    />
+  );
+}
+
+/**
+ * Animated dynamic pagination pill
+ */
+function AnimatedPaginationDot({
+  isActive,
+  onPress,
+  a11yLabel
+}: {
+  isActive: boolean;
+  onPress: () => void;
+  a11yLabel: string;
+}) {
+  const animWidth = useRef(new Animated.Value(isActive ? 24 : 6)).current;
+  const animOpacity = useRef(new Animated.Value(isActive ? 1 : 0.35)).current;
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") {
+      animWidth.setValue(isActive ? 24 : 6);
+      animOpacity.setValue(isActive ? 1 : 0.35);
+      return;
+    }
+    Animated.parallel([
+      Animated.spring(animWidth, {
+        toValue: isActive ? 24 : 6,
+        friction: 7,
+        tension: 80,
+        useNativeDriver: false
+      }),
+      Animated.timing(animOpacity, {
+        toValue: isActive ? 1 : 0.35,
+        duration: 200,
+        useNativeDriver: false
+      })
+    ]).start();
+  }, [isActive, animWidth, animOpacity]);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={styles.dotTouchTarget}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
+      accessibilityState={{ selected: isActive }}
+    >
+      <Animated.View
+        style={[
+          styles.dot,
+          {
+            width: animWidth,
+            opacity: animOpacity,
+            backgroundColor: isActive ? colors.primary : "rgba(255, 255, 255, 0.45)"
+          }
+        ]}
+      />
+    </Pressable>
+  );
+}
+
 export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -51,24 +226,75 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
   // Smooth slide transition animated values
   const slideAnim = useRef(new Animated.Value(1)).current;
   const slideTranslateY = useRef(new Animated.Value(0)).current;
+  const slideScale = useRef(new Animated.Value(1)).current;
+
+  // Next button pulse animation
+  const nextButtonScale = useRef(new Animated.Value(1)).current;
+
+  // Ambient breathing glow animation
+  const ambientPulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(ambientPulse, {
+          toValue: 1.15,
+          duration: 3500,
+          useNativeDriver: true
+        }),
+        Animated.timing(ambientPulse, {
+          toValue: 0.95,
+          duration: 3500,
+          useNativeDriver: true
+        })
+      ])
+    );
+    pulseLoop.start();
+    return () => pulseLoop.stop();
+  }, [ambientPulse]);
+
+  const triggerNextButtonPulse = () => {
+    Animated.sequence([
+      Animated.timing(nextButtonScale, {
+        toValue: 1.06,
+        duration: 120,
+        useNativeDriver: true
+      }),
+      Animated.spring(nextButtonScale, {
+        toValue: 1,
+        friction: 4,
+        tension: 120,
+        useNativeDriver: true
+      })
+    ]).start();
+  };
 
   // Animate content when current slide changes
   const animateSlideChange = (toIndex: number) => {
-    slideAnim.setValue(0.3);
-    slideTranslateY.setValue(12);
+    slideAnim.setValue(0.25);
+    slideTranslateY.setValue(16);
+    slideScale.setValue(0.96);
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: 1,
-        duration: 320,
+        duration: 280,
         useNativeDriver: true
       }),
       Animated.spring(slideTranslateY, {
         toValue: 0,
-        friction: 8,
-        tension: 50,
+        friction: 7,
+        tension: 60,
+        useNativeDriver: true
+      }),
+      Animated.spring(slideScale, {
+        toValue: 1,
+        friction: 7,
+        tension: 70,
         useNativeDriver: true
       })
     ]).start();
+    triggerNextButtonPulse();
   };
 
   const [serverUrl, setServerUrl] = useState(DEFAULT_JELLYFIN_SERVER);
@@ -312,8 +538,35 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <View style={styles.glowTop} pointerEvents="none" />
-      <View style={styles.glowBottom} pointerEvents="none" />
+      <Animated.View
+        style={[
+          styles.glowTop,
+          {
+            transform: [{ scale: ambientPulse }],
+            opacity: ambientPulse.interpolate({
+              inputRange: [0.95, 1.15],
+              outputRange: [0.7, 1.0]
+            })
+          }
+        ]}
+        pointerEvents="none"
+      />
+      <Animated.View
+        style={[
+          styles.glowBottom,
+          {
+            transform: [
+              {
+                scale: ambientPulse.interpolate({
+                  inputRange: [0.95, 1.15],
+                  outputRange: [1.1, 0.95]
+                })
+              }
+            ]
+          }
+        ]}
+        pointerEvents="none"
+      />
 
       <View style={styles.topHeader}>
         <Image
@@ -350,7 +603,10 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
               styles.slideContent,
               currentSlide === 0 && {
                 opacity: slideAnim,
-                transform: [{ translateY: slideTranslateY }]
+                transform: [
+                  { translateY: slideTranslateY },
+                  { scale: slideScale }
+                ]
               }
             ]}
           >
@@ -367,15 +623,18 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
               {languages.map((langOption) => {
                 const isSelected = language === langOption.code;
                 return (
-                  <Pressable
+                  <AnimatedCard
                     key={langOption.code}
                     style={[
                       styles.languageCard,
                       isSelected && styles.languageCardActive
                     ]}
+                    containerStyle={{ width: "100%" }}
+                    isSelected={isSelected}
                     onPress={() => {
                       hapticService.selection();
                       setLanguage(langOption.code as SupportedLanguage);
+                      triggerNextButtonPulse();
                     }}
                     accessibilityRole="button"
                     accessibilityLabel={langOption.label}
@@ -387,9 +646,9 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                       <Text style={styles.languageSubName}>{langOption.label}</Text>
                     </View>
                     <View style={[styles.languageRadio, isSelected && styles.languageRadioActive]}>
-                      {isSelected && <View style={styles.languageRadioDot} />}
+                      <AnimatedRadioDot visible={isSelected} dotStyle={styles.languageRadioDot} />
                     </View>
-                  </Pressable>
+                  </AnimatedCard>
                 );
               })}
             </View>
@@ -408,7 +667,10 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                 currentSlide === 1
                   ? {
                       opacity: slideAnim,
-                      transform: [{ translateY: slideTranslateY }]
+                      transform: [
+                        { translateY: slideTranslateY },
+                        { scale: slideScale }
+                      ]
                     }
                   : undefined
               }
@@ -427,14 +689,17 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
               </Text>
 
               {/* Auto Skip Intro Choice Card */}
-              <Pressable
+              <AnimatedCard
                 style={[
                   styles.interactiveQuestionCard,
                   playbackPreferences.autoSkipIntro && styles.interactiveQuestionCardActive
                 ]}
+                containerStyle={{ width: "100%" }}
+                isSelected={playbackPreferences.autoSkipIntro}
                 onPress={() => {
                   hapticService.impactLight();
                   setAutoSkipIntro(!playbackPreferences.autoSkipIntro);
+                  triggerNextButtonPulse();
                 }}
                 accessibilityRole="switch"
                 accessibilityLabel={t("onboarding.autoSkipIntroLabel")}
@@ -452,18 +717,27 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                   onValueChange={(val) => {
                     hapticService.impactLight();
                     setAutoSkipIntro(val);
+                    triggerNextButtonPulse();
                   }}
                   trackColor={{ false: "#2A2A38", true: colors.primary }}
                   thumbColor={Platform.OS === "android" ? "#FFFFFF" : undefined}
                 />
-              </Pressable>
+              </AnimatedCard>
 
               {/* Instant Direct Play Feature Showcase */}
               <View style={styles.featureShowcaseCard}>
                 <View style={styles.featureShowcaseRow}>
-                  <View style={[styles.cardIconBox, { backgroundColor: "rgba(255, 184, 0, 0.12)" }]}>
+                  <Animated.View
+                    style={[
+                      styles.cardIconBox,
+                      {
+                        backgroundColor: "rgba(255, 184, 0, 0.12)",
+                        transform: [{ scale: ambientPulse }]
+                      }
+                    ]}
+                  >
                     <Ionicons name="flash-outline" size={20} color="#FFB800" />
-                  </View>
+                  </Animated.View>
                   <View style={styles.cardTexts}>
                     <Text style={styles.cardTitle}>Direct Play Native 4K / HD</Text>
                     <Text style={styles.cardSubtitle}>
@@ -471,6 +745,43 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                     </Text>
                   </View>
                   <Ionicons name="checkmark-circle" size={22} color="#34C759" />
+                </View>
+              </View>
+
+              {/* Preferred Audio Language Chips */}
+              <View style={styles.prefSection}>
+                <Text style={styles.prefSectionLabel}>{t("onboarding.audioLanguageLabel")}</Text>
+                <View style={styles.chipsRow}>
+                  {[
+                    { id: "fr", label: "Français", flag: "🇫🇷" },
+                    { id: "en", label: "English", flag: "🇬🇧" },
+                    { id: "ja", label: "日本語", flag: "🇯🇵" },
+                    { id: "auto", label: "Original", flag: "🌐" }
+                  ].map((item) => {
+                    const isSelected = (playbackPreferences.preferredAudioLanguage || "fr") === item.id;
+                    return (
+                      <AnimatedCard
+                        key={item.id}
+                        style={[styles.chip, isSelected && styles.chipActive]}
+                        containerStyle={{ alignSelf: "flex-start" }}
+                        scaleOnPress={0.92}
+                        isSelected={isSelected}
+                        onPress={() => {
+                          hapticService.selection();
+                          setPreferredAudioLanguage(item.id);
+                          triggerNextButtonPulse();
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${item.label} audio`}
+                        accessibilityState={{ selected: isSelected }}
+                      >
+                        <Text style={styles.chipFlag}>{item.flag}</Text>
+                        <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
+                          {item.label}
+                        </Text>
+                      </AnimatedCard>
+                    );
+                  })}
                 </View>
               </View>
 
@@ -485,12 +796,16 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                   ].map((item) => {
                     const isSelected = (playbackPreferences.subtitleMode || "smart") === item.id;
                     return (
-                      <Pressable
+                      <AnimatedCard
                         key={item.id}
                         style={[styles.chip, isSelected && styles.chipActive]}
+                        containerStyle={{ alignSelf: "flex-start" }}
+                        scaleOnPress={0.92}
+                        isSelected={isSelected}
                         onPress={() => {
                           hapticService.selection();
                           setSubtitleMode(item.id);
+                          triggerNextButtonPulse();
                         }}
                         accessibilityRole="button"
                         accessibilityLabel={item.label}
@@ -505,7 +820,7 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                         <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
                           {item.label}
                         </Text>
-                      </Pressable>
+                      </AnimatedCard>
                     );
                   })}
                 </View>
@@ -514,7 +829,7 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
           </ScrollView>
         </View>
 
-        {/* Slide 2: Question 3 — Languages & Offline Downloads */}
+        {/* Slide 2: Question 3 — Offline Downloads */}
         <View style={styles.slide}>
           <ScrollView
             style={styles.slideScroll}
@@ -526,7 +841,10 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                 currentSlide === 2
                   ? {
                       opacity: slideAnim,
-                      transform: [{ translateY: slideTranslateY }]
+                      transform: [
+                        { translateY: slideTranslateY },
+                        { scale: slideScale }
+                      ]
                     }
                   : undefined
               }
@@ -543,39 +861,6 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
               <Text style={styles.slideDescription}>
                 {t("onboarding.question3Subtitle") || t("onboarding.playbackPreferencesSubtitle")}
               </Text>
-
-              {/* Preferred Audio Language Chips */}
-              <View style={styles.prefSection}>
-                <Text style={styles.prefSectionLabel}>{t("onboarding.audioLanguageLabel")}</Text>
-                <View style={styles.chipsRow}>
-                  {[
-                    { id: "fr", label: "Français", flag: "🇫🇷" },
-                    { id: "en", label: "English", flag: "🇬🇧" },
-                    { id: "ja", label: "日本語", flag: "🇯🇵" },
-                    { id: "auto", label: "Original", flag: "🌐" }
-                  ].map((item) => {
-                    const isSelected = (playbackPreferences.preferredAudioLanguage || "fr") === item.id;
-                    return (
-                      <Pressable
-                        key={item.id}
-                        style={[styles.chip, isSelected && styles.chipActive]}
-                        onPress={() => {
-                          hapticService.selection();
-                          setPreferredAudioLanguage(item.id);
-                        }}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${item.label} audio`}
-                        accessibilityState={{ selected: isSelected }}
-                      >
-                        <Text style={styles.chipFlag}>{item.flag}</Text>
-                        <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
-                          {item.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
 
               {/* Download Quality Selection Cards */}
               <View style={styles.prefSection}>
@@ -601,15 +886,18 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                   ]).map((opt) => {
                     const isSelected = defaultDownloadQuality === opt.id;
                     return (
-                      <Pressable
+                      <AnimatedCard
                         key={opt.id}
                         style={[
                           styles.qualityCard,
                           isSelected && styles.qualityCardActive
                         ]}
+                        containerStyle={{ width: "100%" }}
+                        isSelected={isSelected}
                         onPress={() => {
                           hapticService.selection();
                           setDefaultDownloadQuality(opt.id);
+                          triggerNextButtonPulse();
                         }}
                         accessibilityRole="radio"
                         accessibilityLabel={`${opt.title} - ${opt.desc}`}
@@ -627,23 +915,26 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                           <Text style={styles.qualitySubName}>{opt.desc}</Text>
                         </View>
                         <View style={[styles.qualityRadio, isSelected && styles.qualityRadioActive]}>
-                          {isSelected && <View style={styles.qualityRadioDot} />}
+                          <AnimatedRadioDot visible={isSelected} dotStyle={styles.qualityRadioDot} />
                         </View>
-                      </Pressable>
+                      </AnimatedCard>
                     );
                   })}
                 </View>
               </View>
 
               {/* Wi-Fi Only Downloads Card */}
-              <Pressable
+              <AnimatedCard
                 style={[
                   styles.interactiveQuestionCard,
                   playbackPreferences.downloadWifiOnly && styles.interactiveQuestionCardActive
                 ]}
+                containerStyle={{ width: "100%" }}
+                isSelected={playbackPreferences.downloadWifiOnly}
                 onPress={() => {
                   hapticService.impactLight();
                   setDownloadWifiOnly(!playbackPreferences.downloadWifiOnly);
+                  triggerNextButtonPulse();
                 }}
                 accessibilityRole="switch"
                 accessibilityLabel={t("onboarding.wifiOnlyLabel")}
@@ -661,19 +952,25 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                   onValueChange={(val) => {
                     hapticService.impactLight();
                     setDownloadWifiOnly(val);
+                    triggerNextButtonPulse();
                   }}
                   trackColor={{ false: "#2A2A38", true: colors.primary }}
                   thumbColor={Platform.OS === "android" ? "#FFFFFF" : undefined}
                 />
-              </Pressable>
+              </AnimatedCard>
 
               {/* Notifications Card */}
-              <Pressable
+              <AnimatedCard
                 style={[
                   styles.interactiveQuestionCard,
                   notifPreferences.enabled && styles.interactiveQuestionCardActive
                 ]}
-                onPress={() => handleToggleNotifications(!notifPreferences.enabled)}
+                containerStyle={{ width: "100%" }}
+                isSelected={notifPreferences.enabled}
+                onPress={() => {
+                  handleToggleNotifications(!notifPreferences.enabled);
+                  triggerNextButtonPulse();
+                }}
                 accessibilityRole="switch"
                 accessibilityLabel={t("onboarding.notificationsLabel")}
                 accessibilityState={{ checked: notifPreferences.enabled }}
@@ -687,11 +984,14 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                 </View>
                 <Switch
                   value={notifPreferences.enabled}
-                  onValueChange={handleToggleNotifications}
+                  onValueChange={(val) => {
+                    handleToggleNotifications(val);
+                    triggerNextButtonPulse();
+                  }}
                   trackColor={{ false: "#2A2A38", true: colors.primary }}
                   thumbColor={Platform.OS === "android" ? "#FFFFFF" : undefined}
                 />
-              </Pressable>
+              </AnimatedCard>
             </Animated.View>
           </ScrollView>
         </View>
@@ -712,7 +1012,10 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                   currentSlide === 3
                     ? {
                         opacity: slideAnim,
-                        transform: [{ translateY: slideTranslateY }]
+                        transform: [
+                          { translateY: slideTranslateY },
+                          { scale: slideScale }
+                        ]
                       }
                     : undefined
                 }
@@ -844,9 +1147,9 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
                       <ProfilePickerView
                         users={publicUsers}
                         serverUrl={serverUrl}
+                        isLoading={isLoadingPublicUsers || isSubmitting}
                         onSelectUser={handleSelectPublicProfile}
                         onManualLoginPress={() => setShowManualLogin(true)}
-                        isLoading={isLoadingPublicUsers}
                       />
                     ) : (
                       <>
@@ -932,33 +1235,26 @@ export function OnboardingScreen({ onCompleted }: OnboardingScreenProps) {
       <View style={styles.bottomBar}>
         <View style={styles.paginationDots}>
           {Array.from({ length: TOTAL_SLIDES }).map((_, idx) => (
-            <Pressable
+            <AnimatedPaginationDot
               key={idx}
+              isActive={currentSlide === idx}
               onPress={() => goToSlide(idx)}
-              style={styles.dotTouchTarget}
-              accessibilityRole="button"
-              accessibilityLabel={t("onboarding.stepA11y", { step: idx + 1, total: TOTAL_SLIDES })}
-              accessibilityState={{ selected: currentSlide === idx }}
-            >
-              <View
-                style={[
-                  styles.dot,
-                  currentSlide === idx ? styles.dotActive : styles.dotInactive
-                ]}
-              />
-            </Pressable>
+              a11yLabel={t("onboarding.stepA11y", { step: idx + 1, total: TOTAL_SLIDES })}
+            />
           ))}
         </View>
 
         {currentSlide < LAST_SLIDE_INDEX && (
-          <FinoraButton
-            label={t("onboarding.next")}
-            variant="primary"
-            size="md"
-            rightIcon={<Ionicons name="arrow-forward" size={18} color="#FFFFFF" />}
-            onPress={() => goToSlide(currentSlide + 1)}
-            style={styles.nextButton}
-          />
+          <Animated.View style={{ transform: [{ scale: nextButtonScale }] }}>
+            <FinoraButton
+              label={t("onboarding.next")}
+              variant="primary"
+              size="md"
+              rightIcon={<Ionicons name="arrow-forward" size={18} color="#FFFFFF" />}
+              onPress={() => goToSlide(currentSlide + 1)}
+              style={styles.nextButton}
+            />
+          </Animated.View>
         )}
       </View>
 

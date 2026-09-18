@@ -2,6 +2,7 @@ import React from "react";
 import ReactTestRenderer from "react-test-renderer";
 import { MediaQuickActionsModal } from "../components/MediaQuickActionsModal";
 import { MediaItem } from "../../../types/media";
+import { translate } from "../../../i18n";
 
 describe("MediaQuickActionsModal", () => {
   const serverUrl = "https://jellyfin.example.com";
@@ -78,15 +79,15 @@ describe("MediaQuickActionsModal", () => {
     expect(root.findByProps({ children: "S5:E14 · Ozymandias" })).toBeDefined();
 
     // Check action rows
-    expect(root.findByProps({ children: "Marquer comme vu" })).toBeDefined();
-    expect(root.findByProps({ children: "Marquer comme non vu" })).toBeDefined();
-    expect(root.findByProps({ children: "Retirer de Reprendre la lecture" })).toBeDefined();
-    expect(root.findByProps({ children: "Ajouter aux favoris" })).toBeDefined();
-    expect(root.findByProps({ children: "Reprendre la lecture" })).toBeDefined();
-    expect(root.findByProps({ children: "Voir la fiche détaillée" })).toBeDefined();
+    expect(root.findByProps({ children: translate("quickActions.markWatched") })).toBeDefined();
+    expect(root.findByProps({ children: translate("quickActions.markUnwatched") })).toBeDefined();
+    expect(root.findByProps({ children: translate("quickActions.removeFromResume") })).toBeDefined();
+    expect(root.findByProps({ children: translate("quickActions.addFavorite") })).toBeDefined();
+    expect(root.findByProps({ children: translate("quickActions.resume") })).toBeDefined();
+    expect(root.findByProps({ children: translate("quickActions.viewDetails") })).toBeDefined();
   });
 
-  it("calls onTogglePlayed with true when 'Marquer comme vu' is pressed", () => {
+  it("calls onTogglePlayed with true when 'Mark as watched' is pressed", () => {
     const onTogglePlayedMock = jest.fn();
     const onCloseMock = jest.fn();
 
@@ -104,11 +105,10 @@ describe("MediaQuickActionsModal", () => {
     });
 
     const root = component!.root;
-    const markPlayedText = root.findByProps({ children: "Marquer comme vu" });
-    // Find ancestor pressable
+    const markPlayedLabel = translate("quickActions.markWatched");
     const pressables = root.findAllByType("Pressable" as any);
     const markPlayedPressable = pressables.find(
-      (p) => p.props.accessibilityLabel && p.props.accessibilityLabel.includes("Marquer comme vu")
+      (p) => p.props.accessibilityLabel && p.props.accessibilityLabel.includes(markPlayedLabel)
     );
 
     expect(markPlayedPressable).toBeDefined();
@@ -120,7 +120,7 @@ describe("MediaQuickActionsModal", () => {
     expect(onCloseMock).toHaveBeenCalled();
   });
 
-  it("calls onRemoveFromResume when 'Retirer de Reprendre' is pressed", () => {
+  it("calls onRemoveFromResume when 'Remove from continue watching' is pressed", () => {
     const onRemoveFromResumeMock = jest.fn();
     const onCloseMock = jest.fn();
 
@@ -138,9 +138,10 @@ describe("MediaQuickActionsModal", () => {
     });
 
     const root = component!.root;
+    const removeLabel = translate("quickActions.removeFromResume");
     const pressables = root.findAllByType("Pressable" as any);
     const removePressable = pressables.find(
-      (p) => p.props.accessibilityLabel && p.props.accessibilityLabel.includes("Retirer de Reprendre")
+      (p) => p.props.accessibilityLabel && p.props.accessibilityLabel.includes(removeLabel)
     );
 
     expect(removePressable).toBeDefined();
@@ -170,8 +171,8 @@ describe("MediaQuickActionsModal", () => {
 
     const root = component!.root;
     expect(root.findByProps({ children: "Interstellar" })).toBeDefined();
-    expect(root.findByProps({ children: "Vu · Terminé" })).toBeDefined();
-    expect(root.findByProps({ children: "Favori" })).toBeDefined();
-    expect(root.findByProps({ children: "Retirer des favoris" })).toBeDefined();
+    expect(root.findByProps({ children: translate("quickActions.statusPlayed") })).toBeDefined();
+    expect(root.findByProps({ children: translate("quickActions.statusFavorite") })).toBeDefined();
+    expect(root.findByProps({ children: translate("quickActions.removeFavorite") })).toBeDefined();
   });
 });

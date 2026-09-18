@@ -474,7 +474,20 @@ export const en: Translations = {
     playbackSpeedA11y: "Playback speed {speed}",
     nextEpisodeA11y: "Play next episode",
     pipA11y: "Picture-in-Picture mode (PiP)",
-    pipNotSupported: "Picture-in-Picture is not supported on this device"
+    pipNotSupported: "Picture-in-Picture is not supported on this device",
+    audioSubtitles: "Audio & Subtitles",
+    audioSubtitlesShort: "Audio & Subtitles",
+    audio: "Audio",
+    subtitles: "Subtitles",
+    moreOptions: "More",
+    moreOptionsTitle: "More Options",
+    directPlayDesc: "Original source stream without conversion",
+    directStreamDesc: "Audio or container remuxed for your device",
+    transcodeDesc: "Stream transcoded on-the-fly by server",
+    portraitModeDesc: "Switch to vertical portrait view",
+    landscapeModeDesc: "Cinematic horizontal fullscreen",
+    technicalInfoDesc: "Detailed stats, bitrate, codecs and buffers",
+    episodes: "Episodes"
   },
   settings: {
     title: "Settings",

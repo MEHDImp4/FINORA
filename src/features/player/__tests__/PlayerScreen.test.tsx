@@ -137,14 +137,21 @@ describe("PlayerScreen", () => {
 
   it("renders next episode button and triggers onNextEpisode when available", async () => {
     const originalFetch = global.fetch;
+    const mockCurrentEpisode = {
+      Id: "item-episode-1",
+      Name: "Episode 1",
+      IndexNumber: 1,
+      ParentIndexNumber: 1
+    };
     const mockNextEpisodeItem = {
       Id: "item-episode-2",
       Name: "Episode 2",
-      IndexNumber: 2
+      IndexNumber: 2,
+      ParentIndexNumber: 1
     };
     (global as any).fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ Items: [mockNextEpisodeItem] })
+      json: async () => ({ Items: [mockCurrentEpisode, mockNextEpisodeItem] })
     });
 
     const episodeItem: MediaItem = {

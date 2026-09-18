@@ -2,6 +2,7 @@ import React from "react";
 import ReactTestRenderer from "react-test-renderer";
 import { HeroBanner } from "../components/HeroBanner";
 import { MediaItem } from "../../../types/media";
+import { translate } from "../../../i18n";
 
 describe("HeroBanner", () => {
   const serverUrl = "https://jellyfin.example.com";
@@ -65,6 +66,6 @@ describe("HeroBanner", () => {
     const component = ReactTestRenderer.create(
       <HeroBanner item={null} serverUrl={serverUrl} />
     );
-    expect(component.root.findByProps({ children: "Aucun média à mettre en avant" })).toBeDefined();
+    expect(component.root.findByProps({ children: translate("home.noHeroMedia", undefined, "en") })).toBeDefined();
   });
 });

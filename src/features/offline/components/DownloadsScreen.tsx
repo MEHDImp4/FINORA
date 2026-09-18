@@ -14,6 +14,7 @@ import { useAuthStore } from "../../../stores/authStore";
 import { getPosterUrl } from "../../../core/repositories/imageUrlBuilder";
 import { DownloadProgressCard } from "./DownloadProgressCard";
 import { DownloadedSeriesView } from "./DownloadedSeriesView";
+import { useTranslation } from "../../../i18n";
 
 import {
   formatBytes,
@@ -52,6 +53,7 @@ interface DownloadsScreenProps {
 
 export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const session = useAuthStore((s) => s.session);
   const serverUrl = session?.serverUrl || "";
 
@@ -106,12 +108,12 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     (record: OfflineMediaRecord) => {
       hapticService.impactLight();
       Alert.alert(
-        "Supprimer le téléchargement ?",
-        `« ${record.title} » sera supprimé de cet appareil.`,
+        t("downloads.deleteDownloadConfirmTitle"),
+        t("downloads.deleteDownloadConfirmDesc", { title: record.title }),
         [
-          { text: "Annuler", style: "cancel" },
+          { text: t("common.cancel"), style: "cancel" },
           {
-            text: "Supprimer",
+            text: t("common.delete"),
             style: "destructive",
             onPress: async () => {
               await offlineStorageService.deleteOfflineMedia(record.itemId);
@@ -121,19 +123,19 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
         ]
       );
     },
-    [loadData]
+    [loadData, t]
   );
 
   const handleDeleteSeries = useCallback(
     (seriesIdOrName: string) => {
       hapticService.impactMedium();
       Alert.alert(
-        "Supprimer la série téléchargée ?",
-        "Tous les épisodes téléchargés de cette série seront supprimés de cet appareil.",
+        t("downloads.deleteSeriesConfirmTitle"),
+        t("downloads.deleteSeriesConfirmDesc"),
         [
-          { text: "Annuler", style: "cancel" },
+          { text: t("common.cancel"), style: "cancel" },
           {
-            text: "Tout supprimer",
+            text: t("downloads.deleteAll"),
             style: "destructive",
             onPress: async () => {
               await offlineStorageService.deleteSeriesOfflineMedia(seriesIdOrName);
@@ -144,7 +146,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
         ]
       );
     },
-    [loadData]
+    [loadData, t]
   );
 
   const handleCleanOrphans = useCallback(async () => {
@@ -286,7 +288,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
             setSelectedSeriesKey(item.seriesId || item.seriesName);
           }}
           accessibilityRole="button"
-          accessibilityLabel={`Parcourir ${item.seriesName}, ${item.episodes.length} épisodes téléchargés`}
+          accessibilityLabel={t("downloads.browseSeriesA11y", { name: item.seriesName, count: item.episodes.length })}
           testID={`downloaded-series-card-${item.seriesId}`}
         >
           <View style={styles.cardPosterContainer}>
@@ -309,7 +311,10 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
               {item.seriesName}
             </FinoraText>
             <FinoraText variant="caption" style={styles.cardSubtitle} numberOfLines={1}>
-              {`Série • ${item.episodes.length} ${item.episodes.length <= 1 ? "épisode" : "épisodes"} téléchargés`}
+              {t("downloads.seriesDownloadedEpisodes", {
+                count: item.episodes.length,
+                episodeWord: item.episodes.length <= 1 ? t("downloads.episodeSingle") : t("downloads.episodeMultiple")
+              })}
             </FinoraText>
             <FinoraText variant="caption" style={styles.cardSize}>
               {formatBytes(item.totalBytes)}
@@ -325,7 +330,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
 
     const movie = item.movie;
     const isMissing = movie.fileExists === false;
-    const retentionLabel = getRetentionLabel(movie);
+    const retentionLabel = getRetentionLabel(movie, t);
     const posterUri = movie.posterLocalPath
       ? movie.posterLocalPath
       : movie.posterPath && serverUrl
@@ -338,7 +343,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
           style={styles.cardPosterContainer}
           onPress={() => handlePlay(movie)}
           accessibilityRole="button"
-          accessibilityLabel={`Lire ${movie.title}`}
+          accessibilityLabel={t("downloads.playTitle", { title: movie.title })}
         >
           {posterUri ? (
             <Image source={{ uri: posterUri }} style={styles.cardPoster} contentFit="cover" transition={200} />
@@ -349,7 +354,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
           )}
           <View style={styles.movieBadge}>
             <FinoraText variant="caption" weight="700" style={styles.movieBadgeText}>
-              FILM
+              {t("common.movie").toUpperCase()}
             </FinoraText>
           </View>
         </Pressable>
@@ -359,7 +364,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
             {movie.title}
           </FinoraText>
           <FinoraText variant="caption" style={styles.cardSubtitle} numberOfLines={1}>
-            {`Film${movie.year ? ` • ${movie.year}` : ""}`}
+            {`${t("common.movie")}${movie.year ? ` • ${movie.year}` : ""}`}
           </FinoraText>
           <View style={styles.metaRow}>
             <FinoraText variant="caption" style={styles.cardSize}>
@@ -370,7 +375,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
               <View style={styles.missingBadge}>
                 <Ionicons name="alert-circle-outline" size={11} color="#E50914" style={{ marginRight: 2 }} />
                 <FinoraText variant="caption" style={styles.missingText}>
-                  Manquant
+                  {t("downloads.missingBadge")}
                 </FinoraText>
               </View>
             )}
@@ -392,11 +397,11 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
               style={styles.playButton}
               onPress={() => handlePlay(movie)}
               accessibilityRole="button"
-              accessibilityLabel={`Lire hors-ligne ${movie.title}`}
+              accessibilityLabel={t("downloads.playOfflineTitle", { title: movie.title })}
             >
               <Ionicons name="play" size={15} color="#FFFFFF" />
               <FinoraText variant="caption" weight="600" style={styles.playText}>
-                Lire
+                {t("common.play")}
               </FinoraText>
             </Pressable>
           )}
@@ -405,7 +410,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
             style={styles.deleteButton}
             onPress={() => handleDelete(movie)}
             accessibilityRole="button"
-            accessibilityLabel={`Supprimer ${movie.title}`}
+            accessibilityLabel={t("downloads.deleteMediaA11y", { title: movie.title })}
           >
             <Ionicons name="trash-outline" size={18} color={colors.textSecondary} />
           </Pressable>
@@ -418,10 +423,10 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <View style={styles.header}>
         <FinoraText variant="title" weight="700" style={styles.headerTitle}>
-          Téléchargements
+          {t("downloads.title")}
         </FinoraText>
         <FinoraText variant="caption" style={styles.storageText}>
-          Stockage hors-ligne utilisé : {formatBytes(totalPhysicalStorage)}
+          {t("downloads.storageUsed", { size: formatBytes(totalPhysicalStorage) })}
         </FinoraText>
       </View>
 
@@ -430,20 +435,20 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
           <Ionicons name="information-circle-outline" size={20} color="#F5A623" style={{ marginRight: 8 }} />
           <View style={{ flex: 1 }}>
             <FinoraText variant="caption" weight="600" style={styles.orphanTitle}>
-              Données résiduelles détectées
+              {t("downloads.orphanTitle")}
             </FinoraText>
             <FinoraText variant="caption" style={styles.orphanSubtitle}>
-              Des fichiers de sessions antérieures ne sont plus sur l'appareil.
+              {t("downloads.orphanDesc")}
             </FinoraText>
           </View>
           <Pressable
             style={styles.cleanButton}
             onPress={handleCleanOrphans}
             accessibilityRole="button"
-            accessibilityLabel="Nettoyer les fichiers manquants"
+            accessibilityLabel={t("downloads.cleanOrphansA11y")}
           >
             <FinoraText variant="caption" weight="600" style={styles.cleanButtonText}>
-              Nettoyer
+              {t("downloads.cleanOrphans")}
             </FinoraText>
           </Pressable>
         </View>
@@ -452,7 +457,10 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
       {pendingOrFailedDownloads.length > 0 && (
         <View style={styles.activeSection}>
           <FinoraText variant="caption" weight="700" style={styles.sectionTitle}>
-            {`EN COURS (${activeCount}/3 actifs${queuedCount > 0 ? ` • ${queuedCount} en attente` : ""})`}
+            {t("downloads.inProgress", {
+              active: activeCount,
+              queued: queuedCount > 0 ? ` • ${queuedCount} ${t("downloads.statusQueued").toLowerCase()}` : ""
+            })}
           </FinoraText>
           {pendingOrFailedDownloads.map((download) => (
             <DownloadProgressCard
@@ -477,7 +485,7 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
           catalogItems.length > 0 ? (
             <View style={styles.catalogHeader}>
               <FinoraText variant="caption" weight="700" style={styles.catalogHeaderText}>
-                CONTENUS DISPONIBLES ({catalogItems.length})
+                {t("downloads.availableContent", { count: catalogItems.length })}
               </FinoraText>
             </View>
           ) : null
@@ -488,17 +496,17 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
               <View style={styles.emptyBadge}>
                 <Ionicons name="sparkles" size={12} color={colors.primary} style={{ marginRight: 4 }} />
                 <FinoraText variant="caption" weight="700" style={styles.emptyBadgeText}>
-                  STOCKAGE HORS-LIGNE
+                  {t("downloads.offlineStorageBadge")}
                 </FinoraText>
               </View>
               <View style={styles.emptyIconCircle}>
                 <Ionicons name="cloud-download-outline" size={44} color={colors.primary} />
               </View>
               <FinoraText variant="title" weight="700" style={styles.emptyTitle}>
-                Aucun téléchargement
+                {t("downloads.noDownloadsTitle")}
               </FinoraText>
               <FinoraText variant="caption" style={styles.emptySubtitle}>
-                Téléchargez des films et séries depuis votre catalogue pour en profiter partout, même sans connexion.
+                {t("downloads.noDownloadsDesc")}
               </FinoraText>
               <Pressable
                 style={styles.exploreButton}
@@ -507,11 +515,11 @@ export function DownloadsScreen({ onPlayItem }: DownloadsScreenProps) {
                   router.push("/(tabs)");
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="Explorer le catalogue"
+                accessibilityLabel={t("downloads.browseContent")}
               >
                 <Ionicons name="film-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
                 <FinoraText variant="body" weight="700" style={styles.exploreButtonText}>
-                  Explorer le catalogue
+                  {t("downloads.browseContent")}
                 </FinoraText>
               </Pressable>
             </View>

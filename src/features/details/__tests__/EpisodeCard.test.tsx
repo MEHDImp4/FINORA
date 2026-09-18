@@ -95,9 +95,11 @@ describe("EpisodeCard", () => {
     );
   });
 
-  it("prioritizes series primary poster for episode thumbnail with centered framing", () => {
-    const episodeWithSeriesPoster: MediaItem = {
+  it("prioritizes episode primary still frame for episode thumbnail with centered framing", () => {
+    const episodeWithThumbnail: MediaItem = {
       ...mockEpisode,
+      id: "ep-101",
+      primaryImageTag: "tag-ep-101-still",
       seriesId: "series-got",
       seriesPrimaryImageTag: "tag-series-poster"
     };
@@ -106,7 +108,7 @@ describe("EpisodeCard", () => {
     act(() => {
       root = renderer.create(
         <EpisodeCard
-          episode={episodeWithSeriesPoster}
+          episode={episodeWithThumbnail}
           serverUrl="https://jellyfin.example.com"
           onPlay={jest.fn()}
         />
@@ -115,14 +117,15 @@ describe("EpisodeCard", () => {
 
     const instance = root!.root;
     const image = instance.findByProps({ contentFit: "cover" });
-    expect(image.props.source.uri).toContain("/Items/series-got/Images/Primary");
-    expect(image.props.source.uri).toContain("tag=tag-series-poster");
+    expect(image.props.source.uri).toContain("/Items/ep-101/Images/Primary");
+    expect(image.props.source.uri).toContain("tag=tag-ep-101-still");
     expect(image.props.contentPosition).toBe("center");
   });
 
   it("cycles to fallback when first candidate image onError is triggered", () => {
     const episodeWithFallback: MediaItem = {
       ...mockEpisode,
+      primaryImageTag: "tag-ep-thumb",
       seriesId: "series-got",
       seriesPrimaryImageTag: "tag-series-poster",
       parentBackdropImageTag: "tag-series-backdrop"
@@ -141,14 +144,14 @@ describe("EpisodeCard", () => {
 
     const instance = root!.root;
     let image = instance.findByProps({ contentFit: "cover" });
-    expect(image.props.source.uri).toContain("tag-series-poster");
+    expect(image.props.source.uri).toContain("tag-ep-thumb");
 
-    // Trigger error on series poster
+    // Trigger error on episode still
     act(() => {
       image.props.onError();
     });
 
-    // Should now advance in candidates (to series poster untagged or backdrop)
+    // Should now advance in candidates (to untagged primary still, backdrop, etc.)
     image = instance.findByProps({ contentFit: "cover" });
     expect(image.props.source.uri).toBeTruthy();
   });
@@ -191,5 +194,65 @@ describe("EpisodeCard", () => {
       downloadBtn.props.onPress({ stopPropagation: jest.fn() });
     });
     expect(onDownload).toHaveBeenCalledWith(mockEpisode);
+
+    // Test download button long press
+    const onLongPressDownload = jest.fn();
+    act(() => {
+      root = renderer.create(
+        <EpisodeCard
+          episode={mockEpisode}
+          serverUrl="https://jellyfin.example.com"
+          onPlay={onPlay}
+          onDownload={onDownload}
+          onLongPressDownload={onLongPressDownload}
+        />
+      );
+    });
+    const downloadBtnWithLp = root!.root.findByProps({
+      testID: "download-button-ep-1"
+    });
+    act(() => {
+      downloadBtnWithLp.props.onLongPress({ stopPropagation: jest.fn() });
+    });
+    expect(onLongPressDownload).toHaveBeenCalledWith(mockEpisode);
+  });
+
+  it("renders watched badge, 100% progress bar, and watched tag when episode is played", () => {
+    const watchedEpisode: MediaItem = {
+      ...mockEpisode,
+      isPlayed: true,
+      playedPercentage: 100
+    };
+
+    let root: renderer.ReactTestRenderer;
+    act(() => {
+      root = renderer.create(
+        <EpisodeCard
+          episode={watchedEpisode}
+          serverUrl="https://jellyfin.example.com"
+          onPlay={jest.fn()}
+        />
+      );
+    });
+
+    const instance = root!.root;
+    // Check thumbnail badge
+    const badge = instance.findByProps({ testID: "episode-watched-badge-ep-1" });
+    expect(badge).toBeTruthy();
+
+    // Check 100% progress bar
+    const progressBar = instance.findByProps({ testID: "episode-progress-bar" });
+    expect(progressBar).toBeTruthy();
+    expect(progressBar.props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ width: "100%" })])
+    );
+
+    // Check metadata watched tag
+    const tag = instance.findByProps({ testID: "episode-watched-tag-ep-1" });
+    expect(tag).toBeTruthy();
+
+    // Check a11y label includes Watched prefix
+    const card = instance.findByProps({ testID: "episode-card-ep-1" });
+    expect(card.props.accessibilityLabel).toContain("Watched");
   });
 });

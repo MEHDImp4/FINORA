@@ -140,12 +140,18 @@ function createVideoPlayer(source) {
   return new MockVideoPlayer(source);
 }
 
-function VideoView(props) {
+const VideoView = React.forwardRef(function VideoView(props, ref) {
+  React.useImperativeHandle(ref, () => ({
+    startPictureInPicture: jest.fn(),
+    stopPictureInPicture: jest.fn(),
+    enterFullscreen: jest.fn(),
+    exitFullscreen: jest.fn()
+  }));
   return React.createElement(View, {
     testID: "expo-video-view",
     ...props
   });
-}
+});
 
 module.exports = {
   VideoPlayer: MockVideoPlayer,

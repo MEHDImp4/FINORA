@@ -39,6 +39,8 @@ import { useNotificationStore } from "../../stores/notificationStore";
 import { useNotificationSync } from "../../features/notifications/useNotificationSync";
 import { NotificationsModal } from "../../features/notifications/components/NotificationsModal";
 import { MediaQuickActionsModal } from "../../features/home/components/MediaQuickActionsModal";
+import { useTranslation } from "../../i18n";
+import { getLocalizedLibraryName } from "../../features/library/libraryLocalization";
 
 function CategoryPillItem({
   label,
@@ -49,15 +51,33 @@ function CategoryPillItem({
   label: string;
   icon?: React.ReactNode;
   onPress: () => void;
-  accessibilityLabel: string;
+  accessibilityLabel?: string;
 }) {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.95,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 0
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 30,
+      bounciness: 4
+    }).start();
+  };
 
   return (
     <Pressable
       style={styles.pillPressable}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
+      accessibilityLabel={accessibilityLabel || label}
       onPressIn={() => {
         hapticService.selection();
         Animated.spring(scaleAnim, {
@@ -105,15 +125,18 @@ function HomeLibraryRow({
   onItemPress: (item: MediaItem) => void;
   onItemLongPress?: (item: MediaItem) => void;
 }) {
+  const { t } = useTranslation();
   const { data: items = [] } = useRecentlyAdded(userId, library.id, 16);
 
   if (!items || items.length === 0) {
     return null;
   }
 
+  const localizedTitle = getLocalizedLibraryName(library, t);
+
   return (
     <MediaCarousel
-      title={library.name}
+      title={localizedTitle}
       items={items}
       serverUrl={serverUrl}
       variant="poster"
@@ -127,6 +150,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const session = useAuthStore((state) => state.session);
   const userId = session?.userId;
   const serverUrl = session?.serverUrl || jellyfinClient.getServerUrl() || "";
@@ -420,8 +444,8 @@ export default function HomeScreen() {
         isOffline={Boolean(hasAnyContent && failureType !== null)}
         message={
           failureType === "no_internet"
-            ? "Appareil hors-ligne. Affichage des médias en cache."
-            : "Serveur Jellyfin indisponible. Affichage des médias en cache."
+            ? t("errors.offlineBannerDevice")
+            : t("errors.offlineBannerServer")
         }
         onRetry={onRefresh}
       />
@@ -447,10 +471,10 @@ export default function HomeScreen() {
                 style={styles.brandLogoIcon}
                 contentFit="contain"
                 transition={200}
-                accessibilityLabel="Logo FINORA"
+                accessibilityLabel="FINORA"
               />
               <FinoraText variant="title" color="textPrimary" weight="800" style={styles.headerTitle}>
-                Accueil
+                {t("tabs.home")}
               </FinoraText>
             </View>
 
@@ -460,7 +484,7 @@ export default function HomeScreen() {
                 hitSlop={4}
                 onPress={() => router.push("/(tabs)/downloads")}
                 accessibilityRole="button"
-                accessibilityLabel="Téléchargements"
+                accessibilityLabel={t("tabs.downloads")}
               >
                 <Ionicons name="download-outline" size={20} color="#FFFFFF" />
               </Pressable>
@@ -473,7 +497,11 @@ export default function HomeScreen() {
                   setIsNotifModalVisible(true);
                 }}
                 accessibilityRole="button"
-                accessibilityLabel={`Notifications${unreadNotifCount > 0 ? `, ${unreadNotifCount} non lues` : ""}`}
+                accessibilityLabel={
+                  unreadNotifCount > 0
+                    ? t("home.unreadNotifications", { count: unreadNotifCount })
+                    : t("home.notifications")
+                }
               >
                 <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
                 {unreadNotifCount > 0 && <View style={styles.notificationDot} />}
@@ -488,28 +516,28 @@ export default function HomeScreen() {
               contentContainerStyle={styles.categoriesRow}
             >
               <CategoryPillItem
-                label={showsLib?.name || "Séries"}
+                label={t("home.seriesCategory")}
                 onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: showsLib?.id || "shows" } })}
-                accessibilityLabel="Parcourir les séries"
+                accessibilityLabel={t("home.seriesCategory")}
               />
 
               <CategoryPillItem
-                label={moviesLib?.name || "Films"}
+                label={t("home.moviesCategory")}
                 onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: moviesLib?.id || "movies" } })}
-                accessibilityLabel="Parcourir les films"
+                accessibilityLabel={t("home.moviesCategory")}
               />
 
               <CategoryPillItem
-                label={collectionsLib?.name || "Collections"}
+                label={t("home.collectionsCategory")}
                 onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: collectionsLib?.id || "collections" } })}
-                accessibilityLabel="Parcourir les collections"
+                accessibilityLabel={t("home.collectionsCategory")}
               />
 
               <CategoryPillItem
-                label="Ma liste"
+                label={t("home.myList")}
                 icon={<Ionicons name="bookmark" size={11} color="#FFFFFF" style={styles.pillIcon} />}
                 onPress={() => router.push({ pathname: "/(tabs)/library", params: { tab: "watchlist" } })}
-                accessibilityLabel="Parcourir ma liste"
+                accessibilityLabel={t("home.myList")}
               />
             </ScrollView>
           </View>
@@ -525,7 +553,7 @@ export default function HomeScreen() {
 
         {resumeItems && resumeItems.length > 0 ? (
           <MediaCarousel
-            title="Continuer à regarder"
+            title={t("home.continueWatching")}
             items={resumeItems}
             serverUrl={serverUrl}
             variant="poster"
@@ -536,7 +564,7 @@ export default function HomeScreen() {
 
         {recommendedItemsList.length > 0 ? (
           <MediaCarousel
-            title="Recommandé pour vous"
+            title={t("home.recommendedForYou")}
             items={recommendedItemsList}
             serverUrl={serverUrl}
             variant="poster"
@@ -547,7 +575,7 @@ export default function HomeScreen() {
 
         {becauseYouWatched && becauseYouWatchedItems.length > 0 ? (
           <MediaCarousel
-            title={`Parce que vous avez regardé ${becauseYouWatched.sourceItem.name}`}
+            title={t("home.becauseYouWatched", { title: becauseYouWatched.sourceItem.name })}
             items={becauseYouWatchedItems}
             serverUrl={serverUrl}
             variant="poster"
@@ -558,7 +586,7 @@ export default function HomeScreen() {
 
         {watchlistItems && watchlistItems.length > 0 ? (
           <MediaCarousel
-            title="Ma liste"
+            title={t("home.myList")}
             items={watchlistItems}
             serverUrl={serverUrl}
             variant="poster"
@@ -569,7 +597,7 @@ export default function HomeScreen() {
 
         {recentItems && recentItems.length > 0 ? (
           <MediaCarousel
-            title="Ajouts récents"
+            title={t("home.recentlyAdded")}
             items={recentItems}
             serverUrl={serverUrl}
             variant="poster"
@@ -703,21 +731,16 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   categoryPill: {
-    minHeight: 40,
+    minHeight: 38,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 18,
-    backgroundColor: "rgba(255, 255, 255, 0.09)",
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "#181822",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.16)",
-    borderTopColor: "rgba(255, 255, 255, 0.28)",
+    borderColor: "#282836",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6
+    justifyContent: "center"
   },
   categoryPillText: {
     fontSize: 12,

@@ -7,7 +7,8 @@ import {
   LayoutChangeEvent,
   PanResponder,
   PanResponderGestureState,
-  Platform
+  Platform,
+  Animated
 } from "react-native";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { Ionicons } from "@expo/vector-icons";
@@ -98,14 +99,23 @@ export function PlayerGestures({
     setContainerWidth(e.nativeEvent.layout.width);
   };
 
+  const rippleAnim = useRef(new Animated.Value(0)).current;
+
   const showRipple = (side: "left" | "right") => {
     setRippleSide(side);
+    rippleAnim.setValue(0);
+    Animated.timing(rippleAnim, {
+      toValue: 1,
+      duration: 450,
+      useNativeDriver: true
+    }).start();
+
     if (rippleTimerRef.current) {
       clearTimeout(rippleTimerRef.current);
     }
     rippleTimerRef.current = setTimeout(() => {
       setRippleSide(null);
-    }, 600);
+    }, 500);
   };
 
   const showSwipeHUD = (type: SwipeHUDType, value: number) => {
@@ -196,7 +206,7 @@ export function PlayerGestures({
     }
 
     const timeDiff = now - lastTapTimeRef.current;
-    const isDoubleTap = timeDiff < 350 && lastTapSideRef.current === side;
+    const isDoubleTap = timeDiff < 300 && lastTapSideRef.current === side;
 
     if (isDoubleTap) {
       if (singleTapTimerRef.current) {
@@ -225,7 +235,7 @@ export function PlayerGestures({
         lastTapTimeRef.current = 0;
         lastTapSideRef.current = null;
         onSingleTap();
-      }, 300);
+      }, 190);
     }
   };
 
@@ -272,22 +282,70 @@ export function PlayerGestures({
       >
         {/* Double-tap Seek Left Indicator */}
         {rippleSide === "left" && (
-          <View style={[styles.seekRipple, styles.seekRippleLeft]} testID="seek-indicator-left">
-            <Ionicons name="play-back" size={24} color="#FFFFFF" style={{ marginRight: 6 }} />
-            <FinoraText variant="title" style={styles.seekText}>
-              10s
-            </FinoraText>
-          </View>
+          <Animated.View
+            style={[
+              styles.seekWave,
+              styles.seekWaveLeft,
+              {
+                opacity: rippleAnim.interpolate({
+                  inputRange: [0, 0.2, 0.8, 1],
+                  outputRange: [0, 1, 0.8, 0]
+                }),
+                transform: [
+                  {
+                    scale: rippleAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.95, 1.05]
+                    })
+                  }
+                ]
+              }
+            ]}
+            testID="seek-indicator-left"
+          >
+            <View style={styles.seekContent}>
+              <View style={styles.chevronRow}>
+                <Ionicons name="play-back" size={24} color="#FFFFFF" />
+              </View>
+              <FinoraText variant="title" style={styles.seekText}>
+                10s
+              </FinoraText>
+            </View>
+          </Animated.View>
         )}
 
         {/* Double-tap Seek Right Indicator */}
         {rippleSide === "right" && (
-          <View style={[styles.seekRipple, styles.seekRippleRight]} testID="seek-indicator-right">
-            <FinoraText variant="title" style={styles.seekText}>
-              10s
-            </FinoraText>
-            <Ionicons name="play-forward" size={24} color="#FFFFFF" style={{ marginLeft: 6 }} />
-          </View>
+          <Animated.View
+            style={[
+              styles.seekWave,
+              styles.seekWaveRight,
+              {
+                opacity: rippleAnim.interpolate({
+                  inputRange: [0, 0.2, 0.8, 1],
+                  outputRange: [0, 1, 0.8, 0]
+                }),
+                transform: [
+                  {
+                    scale: rippleAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.95, 1.05]
+                    })
+                  }
+                ]
+              }
+            ]}
+            testID="seek-indicator-right"
+          >
+            <View style={styles.seekContent}>
+              <View style={styles.chevronRow}>
+                <Ionicons name="play-forward" size={24} color="#FFFFFF" />
+              </View>
+              <FinoraText variant="title" style={styles.seekText}>
+                10s
+              </FinoraText>
+            </View>
+          </Animated.View>
         )}
 
         {/* 2x Speed Hold Badge */}
@@ -356,52 +414,84 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     zIndex: 15
   },
-  seekRipple: {
+  seekWave: {
     position: "absolute",
-    top: "35%",
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    top: "15%",
+    bottom: "15%",
+    width: "38%",
+    backgroundColor: "rgba(255, 255, 255, 0.14)",
     justifyContent: "center",
-    alignItems: "center"
+    alignItems: "center",
+    zIndex: 16
   },
-  seekRippleLeft: {
-    left: "15%"
+  seekWaveLeft: {
+    left: 0,
+    borderTopRightRadius: 180,
+    borderBottomRightRadius: 180
   },
-  seekRippleRight: {
-    right: "15%"
+  seekWaveRight: {
+    right: 0,
+    borderTopLeftRadius: 180,
+    borderBottomLeftRadius: 180
+  },
+  seekContent: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6
+  },
+  chevronRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center"
   },
   seekText: {
     color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "bold"
+    fontSize: 15,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.8,
+    shadowRadius: 3
   },
   speedBadge: {
     position: "absolute",
     top: spacing.xl,
     alignSelf: "center",
-    backgroundColor: "rgba(20, 20, 26, 0.85)",
+    backgroundColor: "rgba(16, 16, 22, 0.88)",
     borderColor: colors.primary,
-    borderWidth: 1,
+    borderWidth: 1.5,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 20
+    paddingVertical: 6,
+    borderRadius: 20,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6
   },
   speedBadgeText: {
     color: colors.primary,
-    fontSize: 14,
-    fontWeight: "bold"
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.5
   },
   swipeHUD: {
     position: "absolute",
-    top: "25%",
-    width: 70,
-    backgroundColor: "rgba(0, 0, 0, 0.65)",
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    alignItems: "center"
+    top: "28%",
+    width: 68,
+    backgroundColor: "rgba(16, 16, 24, 0.82)",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.14)",
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 10
   },
   swipeHUDLeft: {
     left: 24
@@ -410,28 +500,30 @@ const styles = StyleSheet.create({
     right: 24
   },
   swipeHUDLabel: {
-    color: "rgba(255,255,255,0.7)",
+    color: "rgba(255, 255, 255, 0.7)",
     fontSize: 10,
+    fontWeight: "600",
     textAlign: "center",
-    marginBottom: 2
+    marginBottom: 2,
+    letterSpacing: 0.2
   },
   swipeHUDValue: {
     color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "800",
     marginBottom: 8
   },
   swipeBar: {
-    width: 6,
-    height: 60,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 3,
+    width: 5,
+    height: 64,
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
+    borderRadius: 2.5,
     overflow: "hidden",
     justifyContent: "flex-end"
   },
   swipeBarFill: {
     width: "100%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 3
+    backgroundColor: colors.primary,
+    borderRadius: 2.5
   }
 });

@@ -105,6 +105,25 @@ export function getPersonImageUrl(
   });
 }
 
+export function getUserAvatarUrl(
+  baseUrl: string,
+  userId: string,
+  tag?: string,
+  targetWidth: number = 200
+): string {
+  if (!baseUrl || !userId) return "";
+  const cleanBase = baseUrl.replace(/\/+$/, "");
+  const url = new URL(`${cleanBase}/Users/${userId}/Images/Primary`);
+  if (targetWidth) {
+    url.searchParams.append("maxWidth", String(targetWidth));
+  }
+  if (tag) {
+    url.searchParams.append("tag", tag);
+  }
+  url.searchParams.append("quality", "85");
+  return url.toString();
+}
+
 /**
  * Resolves an ordered list of candidate high-definition banner URLs for the Hero Banner.
  * Prioritizes official Primary posters (2:3 vertical key art, centered) in 1080p
@@ -378,16 +397,16 @@ export function getMediaPosterUrl(
 }
 
 /**
- * Resolves an ordered list of candidate thumbnail URLs for an item.
- * Always prioritizes the official Series/Movie/Anime poster over episode stills.
+ * Resolves an ordered list of candidate 16:9 horizontal thumbnail URLs for an item.
  * - For an Episode:
- *   1. Series Primary Poster (2:3) with tag
- *   2. Season Primary Poster with tag
- *   3. Series Primary Poster without tag
- *   4. Series Backdrop (16:9) with tag
- *   5. Series Thumb (16:9) with tag
- *   6. Fallbacks without tag
- *   7. Episode Still (last resort)
+ *   1. Episode Primary still frame with tag (16:9 thumbnail)
+ *   2. Episode Thumb with tag (16:9)
+ *   3. Episode Primary still without tag
+ *   4. Parent Series Backdrop (16:9 landscape fanart) with tag
+ *   5. Parent Series Thumb (16:9) with tag
+ *   6. Parent Backdrop fallback without tag
+ *   7. Season Primary Poster fallback
+ *   8. Series Primary Poster fallback
  * - For Movies & Series:
  *   1. Primary Poster with tag
  *   2. Backdrop (16:9) with tag
@@ -404,41 +423,37 @@ export function getMediaThumbnailUrls(
   const urls: string[] = [];
 
   if (item.type === "Episode") {
-    // 1. Parent Series Primary Poster with tag (2:3) — Prioritize official poster over episode stills
-    const seriesId = item.seriesId || item.parentId;
-    const seriesPosterTag = item.seriesPrimaryImageTag || item.parentPrimaryImageTag;
-    if (seriesId && seriesPosterTag) {
+    // 1. Episode's own Primary still frame with tag (16:9 thumbnail)
+    if (item.primaryImageTag) {
       urls.push(
-        buildImageUrl(baseUrl, seriesId, "Primary", {
+        buildImageUrl(baseUrl, item.id, "Primary", {
           width: targetWidth,
           quality: 85,
-          tag: seriesPosterTag
+          tag: item.primaryImageTag
         })
       );
     }
 
-    // 2. Season Primary Poster
-    const seasonId = item.seasonId || item.parentId;
-    if (seasonId) {
+    // 2. Episode's own Thumb with tag (16:9)
+    if (item.thumbImageTag) {
       urls.push(
-        buildImageUrl(baseUrl, seasonId, "Primary", {
+        buildImageUrl(baseUrl, item.id, "Thumb", {
           width: targetWidth,
-          quality: 85
+          quality: 85,
+          tag: item.thumbImageTag
         })
       );
     }
 
-    // 3. Series Primary fallback without tag
-    if (seriesId) {
-      urls.push(
-        buildImageUrl(baseUrl, seriesId, "Primary", {
-          width: targetWidth,
-          quality: 85
-        })
-      );
-    }
+    // 3. Episode Primary fallback without tag
+    urls.push(
+      buildImageUrl(baseUrl, item.id, "Primary", {
+        width: targetWidth,
+        quality: 85
+      })
+    );
 
-    // 4. Parent Series Backdrop with tag (16:9)
+    // 4. Parent Series Backdrop with tag (16:9 landscape fallback)
     const parentBackdropId = item.parentBackdropItemId || item.seriesId || item.parentId;
     const parentBackdropTag = item.parentBackdropImageTag || item.backdropImageTag;
     if (parentBackdropId && parentBackdropTag) {
@@ -474,24 +489,39 @@ export function getMediaThumbnailUrls(
       );
     }
 
-    // 7. Last resort: Episode Primary still with tag
-    if (item.primaryImageTag) {
+    // 7. Season Primary Poster fallback
+    const seasonId = item.seasonId || item.parentId;
+    if (seasonId) {
       urls.push(
-        buildImageUrl(baseUrl, item.id, "Primary", {
+        buildImageUrl(baseUrl, seasonId, "Primary", {
           width: targetWidth,
-          quality: 85,
-          tag: item.primaryImageTag
+          quality: 85
         })
       );
     }
 
-    // 8. Episode Primary fallback without tag
-    urls.push(
-      buildImageUrl(baseUrl, item.id, "Primary", {
-        width: targetWidth,
-        quality: 85
-      })
-    );
+    // 8. Parent Series Primary Poster with tag (2:3) fallback
+    const seriesId = item.seriesId || item.parentId;
+    const seriesPosterTag = item.seriesPrimaryImageTag || item.parentPrimaryImageTag;
+    if (seriesId && seriesPosterTag) {
+      urls.push(
+        buildImageUrl(baseUrl, seriesId, "Primary", {
+          width: targetWidth,
+          quality: 85,
+          tag: seriesPosterTag
+        })
+      );
+    }
+
+    // 9. Series Primary fallback without tag
+    if (seriesId) {
+      urls.push(
+        buildImageUrl(baseUrl, seriesId, "Primary", {
+          width: targetWidth,
+          quality: 85
+        })
+      );
+    }
 
     return Array.from(new Set(urls.filter(Boolean)));
   }
