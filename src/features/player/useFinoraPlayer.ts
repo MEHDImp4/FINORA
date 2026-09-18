@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from "react";
 import { useVideoPlayer, VideoPlayer } from "expo-video";
 import { FinoraPlayerEngine } from "./FinoraPlayerEngine";
 import { FinoraPlayerControls, FinoraPlayerSnapshot, IFinoraPlayerEngine } from "./types";
@@ -37,6 +37,7 @@ export function useFinoraPlayer({
   const engine = engineRef.current;
 
   // Prepare video source with optional auth headers
+  const headersKey = headers ? JSON.stringify(headers) : "";
   const videoSource = useMemo(() => {
     if (!sourceUrl) return null;
     if (headers && Object.keys(headers).length > 0) {
@@ -46,7 +47,7 @@ export function useFinoraPlayer({
       };
     }
     return { uri: sourceUrl };
-  }, [sourceUrl, headers]);
+  }, [sourceUrl, headersKey]);
 
   // Initialize native expo-video player
   const player = useVideoPlayer(videoSource, (p) => {
@@ -146,18 +147,13 @@ export function useFinoraPlayer({
     };
   }, [player]);
 
-  // Subscribe to engine state
-  const [snapshot, setSnapshot] = useState<FinoraPlayerSnapshot>(() => engine.getSnapshot());
-
-  useEffect(() => {
-    const unsubscribe = engine.subscribe((newSnapshot) => {
-      setSnapshot(newSnapshot);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [engine]);
+  // Subscribe to engine state via useSyncExternalStore for loop-safe, tear-free updates
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => engine.subscribe(onStoreChange),
+    [engine]
+  );
+  const getSnapshot = useCallback(() => engine.getSnapshot(), [engine]);
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot);
 
   // Cleanup on unmount
   useEffect(() => {

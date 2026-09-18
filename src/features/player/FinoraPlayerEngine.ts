@@ -36,6 +36,7 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
 
   public attachPlayer(player: VideoPlayer, initialPositionSeconds: number = 0): void {
     if (this.isDestroyed) return;
+    if (this.player === player) return;
 
     this.detachPlayer();
     this.player = player;
@@ -249,6 +250,17 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
   }
 
   private updateSnapshot(partial: Partial<FinoraPlayerSnapshot>): void {
+    let hasChanged = false;
+    for (const key of Object.keys(partial) as (keyof FinoraPlayerSnapshot)[]) {
+      if (this.snapshot[key] !== partial[key]) {
+        hasChanged = true;
+        break;
+      }
+    }
+    if (!hasChanged) {
+      return;
+    }
+
     this.snapshot = {
       ...this.snapshot,
       ...partial
@@ -348,8 +360,6 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
 
   public subscribe(listener: (snapshot: FinoraPlayerSnapshot) => void): () => void {
     this.listeners.add(listener);
-    // Notify immediately with current snapshot
-    listener(this.snapshot);
 
     return () => {
       this.listeners.delete(listener);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useAuthStore } from "../../stores/authStore";
@@ -144,30 +144,32 @@ export default function PlayerRoute() {
     );
   }
 
-  const effectiveItem: MediaItem | null =
-    (offlineRecord
-      ? {
-          id: offlineRecord.itemId,
-          name: offlineRecord.title,
-          type: offlineRecord.type,
-          year: offlineRecord.year,
-          overview: offlineRecord.overview,
-          genres: [],
-          totalTicks: offlineRecord.totalTicks || 0,
-          playbackPositionTicks: offlineRecord.playbackPositionTicks || 0,
-          playedPercentage:
-            offlineRecord.totalTicks > 0
-              ? ((offlineRecord.playbackPositionTicks || 0) / offlineRecord.totalTicks) * 100
-              : 0,
-          isFavorite: false,
-          isPlayed: false,
-          seriesId: offlineRecord.seriesId,
-          seriesName: offlineRecord.seriesName,
-          seasonIndex: offlineRecord.seasonIndex,
-          episodeIndex: offlineRecord.episodeIndex,
-          mediaStreams: []
-        }
-      : item) || null;
+  const effectiveItem: MediaItem | null = useMemo(() => {
+    if (offlineRecord) {
+      return {
+        id: offlineRecord.itemId,
+        name: offlineRecord.title,
+        type: offlineRecord.type,
+        year: offlineRecord.year,
+        overview: offlineRecord.overview,
+        genres: [],
+        totalTicks: offlineRecord.totalTicks || 0,
+        playbackPositionTicks: offlineRecord.playbackPositionTicks || 0,
+        playedPercentage:
+          offlineRecord.totalTicks > 0
+            ? ((offlineRecord.playbackPositionTicks || 0) / offlineRecord.totalTicks) * 100
+            : 0,
+        isFavorite: false,
+        isPlayed: false,
+        seriesId: offlineRecord.seriesId,
+        seriesName: offlineRecord.seriesName,
+        seasonIndex: offlineRecord.seasonIndex,
+        episodeIndex: offlineRecord.episodeIndex,
+        mediaStreams: []
+      };
+    }
+    return item || null;
+  }, [offlineRecord, item]);
 
   if (
     !effectiveItem ||

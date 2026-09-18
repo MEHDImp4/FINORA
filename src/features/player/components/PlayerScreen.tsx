@@ -332,7 +332,16 @@ export function PlayerScreen({
     };
 
     if (player.availableAudioTracks && player.availableAudioTracks.length > 0) {
-      setAvailableAudioTracks(player.availableAudioTracks);
+      setAvailableAudioTracks((prev) => {
+        if (
+          prev === player.availableAudioTracks ||
+          (prev.length === player.availableAudioTracks.length &&
+            prev[0]?.id === player.availableAudioTracks[0]?.id)
+        ) {
+          return prev;
+        }
+        return player.availableAudioTracks;
+      });
       syncAudioTrack(player.availableAudioTracks);
     }
 
@@ -387,7 +396,16 @@ export function PlayerScreen({
     };
 
     if (player.availableSubtitleTracks && player.availableSubtitleTracks.length > 0) {
-      setAvailableSubtitleTracks(player.availableSubtitleTracks);
+      setAvailableSubtitleTracks((prev) => {
+        if (
+          prev === player.availableSubtitleTracks ||
+          (prev.length === player.availableSubtitleTracks.length &&
+            prev[0]?.id === player.availableSubtitleTracks[0]?.id)
+        ) {
+          return prev;
+        }
+        return player.availableSubtitleTracks;
+      });
       syncSubtitleTrack(player.availableSubtitleTracks);
     }
 
