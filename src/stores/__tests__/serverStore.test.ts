@@ -64,6 +64,20 @@ describe("serverStore multi-account switch", () => {
     expect(useNotificationStore.getState().activeScopeKey).toContain("user-b");
   });
 
+  it("removing an account purges its scoped downloads", async () => {
+    const { offlineStorageService } = require("../../features/offline/offlineStorage");
+    const purgeSpy = jest
+      .spyOn(offlineStorageService, "purgeScope")
+      .mockResolvedValue(undefined);
+    (serverManager.removeAccount as jest.Mock).mockResolvedValueOnce(undefined);
+    (serverManager.getSavedAccounts as jest.Mock).mockResolvedValue([]);
+
+    await useServerStore.getState().removeAccount("server-a", "user-a");
+
+    expect(purgeSpy).toHaveBeenCalledWith({ serverId: "server-a", userId: "user-a" });
+    purgeSpy.mockRestore();
+  });
+
   it("restores the previous UI session if the target switch fails", async () => {
     queryClient.setQueryData(["media", "old-account"], { id: "old" });
     (serverManager.switchAccount as jest.Mock).mockRejectedValueOnce(new Error("token missing"));

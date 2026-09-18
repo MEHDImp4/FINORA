@@ -101,6 +101,29 @@ describe("authStore", () => {
     expect(state.session).toBeNull();
   });
 
+  it("logout does NOT purge downloads (logout is not remove account)", async () => {
+    const { offlineStorageService } = require("../../features/offline/offlineStorage");
+    const purgeSpy = jest
+      .spyOn(offlineStorageService, "purgeScope")
+      .mockResolvedValue(undefined);
+
+    useAuthStore.setState({
+      status: "authenticated",
+      session: {
+        token: "active-token",
+        serverId: "srv-1",
+        serverUrl: "https://finora.media",
+        userId: "usr-1",
+        userName: "User"
+      }
+    });
+
+    await useAuthStore.getState().logout();
+
+    expect(purgeSpy).not.toHaveBeenCalled();
+    purgeSpy.mockRestore();
+  });
+
   it("clears error message with clearError", () => {
     useAuthStore.setState({ errorMessage: "Something went wrong" });
     useAuthStore.getState().clearError();

@@ -11,6 +11,16 @@ import {
   getDownloadHeaders,
   estimateTranscodedBytes
 } from "./downloadQuality";
+import { getEffectiveExpectedBytes, isFileComplete } from "./downloadSizing";
+import {
+  INSUFFICIENT_STORAGE_ERROR,
+  STORAGE_FULL_ERROR,
+  evaluateDiskSpace,
+  getAvailableDiskBytes,
+  isDiskFullError,
+  requiredBytesForDownload
+} from "./diskSpace";
+import * as Network from "expo-network";
 import { formatBytes, formatSpeed, formatTimeRemaining } from "./offlineFormatting";
 import {
   DownloadAuthContext,
@@ -190,10 +200,19 @@ export class DownloadManager {
   /** In-flight initialize() call, so concurrent callers share one run. */
   private initPromise: Promise<void> | null = null;
   private appStateSubscription: { remove: () => void } | null = null;
+  private networkSubscription: { remove: () => void } | null = null;
+  /**
+   * Monotonic "job generation" per item. `completeDownload` only commits when
+   * the generation it started with is still current, so a delete/cancel that
+   * happens while a file is finalizing can never resurrect a catalog entry
+   * (DWN-05 delete race).
+   */
+  private jobGenerations: Map<string, number> = new Map();
   private static activeInstances: Set<DownloadManager> = new Set();
 
   public constructor() {
     DownloadManager.activeInstances.add(this);
+    this.attachNetworkListener();
   }
 
   public static destroyAll(): void {
@@ -310,6 +329,22 @@ export class DownloadManager {
       this.appStateSubscription.remove();
       this.appStateSubscription = null;
     }
+    if (this.networkSubscription) {
+      this.networkSubscription.remove();
+      this.networkSubscription = null;
+    }
+  }
+
+  /** Starts a new job generation for an item and returns it. */
+  private beginJobGeneration(itemId: string): number {
+    const next = (this.jobGenerations.get(itemId) ?? 0) + 1;
+    this.jobGenerations.set(itemId, next);
+    return next;
+  }
+
+  /** Invalidates any in-flight completion for an item (pause/cancel/delete). */
+  private invalidateJobGeneration(itemId: string): void {
+    this.jobGenerations.set(itemId, (this.jobGenerations.get(itemId) ?? 0) + 1);
   }
 
 
@@ -481,11 +516,41 @@ export class DownloadManager {
         (state: AppStateStatus) => {
           if (state === "background" || state === "inactive") {
             this.flushPersist().catch(() => {});
+          } else if (state === "active") {
+            // Wi-Fi only downloads may have been waiting for the network while
+            // the app was backgrounded. Re-evaluate on return to foreground.
+            this.processQueue();
           }
         }
       );
     } catch {
       // AppState unavailable — the debounced persistence path still applies
+    }
+  }
+
+  /**
+   * DWN-03 — promotes Wi-Fi-only downloads waiting for the network.
+   *
+   * Best effort: `expo-network`'s listener may be unavailable (or absent in
+   * tests). The AppState foreground hook and manual resume remain as fallbacks.
+   */
+  private attachNetworkListener(): void {
+    if (this.networkSubscription) return;
+    try {
+      const api = Network as unknown as {
+        addNetworkStateListener?: (listener: () => void) => { remove: () => void } | undefined;
+      };
+      if (typeof api.addNetworkStateListener !== "function") return;
+      const subscription = api.addNetworkStateListener(() => {
+        if (usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly) {
+          this.processQueue();
+        }
+      });
+      if (subscription && typeof subscription.remove === "function") {
+        this.networkSubscription = subscription;
+      }
+    } catch {
+      // Network listener unavailable — AppState/manual resume still work.
     }
   }
 
@@ -556,8 +621,10 @@ export class DownloadManager {
           `persistedStatus=${entry.status}, hasFile=${fileSizeBytes > 0}`
         );
 
-        // Case D — already fully downloaded on disk
-        if (entry.totalBytes > 0 && fileSizeBytes >= entry.totalBytes) {
+        // Case D — already fully downloaded on disk. Uses the effective expected
+        // size so a completed transcode (totalBytes = 0, expectedBytes = X) is
+        // reconciled as completed instead of being re-downloaded (DWN-02).
+        if (isFileComplete(fileSizeBytes, entry.totalBytes, entry.expectedBytes)) {
           const reconciled = await this.reconcileCompletedOnDisk(entry, fileSizeBytes);
           if (reconciled) {
             continue;
@@ -585,8 +652,10 @@ export class DownloadManager {
           restoredStatus = entry.status;
         }
 
-        const restoredDenominator =
-          entry.totalBytes > 0 ? entry.totalBytes : entry.expectedBytes ?? 0;
+        const restoredDenominator = getEffectiveExpectedBytes(
+          entry.totalBytes,
+          entry.expectedBytes
+        );
         const restoredProgress =
           restoredDenominator > 0
             ? Math.min(1, bytesDownloaded / restoredDenominator)
@@ -758,6 +827,7 @@ export class DownloadManager {
     this.notify();
     this.processQueue();
     this.attachAppStateListener();
+    this.attachNetworkListener();
     this.syncForegroundService();
 
     logger.info(`[DownloadManager] Initialized (${this.downloads.size} tracked download(s)).`);
@@ -814,6 +884,7 @@ export class DownloadManager {
     this.corruptionRestarted.clear();
     this.speedTrackers.clear();
     this.progressPersistMarkers.clear();
+    this.jobGenerations.clear();
     this.authContext = null;
     this.activeScope = null;
     this.initialized = false;
@@ -1017,27 +1088,64 @@ export class DownloadManager {
       return downloadItem;
     }
 
+    // Transcode responses carry no Content-Length, so progress and disk-space
+    // checks rely on an estimate derived from duration and target bitrate.
+    const expectedBytes = estimateTranscodedBytes(
+      options?.quality ?? "original",
+      metadata?.totalTicks
+    );
+
     const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
-    if (wifiOnly) {
-      const isWifi = await isWifiConnected();
-      if (!isWifi) {
-        const errorMsg = "Connexion Wi-Fi requise (mode Wi-Fi uniquement activé)";
-        logger.warn(`[DownloadManager] Download blocked for ${item.title}: ${errorMsg}`);
-        const downloadItem: DownloadItem = {
-          ...item,
-          localPath,
-          status: "failed",
-          progress: 0,
-          bytesDownloaded: 0,
-          totalBytes: 0,
-          error: errorMsg,
-          startedAt: Date.now()
-        };
-        this.downloads.set(item.itemId, downloadItem);
-        this.schedulePersist();
-        this.notify();
-        return downloadItem;
+    const isWifi = wifiOnly ? await isWifiConnected() : true;
+    if (wifiOnly && !isWifi) {
+      // DWN-03: a Wi-Fi-only download waits for the network instead of failing.
+      // It is promoted automatically when Wi-Fi returns (network/foreground hook).
+      logger.warn(`[DownloadManager] Download waiting for Wi-Fi: ${item.title}`);
+      const downloadItem: DownloadItem = {
+        ...item,
+        localPath,
+        status: "queued",
+        progress: 0,
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        expectedBytes,
+        isEstimatedTotal: false,
+        error: WIFI_REQUIRED_ERROR,
+        startedAt: Date.now()
+      };
+      this.downloads.set(item.itemId, downloadItem);
+      if (!this.queue.includes(item.itemId)) {
+        this.queue.push(item.itemId);
       }
+      this.schedulePersist();
+      this.notify();
+      return downloadItem;
+    }
+
+    // DWN-01: refuse BEFORE any byte is written when the estimate does not fit.
+    const storageCheck = await this.evaluateStorageForDownload(0, expectedBytes);
+    if (!storageCheck.sufficient) {
+      logger.warn(
+        `[DownloadManager] Refusing download for ${item.title}: ` +
+        `requires ${storageCheck.requiredBytes} bytes, ` +
+        `${storageCheck.availableBytes} available, margin ${storageCheck.marginBytes}.`
+      );
+      const downloadItem: DownloadItem = {
+        ...item,
+        localPath,
+        status: "failed",
+        progress: 0,
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        expectedBytes,
+        isEstimatedTotal: false,
+        error: INSUFFICIENT_STORAGE_ERROR,
+        startedAt: Date.now()
+      };
+      this.downloads.set(item.itemId, downloadItem);
+      this.schedulePersist();
+      this.notify();
+      return downloadItem;
     }
 
     const activeCount = Array.from(this.downloads.values()).filter(
@@ -1045,13 +1153,6 @@ export class DownloadManager {
     ).length;
 
     const shouldQueue = activeCount >= MAX_CONCURRENT_DOWNLOADS;
-
-    // Transcode responses carry no Content-Length, so progress needs an estimate
-    // derived from the media duration and the profile's target bitrate.
-    const expectedBytes = estimateTranscodedBytes(
-      options?.quality ?? "original",
-      metadata?.totalTicks
-    );
 
     const downloadItem: DownloadItem = {
       ...item,
@@ -1082,6 +1183,23 @@ export class DownloadManager {
     }
 
     return downloadItem;
+  }
+
+  /**
+   * DWN-01 helper: evaluates free space for the bytes a transfer still needs.
+   * Never throws — an unreadable filesystem fails open (download proceeds).
+   */
+  private async evaluateStorageForDownload(
+    alreadyOnDisk: number,
+    expectedBytes?: number,
+    totalBytes?: number
+  ): Promise<ReturnType<typeof evaluateDiskSpace>> {
+    const requiredBytes = requiredBytesForDownload(totalBytes, expectedBytes, alreadyOnDisk);
+    if (requiredBytes <= 0) {
+      return { requiredBytes: 0, availableBytes: null, marginBytes: 0, sufficient: true };
+    }
+    const availableBytes = await getAvailableDiskBytes();
+    return evaluateDiskSpace(requiredBytes, availableBytes);
   }
 
   /**
@@ -1185,7 +1303,8 @@ export class DownloadManager {
     itemId: string,
     localPath: string,
     result: DownloadResultLike,
-    metadata?: Partial<OfflineMediaRecord>
+    metadata?: Partial<OfflineMediaRecord>,
+    jobGeneration?: number
   ): Promise<void> {
     const downloadItem = this.downloads.get(itemId);
     if (!downloadItem) return;
@@ -1224,8 +1343,8 @@ export class DownloadManager {
     // or the recorded offset is stale and the transfer must start over.
     if (status === 416) {
       const size = await this.getExistingFileSize(localPath);
-      if (downloadItem.totalBytes > 0 && size >= downloadItem.totalBytes) {
-        await this.completeDownload(itemId, size, { ...metadata, localPath });
+      if (isFileComplete(size, downloadItem.totalBytes, downloadItem.expectedBytes)) {
+        await this.completeDownload(itemId, size, { ...metadata, localPath }, jobGeneration);
         return;
       }
       await this.restartFromZero(itemId, localPath, "Plage HTTP non satisfiable");
@@ -1252,8 +1371,12 @@ export class DownloadManager {
     if (!result.uri) return;
 
     // Integrity check — never mark a file complete that is missing or short.
+    // Uses the effective expected size so a completed transcode is accepted.
     const finalSize = await this.getExistingFileSize(result.uri);
-    const expectedSize = downloadItem.totalBytes;
+    const expectedSize = getEffectiveExpectedBytes(
+      downloadItem.totalBytes,
+      downloadItem.expectedBytes
+    );
     if (finalSize <= 0 || (expectedSize > 0 && finalSize < expectedSize)) {
       logger.error(
         `[DownloadManager] Incomplete file for ${itemId} (${finalSize}/${expectedSize} bytes).`
@@ -1263,7 +1386,7 @@ export class DownloadManager {
     }
 
     logger.info(`[DownloadManager] Download complete: ${downloadItem.title} (${finalSize} bytes)`);
-    await this.completeDownload(itemId, finalSize, { ...metadata, localPath: result.uri });
+    await this.completeDownload(itemId, finalSize, { ...metadata, localPath: result.uri }, jobGeneration);
   }
 
   private async executeDownload(itemId: string): Promise<void> {
@@ -1275,8 +1398,15 @@ export class DownloadManager {
     if (wifiOnly) {
       const isWifi = await isWifiConnected();
       if (!isWifi) {
-        logger.warn(`[DownloadManager] Execution halted for ${downloadItem.title}: ${WIFI_REQUIRED_ERROR}`);
-        this.markFailed(itemId, WIFI_REQUIRED_ERROR);
+        // DWN-03: stay queued and wait for Wi-Fi instead of transitioning to failed.
+        logger.warn(`[DownloadManager] Waiting for Wi-Fi before ${downloadItem.title}`);
+        downloadItem.status = "queued";
+        downloadItem.error = WIFI_REQUIRED_ERROR;
+        if (!this.queue.includes(itemId)) {
+          this.queue.push(itemId);
+        }
+        this.schedulePersist();
+        this.notify();
         return;
       }
     }
@@ -1316,12 +1446,29 @@ export class DownloadManager {
         `totalBytes=${downloadItem.totalBytes}, platform=${Platform.OS}`
       );
 
-      if (downloadItem.totalBytes > 0 && partialBytes >= downloadItem.totalBytes) {
+      if (isFileComplete(partialBytes, downloadItem.totalBytes, downloadItem.expectedBytes)) {
         // The file on disk is already complete — no transfer needed.
         await this.completeDownload(item.itemId, partialBytes, { ...metadata, localPath });
         return;
       }
 
+      // DWN-01: re-check free space at execution time, accounting for the bytes
+      // already downloaded. Refuse cleanly rather than writing into a full disk.
+      const storageCheck = await this.evaluateStorageForDownload(
+        partialBytes,
+        downloadItem.expectedBytes,
+        downloadItem.totalBytes
+      );
+      if (!storageCheck.sufficient) {
+        logger.warn(
+          `[DownloadManager] Insufficient space for ${item.itemId}: ` +
+          `requires ${storageCheck.requiredBytes}, available ${storageCheck.availableBytes}.`
+        );
+        this.markFailed(item.itemId, INSUFFICIENT_STORAGE_ERROR);
+        return;
+      }
+
+      const jobGeneration = this.beginJobGeneration(item.itemId);
       const resumeOffset = this.resolveResumeOffset(partialBytes, downloadItem.totalBytes);
       logger.info(
         `[DownloadManager] resumeOffset=${resumeOffset} for ${itemId} ` +
@@ -1362,18 +1509,28 @@ export class DownloadManager {
         .then(async (result) => {
           this.activeTasks.delete(item.itemId);
           if (result) {
-            await this.handleDownloadResult(item.itemId, localPath, result, metadata);
+            await this.handleDownloadResult(item.itemId, localPath, result, metadata, jobGeneration);
           }
         })
         .catch((err) => {
           this.activeTasks.delete(item.itemId);
           logger.error(`[DownloadManager] Download error for ${item.itemId}:`, err?.message || err);
+          // DWN-01: a full disk is a distinct, actionable failure. The item is
+          // never marked completed and the partial file is kept for a later retry.
+          if (isDiskFullError(err)) {
+            this.markFailed(item.itemId, STORAGE_FULL_ERROR);
+            return;
+          }
           // Keep the partial file so a retry can genuinely resume it.
           this.markFailed(item.itemId, err?.message || "Échec du téléchargement");
         });
     } catch (err: any) {
       this.activeTasks.delete(item.itemId);
       logger.error(`[DownloadManager] Initialization error for ${item.itemId}:`, err?.message || err);
+      if (isDiskFullError(err)) {
+        this.markFailed(item.itemId, STORAGE_FULL_ERROR);
+        return;
+      }
       this.markFailed(item.itemId, err?.message || "Erreur d'initialisation du téléchargement");
     }
   }
@@ -1527,7 +1684,14 @@ export class DownloadManager {
     if (wifiOnly) {
       const isWifi = await isWifiConnected();
       if (!isWifi) {
-        this.markFailed(itemId, WIFI_REQUIRED_ERROR);
+        // DWN-03: waiting for the network is not a failure.
+        item.status = "queued";
+        item.error = WIFI_REQUIRED_ERROR;
+        if (!this.queue.includes(itemId)) {
+          this.queue.unshift(itemId);
+        }
+        this.schedulePersist();
+        this.notify();
         return;
       }
     }
@@ -1574,6 +1738,8 @@ export class DownloadManager {
     this.resumeOffsets.delete(itemId);
     this.authRetried.delete(itemId);
     this.corruptionRestarted.delete(itemId);
+    // DWN-05: any in-flight finalization for this item must be discarded.
+    this.invalidateJobGeneration(itemId);
     this.queue = this.queue.filter((id) => id !== itemId);
 
     const task = this.activeTasks.get(itemId);
@@ -1622,10 +1788,16 @@ export class DownloadManager {
   public async completeDownload(
     itemId: string,
     totalBytes: number,
-    metadata?: Partial<OfflineMediaRecord>
+    metadata?: Partial<OfflineMediaRecord>,
+    jobGeneration?: number
   ): Promise<void> {
     const item = this.downloads.get(itemId);
     if (!item) return;
+
+    // DWN-05: snapshot the job generation. If the user deletes/cancels the item
+    // while we are finalizing, the generation changes and this completion is
+    // discarded instead of resurrecting a catalog entry.
+    const generation = jobGeneration ?? this.jobGenerations.get(itemId) ?? 0;
 
     // 1. Transition: DOWNLOADING -> FINALIZING
     this.activeTasks.delete(itemId);
@@ -1699,6 +1871,22 @@ export class DownloadManager {
         itemId,
         `Échec de l'enregistrement dans le catalogue hors-ligne: ${err?.message || err}`
       );
+      return;
+    }
+
+    // Delete race guard: the catalog write is the slow step. If the item was
+    // removed or its job invalidated while it was in flight, undo the catalog
+    // entry and never claim completion.
+    const stillCurrent =
+      this.downloads.get(itemId) === item &&
+      (this.jobGenerations.get(itemId) ?? generation) === generation;
+    if (!stillCurrent) {
+      logger.warn(
+        `[DownloadManager] Completion for ${itemId} discarded (item removed during finalization).`
+      );
+      await offlineStorageService
+        .deleteOfflineMedia(itemId, offlineScope)
+        .catch(() => {});
       return;
     }
 

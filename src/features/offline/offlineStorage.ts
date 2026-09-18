@@ -1,6 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 import { OfflineMediaRecord, SyncQueueEntry } from "./types";
+import { DOWNLOAD_ROOT_DIR, sanitizePathSegment } from "./downloadPaths";
+
+/**
+ * DWN-05 — a suspect file is only deleted once it is clearly past any
+ * in-flight finalization window. Keeping one orphan a little longer is always
+ * preferable to deleting a valid file that is still being written.
+ */
+export const ORPHAN_FILE_MIN_AGE_MS = 10 * 60 * 1000;
 
 /** Legacy unscoped keys kept only for a safe one-account migration. */
 export const OFFLINE_CATALOG_STORAGE_KEY = "@finora_offline_catalog";
@@ -215,15 +223,18 @@ export class OfflineStorageService {
   /**
    * Deletes an offline media record and cleans up physical file for the active account.
    */
-  public async deleteOfflineMedia(itemId: string): Promise<void> {
-    const scope = await this.resolveScope();
-    if (!scope) return;
+  public async deleteOfflineMedia(
+    itemId: string,
+    scope?: OfflineStorageScope
+  ): Promise<void> {
+    const resolved = await this.resolveScope(scope);
+    if (!resolved) return;
 
-    const all = await this.getAllOfflineMedia(scope);
+    const all = await this.getAllOfflineMedia(resolved);
     const item = all.find((i) => i.itemId === itemId);
     const filtered = all.filter((i) => i.itemId !== itemId);
     await AsyncStorage.setItem(
-      getScopedOfflineCatalogKey(scope),
+      getScopedOfflineCatalogKey(resolved),
       JSON.stringify(filtered)
     );
     if (item?.localPath && typeof FileSystem.deleteAsync === "function") {
@@ -440,15 +451,41 @@ export class OfflineStorageService {
     return results;
   }
 
+  /** Every account scope FINORA currently knows about. */
+  private async collectKnownScopes(): Promise<OfflineStorageScope[]> {
+    const scopes: OfflineStorageScope[] = [];
+    try {
+      const accounts = parseArray<Partial<OfflineStorageScope>>(
+        await AsyncStorage.getItem(SAVED_ACCOUNTS_STORAGE_KEY)
+      );
+      const activeScope = await this.getActiveScope();
+      if (activeScope) accounts.push(activeScope);
+      if (this.fixedScope) accounts.push(this.fixedScope);
+      for (const candidate of accounts) {
+        if (isValidScope(candidate)) scopes.push(candidate);
+      }
+    } catch {
+      // Unknown scopes → caller stays conservative and deletes nothing scoped.
+    }
+    return scopes;
+  }
+
   /**
    * Scans the shared finora_downloads directory tree and removes only files that
-   * do not belong to ANY saved account catalog.
+   * satisfy ALL of the following:
+   *  - they belong to no known account catalog (and are not actively tracked),
+   *  - if they live under a server/user namespace, that namespace is a KNOWN
+   *    account (a removed account's files are handled explicitly, never here),
+   *  - they are older than ORPHAN_FILE_MIN_AGE_MS (never race a finalization).
+   *
+   * This replaces the previous "delete anything not in a catalog" behaviour,
+   * which could delete another account's media or a file still being written.
    */
   public async cleanupOrphanDiskFiles(excludePaths?: string[]): Promise<number> {
     let deletedCount = 0;
     try {
       if (FileSystem.documentDirectory && typeof FileSystem.readDirectoryAsync === "function") {
-        const mediaDir = `${FileSystem.documentDirectory}finora_downloads/`;
+        const mediaDir = `${FileSystem.documentDirectory}${DOWNLOAD_ROOT_DIR}/`;
         const dirInfo = await FileSystem.getInfoAsync(mediaDir);
         if (!dirInfo || !dirInfo.exists) return 0;
 
@@ -467,13 +504,50 @@ export class OfflineStorageService {
           }
         }
 
+        const knownScopes = await this.collectKnownScopes();
+        const knownScopeKeys = new Set(
+          knownScopes.map(
+            (scope) =>
+              `${sanitizePathSegment(scope.serverId)}/${sanitizePathSegment(scope.userId)}`
+          )
+        );
+
+        const marker = `${DOWNLOAD_ROOT_DIR}/`;
+
         for (const filePath of files) {
           const normalized = filePath.replace(/\\/g, "/");
-          if (!activePaths.has(filePath) && !activePaths.has(normalized)) {
-            if (typeof FileSystem.deleteAsync === "function") {
-              await FileSystem.deleteAsync(filePath, { idempotent: true });
-              deletedCount++;
+          if (activePaths.has(filePath) || activePaths.has(normalized)) continue;
+
+          // Confine deletion to known account namespaces (or the unscoped root).
+          const markerIndex = normalized.indexOf(marker);
+          const relative = markerIndex >= 0 ? normalized.slice(markerIndex + marker.length) : "";
+          const segments = relative.split("/").filter(Boolean);
+          if (segments.length >= 3) {
+            const scopeKey = `${segments[0]}/${segments[1]}`;
+            if (!knownScopeKeys.has(scopeKey)) continue;
+          }
+
+          // Never delete a file that may still be finalizing.
+          try {
+            const info = await FileSystem.getInfoAsync(filePath);
+            const modificationTime =
+              info && "modificationTime" in info
+                ? (info as { modificationTime?: number }).modificationTime
+                : undefined;
+            if (typeof modificationTime !== "number") continue;
+            if (
+              modificationTime > 0 &&
+              Date.now() - modificationTime < ORPHAN_FILE_MIN_AGE_MS
+            ) {
+              continue;
             }
+          } catch {
+            continue;
+          }
+
+          if (typeof FileSystem.deleteAsync === "function") {
+            await FileSystem.deleteAsync(filePath, { idempotent: true });
+            deletedCount++;
           }
         }
       }
@@ -481,6 +555,30 @@ export class OfflineStorageService {
       // Safe execution
     }
     return deletedCount;
+  }
+
+  /**
+   * Removes every trace of an account (catalog, sync queue and physical files)
+   * when the user explicitly REMOVES the account. A simple logout must never
+   * call this — downloads are intentionally retained across logout.
+   */
+  public async purgeScope(scope: OfflineStorageScope): Promise<void> {
+    if (!isValidScope(scope)) return;
+
+    // Physical files, confined to this account's namespace.
+    if (FileSystem.documentDirectory && typeof FileSystem.deleteAsync === "function") {
+      const scopeDir = `${FileSystem.documentDirectory}${DOWNLOAD_ROOT_DIR}/${sanitizePathSegment(
+        scope.serverId
+      )}/${sanitizePathSegment(scope.userId)}/`;
+      try {
+        await FileSystem.deleteAsync(scopeDir, { idempotent: true });
+      } catch {
+        // Best effort — metadata removal below still makes the files unreachable.
+      }
+    }
+
+    await AsyncStorage.removeItem(getScopedOfflineCatalogKey(scope)).catch(() => {});
+    await AsyncStorage.removeItem(getScopedOfflineSyncQueueKey(scope)).catch(() => {});
   }
 
   /**
@@ -669,10 +767,13 @@ export class OfflineStorageService {
     }
 
     if (FileSystem.documentDirectory && typeof FileSystem.getInfoAsync === "function") {
+      // itemId originates from Jellyfin, so it is sanitized before being used
+      // as a path segment (DWN-04). Legacy name variants are kept as fallbacks.
+      const safeItemId = sanitizePathSegment(record.itemId);
       const candidates: string[] = [
-        `${FileSystem.documentDirectory}finora_downloads/${record.itemId}.mp4`,
-        `${FileSystem.documentDirectory}finora_downloads/ep_${record.itemId}.mp4`,
-        `${FileSystem.documentDirectory}finora_downloads/movie_${record.itemId}.mp4`
+        `${FileSystem.documentDirectory}${DOWNLOAD_ROOT_DIR}/${safeItemId}.mp4`,
+        `${FileSystem.documentDirectory}${DOWNLOAD_ROOT_DIR}/ep_${safeItemId}.mp4`,
+        `${FileSystem.documentDirectory}${DOWNLOAD_ROOT_DIR}/movie_${safeItemId}.mp4`
       ];
 
       if (record.localPath) {
@@ -680,7 +781,7 @@ export class OfflineStorageService {
         // This survives the sandbox GUID changing across app reinstalls and keeps
         // the server/user namespace intact.
         const normalizedStored = record.localPath.replace(/\\/g, "/");
-        const marker = "finora_downloads/";
+        const marker = `${DOWNLOAD_ROOT_DIR}/`;
         const markerIndex = normalizedStored.indexOf(marker);
         if (markerIndex >= 0) {
           const relative = normalizedStored.slice(markerIndex + marker.length);
@@ -690,8 +791,12 @@ export class OfflineStorageService {
         }
 
         const filename = record.localPath.split("/").pop();
-        if (filename) {
-          candidates.unshift(`${FileSystem.documentDirectory}finora_downloads/${filename}`);
+        if (filename && filename !== sanitizePathSegment(filename)) {
+          candidates.unshift(
+            `${FileSystem.documentDirectory}${DOWNLOAD_ROOT_DIR}/${sanitizePathSegment(filename)}`
+          );
+        } else if (filename) {
+          candidates.unshift(`${FileSystem.documentDirectory}${DOWNLOAD_ROOT_DIR}/${filename}`);
         }
       }
 

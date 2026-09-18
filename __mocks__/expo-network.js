@@ -16,7 +16,28 @@ const getNetworkStateAsync = jest.fn().mockResolvedValue({
   isInternetReachable: true
 });
 
+const networkListeners = new Set();
+
+const addNetworkStateListener = jest.fn((listener) => {
+  if (typeof listener === "function") networkListeners.add(listener);
+  return {
+    remove: jest.fn(() => networkListeners.delete(listener))
+  };
+});
+
+/** Test helper: simulates the OS emitting a network state change. */
+function emitNetworkState() {
+  networkListeners.forEach((listener) => listener());
+}
+
+function resetNetworkListeners() {
+  networkListeners.clear();
+}
+
 module.exports = {
   NetworkStateType,
-  getNetworkStateAsync
+  getNetworkStateAsync,
+  addNetworkStateListener,
+  __emitNetworkState: emitNetworkState,
+  __resetNetworkListeners: resetNetworkListeners
 };

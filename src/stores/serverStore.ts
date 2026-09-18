@@ -17,6 +17,7 @@ import {
   useNotificationStore
 } from "./notificationStore";
 import { downloadManager } from "../features/offline/downloadManager";
+import { offlineStorageService } from "../features/offline/offlineStorage";
 
 export interface ServerState {
   savedAccounts: SavedAccount[];
@@ -91,7 +92,20 @@ export const useServerStore = create<ServerState>((set, get) => ({
         await downloadManager.handleIdentityChange().catch(() => {});
       }
 
+      // A server removal also removes its accounts: capture them first so their
+      // downloads can be purged from disk (server + user scoped).
+      const accountsToPurge = (await serverManager.getSavedAccounts()).filter(
+        (account) => account.serverId === serverId
+      );
+
       await serverManager.removeServer(serverId);
+
+      for (const account of accountsToPurge) {
+        await offlineStorageService
+          .purgeScope({ serverId: account.serverId, userId: account.userId })
+          .catch(() => {});
+      }
+
       const [servers, accounts] = await Promise.all([
         serverManager.getSavedServers(),
         serverManager.getSavedAccounts()
@@ -173,6 +187,11 @@ export const useServerStore = create<ServerState>((set, get) => ({
       }
 
       await serverManager.removeAccount(serverId, userId);
+      // Removing an account ALSO purges its downloads. A plain logout does not
+      // call this path, so logout never deletes downloads.
+      await offlineStorageService
+        .purgeScope({ serverId, userId })
+        .catch(() => {});
       await removePersistedNotificationScope(serverId, userId).catch(() => {});
       const accounts = await serverManager.getSavedAccounts();
       set({ savedAccounts: accounts, isLoading: false });

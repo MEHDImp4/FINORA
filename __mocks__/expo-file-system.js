@@ -55,6 +55,12 @@ const deleteAsync = jest.fn(async (uri) => {
 const makeDirectoryAsync = jest.fn(async () => {});
 const readDirectoryAsync = jest.fn(async () => []);
 
+/** Default free space: 10 GB, comfortably above the test download sizes. */
+const DEFAULT_FREE_DISK = 10 * 1024 * 1024 * 1024;
+let freeDiskStorage = DEFAULT_FREE_DISK;
+const getFreeDiskStorageAsync = jest.fn(async () => freeDiskStorage);
+const getTotalDiskCapacityAsync = jest.fn(async () => freeDiskStorage);
+
 const createDownloadResumable = jest.fn((url, fileUri, options, callback, resumeData) => {
   let resolveFn;
   const promise = new Promise((resolve) => {
@@ -120,8 +126,14 @@ const __api = {
   __reset() {
     fileSizes.clear();
     defaultFileSize = DEFAULT_FILE_SIZE;
+    freeDiskStorage = DEFAULT_FREE_DISK;
+    getFreeDiskStorageAsync.mockClear();
     downloadTasks.length = 0;
     pendingTasks.length = 0;
+  },
+  /** Overrides the free disk space reported to the download manager. */
+  __setFreeDiskStorage(bytes) {
+    freeDiskStorage = bytes;
   },
   /** Forces the size (or non-existence) of a specific path. */
   __setFileSize(uri, size) {
@@ -156,5 +168,7 @@ module.exports = {
   readDirectoryAsync,
   deleteAsync,
   createDownloadResumable,
+  getFreeDiskStorageAsync,
+  getTotalDiskCapacityAsync,
   ...__api
 };

@@ -251,7 +251,7 @@ describe("OfflineStorageService", () => {
       if (path.includes("missing")) {
         return { exists: false, isDirectory: false };
       }
-      return { exists: true, isDirectory: false, size: 450000000 };
+      return { exists: true, isDirectory: false, size: 450000000, modificationTime: 0 };
     });
 
     const existingRecord: OfflineMediaRecord = {
