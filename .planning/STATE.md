@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 status: Awaiting next milestone
 stopped_at: Milestone v1.0 complete and archived; ready for /gsd-new-milestone
-last_updated: "2026-09-17T00:58:00.000Z"
-last_activity: 2026-09-17
-last_activity_desc: Quick task community-infrastructure completed (deployed branch rulesets, CODEOWNERS, 29 curated labels, Issue/PR templates, and community guides)
+last_updated: "2026-09-18T02:38:00.000Z"
+last_activity: 2026-09-18
+last_activity_desc: Quick task fix-server-connect-modal-scroll-layout completed (fixed server connect modal bottom cut-off, safe area insets, and scroll touch responder conflicts)
 state_head: 82d83c8
 progress:
   total_phases: 10
@@ -113,6 +113,13 @@ Items acknowledged and carried forward from previous milestone close:
 | true-download-resume-after-process-death | 2026-09-14 | Reconstruct and truly resume downloads after a process death from the existing partial file, re-authenticating from SecureStore | Complete ✓ |
 | github-presentation-polish | 2026-09-17 | Professionalize GitHub presentation, screenshots section, highlights, accurate technical claims, and bilingual sync | Complete ✓ |
 | community-infrastructure | 2026-09-17 | Deploy branch rulesets, CODEOWNERS, 29 curated labels, Issue/PR templates, and community guides | Complete ✓ |
+| fix-resume-progress-display | 2026-09-17 | Fix resume button progress placeholder in MovieDetailsView and i18n locales | Complete ✓ |
+| revert-liquid-glass-to-netflix-dark | 2026-09-17 | Replace Apple Liquid Glass effects across app with simple Netflix dark design | Complete ✓ |
+| fix-series-rating-season-plural-and-genre-tags | 2026-09-17 | Fix series rating layout, season count plural, and genre tag resolution | Complete ✓ |
+| fix-download-quality-onboarding-and-direct-download | 2026-09-17 | Add download quality cards to onboarding, optimize 1080p profile (2-3 GB target), and enable direct one-tap download with long-press quality picker | Complete ✓ |
+| fix-episode-thumbnail-display | 2026-09-17 | Prioritize episode still frame screenshots over series poster in episode cards and lists | Complete ✓ |
+| fix-server-change-and-profile-detection | 2026-09-17 | Fix Jellyfin profile detection via clean unauthenticated client + /Users fallback, separate server change from user login | Complete ✓ |
+| fix-server-connect-modal-scroll-layout | 2026-09-18 | Fix server connect modal cut-off layout, safe insets, and scroll touch responder conflicts | Complete ✓ |
 
 ## Session Continuity
  
