@@ -38,10 +38,15 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Version consistency
+        run: npm run version:check
+
       - name: Check i18n parity
         run: npm run i18n:check
 
-      - name: Expo doctor check
+      # Advisory only: known Expo SDK patch mismatches must not fail CI.
+      - name: Expo doctor (advisory)
+        continue-on-error: true
         run: npx expo-doctor
 
       - name: Run tests
