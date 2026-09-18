@@ -231,7 +231,14 @@ export class AuthRepository {
       try {
         normalized = normalizeServerUrlForCredentials(descriptor.serverUrl);
       } catch {
+        // REL-02: the descriptor is invalid, so drop it AND the orphaned secure
+        // token — otherwise a stale token is left behind in SecureStore.
         await this.prefStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+        try {
+          await this.secureStorage.deleteToken(tokenKey);
+        } catch {
+          // Token cleanup is best effort; the descriptor is already gone.
+        }
         this.client.setAuthToken(null);
         return null;
       }

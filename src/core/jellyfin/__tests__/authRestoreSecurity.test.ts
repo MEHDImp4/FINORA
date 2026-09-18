@@ -38,8 +38,10 @@ describe("AuthRepository legacy session transport hardening", () => {
     expect(httpClient.request).not.toHaveBeenCalled();
     expect(client.setAuthToken).toHaveBeenCalledWith(null);
     expect(prefStorage.removeItem).toHaveBeenCalledWith(ACTIVE_SESSION_STORAGE_KEY);
-    // Token is intentionally retained in SecureStore so the user can reconnect
-    // to the same server after upgrading its URL to HTTPS.
-    expect(secureStorage.deleteToken).not.toHaveBeenCalled();
+    // REL-02: dropping an invalid descriptor also removes its orphaned secure
+    // token, so no unusable credential lingers in SecureStore.
+    expect(secureStorage.deleteToken).toHaveBeenCalledWith(
+      "finora_auth_token_legacy-server_legacy-user"
+    );
   });
 });
