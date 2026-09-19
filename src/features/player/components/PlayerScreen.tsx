@@ -4,7 +4,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   StatusBar,
-  Platform
+  Platform,
+  AppState
 } from "react-native";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
@@ -201,16 +202,42 @@ export function PlayerScreen({
   // VideoView ref & Picture-in-Picture (PiP) state
   const videoViewRef = useRef<any>(null);
   const [isInPiP, setIsInPiP] = useState(false);
+  const isInPiPRef = useRef(false);
+  const pipRecentlyStoppedRef = useRef(false);
+  const pipExitGuardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      // Android can report the PiP stop event just before the Activity finishes
+      // moving to the background. If the user actually dismissed PiP (instead
+      // of restoring the app), stop playback as soon as that transition lands.
+      if (
+        nextState !== "active" &&
+        pipRecentlyStoppedRef.current &&
+        !isInPiPRef.current
+      ) {
+        controls.pause();
+        pipRecentlyStoppedRef.current = false;
+        if (pipExitGuardTimerRef.current) {
+          clearTimeout(pipExitGuardTimerRef.current);
+          pipExitGuardTimerRef.current = null;
+        }
+      }
+    });
+
     return () => {
+      subscription.remove();
       if (pipTimerRef.current) {
         clearTimeout(pipTimerRef.current);
         pipTimerRef.current = null;
       }
+      if (pipExitGuardTimerRef.current) {
+        clearTimeout(pipExitGuardTimerRef.current);
+        pipExitGuardTimerRef.current = null;
+      }
     };
-  }, []);
+  }, [controls]);
 
   const handleTogglePiP = () => {
     hapticService.impactLight();
@@ -750,11 +777,36 @@ export function PlayerScreen({
           allowsPictureInPicture
           startsPictureInPictureAutomatically
           onPictureInPictureStart={() => {
+            isInPiPRef.current = true;
+            pipRecentlyStoppedRef.current = false;
+            if (pipExitGuardTimerRef.current) {
+              clearTimeout(pipExitGuardTimerRef.current);
+              pipExitGuardTimerRef.current = null;
+            }
             setIsInPiP(true);
             setControlsVisible(false);
           }}
           onPictureInPictureStop={() => {
+            isInPiPRef.current = false;
+            pipRecentlyStoppedRef.current = true;
             setIsInPiP(false);
+            setControlsVisible(true);
+
+            // Restoring the PiP window back into FINORA should continue playing.
+            // Dismissing/swiping away PiP leaves the Activity backgrounded and
+            // must stop audio instead of leaking playback invisibly.
+            if (AppState.currentState !== "active") {
+              controls.pause();
+              pipRecentlyStoppedRef.current = false;
+            } else {
+              if (pipExitGuardTimerRef.current) {
+                clearTimeout(pipExitGuardTimerRef.current);
+              }
+              pipExitGuardTimerRef.current = setTimeout(() => {
+                pipRecentlyStoppedRef.current = false;
+                pipExitGuardTimerRef.current = null;
+              }, 750);
+            }
           }}
           nativeControls={false}
         />

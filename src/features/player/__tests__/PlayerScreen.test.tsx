@@ -323,6 +323,53 @@ describe("PlayerScreen", () => {
     });
   });
 
+  it("pauses playback when PiP is dismissed while the app stays backgrounded", () => {
+    const { AppState } = require("react-native");
+    const originalState = AppState.currentState;
+    Object.defineProperty(AppState, "currentState", {
+      configurable: true,
+      value: "background"
+    });
+
+    const mockRepo = createMockRepo();
+    let root: any;
+    try {
+      act(() => {
+        root = renderer.create(
+          <QueryClientProvider client={queryClient}>
+            <PlayerScreen
+              item={mockItem}
+              serverUrl="https://demo.jellyfin.org"
+              token="test-token"
+              onBack={jest.fn()}
+              playbackRepository={mockRepo}
+              overlayAutoHideMs={0}
+            />
+          </QueryClientProvider>
+        );
+      });
+
+      const videoView = root.root.findByProps({ testID: "expo-video-view" });
+      const player = videoView.props.player;
+      expect(player.playing).toBe(true);
+
+      act(() => {
+        videoView.props.onPictureInPictureStart();
+        videoView.props.onPictureInPictureStop();
+      });
+
+      expect(player.playing).toBe(false);
+    } finally {
+      act(() => {
+        root?.unmount();
+      });
+      Object.defineProperty(AppState, "currentState", {
+        configurable: true,
+        value: originalState
+      });
+    }
+  });
+
   it("unlocks the UI when starting Picture-in-Picture fails (PLR-05)", async () => {
     const expoVideo = require("expo-video");
     const originalVideoView = expoVideo.VideoView;
