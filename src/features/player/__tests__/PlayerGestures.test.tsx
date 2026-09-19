@@ -138,6 +138,53 @@ describe("PlayerGestures", () => {
     });
   });
 
+  it("keeps a rapid same-side tap burst cumulative without firing a single tap", () => {
+    const onSingleTap = jest.fn();
+    const onDoubleTapRight = jest.fn();
+
+    let root: any;
+    act(() => {
+      root = renderer.create(
+        <PlayerGestures
+          onSingleTap={onSingleTap}
+          onDoubleTapLeft={jest.fn()}
+          onDoubleTapRight={onDoubleTapRight}
+        >
+          <View testID="child-view" />
+        </PlayerGestures>
+      );
+    });
+
+    act(() => {
+      root.root.findByProps({ testID: "player-gestures" }).props.onLayout({
+        nativeEvent: { layout: { width: 400 } }
+      });
+    });
+
+    const surface = root.root.findByProps({ testID: "gesture-touch-surface" });
+    for (let index = 0; index < 5; index += 1) {
+      act(() => {
+        surface.props.onPress({ nativeEvent: { locationX: 320 } });
+      });
+      if (index < 4) {
+        act(() => {
+          jest.advanceTimersByTime(80);
+        });
+      }
+    }
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(onDoubleTapRight).toHaveBeenCalledTimes(4);
+    expect(onSingleTap).not.toHaveBeenCalled();
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
   it("triggers long press start and end for 2x speed", () => {
     const onLongPressStart = jest.fn();
     const onLongPressEnd = jest.fn();

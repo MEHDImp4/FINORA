@@ -21,6 +21,7 @@ const SWIPE_THRESHOLD_PX = 10;
 const SWIPE_SENSITIVITY = 0.003;
 // Dead zone around the center to prevent mis-detection when tapping near the midpoint
 const CENTER_DEAD_ZONE_PX = 30;
+const MULTI_TAP_WINDOW_MS = 320;
 
 export interface PlayerGesturesProps {
   onDoubleTapLeft: () => void;
@@ -206,15 +207,20 @@ export function PlayerGestures({
     }
 
     const timeDiff = now - lastTapTimeRef.current;
-    const isDoubleTap = timeDiff < 300 && lastTapSideRef.current === side;
+    const continuesSameSideBurst =
+      timeDiff < MULTI_TAP_WINDOW_MS && lastTapSideRef.current === side;
 
-    if (isDoubleTap) {
+    if (continuesSameSideBurst) {
+      // First tap arms the gesture. The second seeks once, and every additional
+      // tap in the same burst seeks another 10 seconds. Never re-arm a delayed
+      // single tap in the middle of a rapid seek burst.
       if (singleTapTimerRef.current) {
         clearTimeout(singleTapTimerRef.current);
         singleTapTimerRef.current = null;
       }
-      lastTapTimeRef.current = 0;
-      lastTapSideRef.current = null;
+
+      lastTapTimeRef.current = now;
+      lastTapSideRef.current = side;
 
       if (side === "left") {
         showRipple("left");
@@ -223,20 +229,21 @@ export function PlayerGestures({
         showRipple("right");
         onDoubleTapRight();
       }
-    } else {
-      lastTapTimeRef.current = now;
-      lastTapSideRef.current = side;
-
-      if (singleTapTimerRef.current) {
-        clearTimeout(singleTapTimerRef.current);
-      }
-      singleTapTimerRef.current = setTimeout(() => {
-        singleTapTimerRef.current = null;
-        lastTapTimeRef.current = 0;
-        lastTapSideRef.current = null;
-        onSingleTap();
-      }, 190);
+      return;
     }
+
+    lastTapTimeRef.current = now;
+    lastTapSideRef.current = side;
+
+    if (singleTapTimerRef.current) {
+      clearTimeout(singleTapTimerRef.current);
+    }
+    singleTapTimerRef.current = setTimeout(() => {
+      singleTapTimerRef.current = null;
+      lastTapTimeRef.current = 0;
+      lastTapSideRef.current = null;
+      onSingleTap();
+    }, MULTI_TAP_WINDOW_MS);
   };
 
   const handleLongPress = () => {

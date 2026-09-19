@@ -59,26 +59,26 @@ export default function PlayerRoute() {
     };
   }, [rawId]);
 
-  const isOfflineMode = Boolean(offlineRecord);
-
-  // Only trigger session restoration if we are online and not checking offline storage
+  // A downloaded copy is a fallback, not a reason to force local playback while
+  // an authenticated Jellyfin session is available. Online playback keeps the
+  // full server media profile and reliable seeking; the local copy remains the
+  // automatic fallback when the server cannot be used.
   useEffect(() => {
-    if (!checkingOffline && !isOfflineMode) {
-      if (!session && (authStatus === "idle" || authStatus === "unauthenticated")) {
-        restoreSession().catch(() => {});
-      }
+    if (!checkingOffline && !session && (authStatus === "idle" || authStatus === "unauthenticated")) {
+      restoreSession().catch(() => {});
     }
-  }, [checkingOffline, isOfflineMode, session, authStatus, restoreSession]);
+  }, [checkingOffline, session, authStatus, restoreSession]);
 
-  // Only fetch details from server if we are online and finished checking offline storage
-  const shouldFetchOnline = !checkingOffline && !isOfflineMode && Boolean(userId && rawId);
+  const shouldFetchOnline = !checkingOffline && Boolean(userId && rawId);
   const { data: item, isLoading, isError } = useItemDetails(
     shouldFetchOnline ? userId : undefined,
     shouldFetchOnline ? rawId : undefined
   );
 
+  const isOfflineMode = Boolean(offlineRecord && (!shouldFetchOnline || isError));
+
   useEffect(() => {
-    // Only invalidate if we are in online mode and the server returned an error/missing item
+    // Only invalidate if the online server lookup returned an error/missing item.
     if (shouldFetchOnline && (isError || (item && (item.isMissing || item.locationType === "Virtual")))) {
       try {
         queryClient.setQueriesData({ queryKey: mediaKeys.all }, (oldData: any) => {
@@ -95,6 +95,9 @@ export default function PlayerRoute() {
   }, [shouldFetchOnline, isError, item, rawId, queryClient]);
 
   const effectiveItem: MediaItem | null = useMemo(() => {
+    if (!isOfflineMode && item) {
+      return item;
+    }
     if (offlineRecord) {
       return {
         id: offlineRecord.itemId,
@@ -119,7 +122,7 @@ export default function PlayerRoute() {
       };
     }
     return item || null;
-  }, [offlineRecord, item]);
+  }, [offlineRecord, item, isOfflineMode]);
 
   const playerScreenOptions = (
     <Stack.Screen
@@ -137,7 +140,7 @@ export default function PlayerRoute() {
     />
   );
 
-  if (checkingOffline) {
+  if (checkingOffline || (shouldFetchOnline && isLoading)) {
     return (
       <View style={styles.centerContainer} testID="player-route-loading">
         {playerScreenOptions}
@@ -146,8 +149,8 @@ export default function PlayerRoute() {
     );
   }
 
-  // If online streaming, wait for server details and auth restoration
-  if (!isOfflineMode && (isLoading || authStatus === "restoring" || authStatus === "authenticating")) {
+  // If online streaming, wait for auth restoration.
+  if (!isOfflineMode && (authStatus === "restoring" || authStatus === "authenticating")) {
     return (
       <View style={styles.centerContainer} testID="player-route-loading">
         {playerScreenOptions}
@@ -205,7 +208,7 @@ export default function PlayerRoute() {
         item={effectiveItem}
         serverUrl={serverUrl}
         token={token}
-        localPath={offlineRecord?.localPath}
+        localPath={isOfflineMode ? offlineRecord?.localPath : undefined}
         onBack={() => router.back()}
         onNextEpisode={(episodeId) => {
           router.replace({ pathname: "/player/[id]", params: { id: episodeId } });
