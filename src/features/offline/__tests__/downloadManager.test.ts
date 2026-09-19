@@ -22,7 +22,7 @@ describe("DownloadManager", () => {
     expect(manager.getDownload("movie-1")).toBeDefined();
   });
 
-  it("updates download progress and marks completed when finished", async () => {
+  it("updates download progress but NEVER completes from a progress callback", async () => {
     await manager.startDownload({
       itemId: "movie-2",
       title: "Interstellar",
@@ -36,11 +36,13 @@ describe("DownloadManager", () => {
     expect(item?.progress).toBe(0.5);
     expect(item?.status).toBe("downloading");
 
+    // 100 % is only progress. The transfer is not finalised until
+    // completeDownload() verifies the file and commits the catalog.
     manager.updateProgress("movie-2", 1000000, 1000000);
     item = manager.getDownload("movie-2");
     expect(item?.progress).toBe(1);
-    expect(item?.status).toBe("completed");
-    expect(item?.completedAt).toBeDefined();
+    expect(item?.status).toBe("downloading");
+    expect(item?.completedAt).toBeUndefined();
   });
 
   it("pauses, resumes, and cancels a download", async () => {

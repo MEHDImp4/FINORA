@@ -208,6 +208,17 @@ export class DownloadManager {
    * (DWN-05 delete race).
    */
   private jobGenerations: Map<string, number> = new Map();
+  /**
+   * Items whose finalization transaction is currently running. The guard makes
+   * `completeDownload` idempotent, so a completion can be committed at most once
+   * even if it is requested from several code paths.
+   */
+  private finalizationInFlight: Set<string> = new Set();
+  /**
+   * Items whose success notification was already emitted. Cleared on a fresh
+   * attempt, giving exactly-once notification per committed completion.
+   */
+  private completionNotified: Set<string> = new Set();
   private static activeInstances: Set<DownloadManager> = new Set();
 
   public constructor() {
@@ -242,7 +253,11 @@ export class DownloadManager {
 
   /**
    * Serializes and writes the current download state to AsyncStorage.
-   * Completed and canceled downloads are excluded to keep storage lean.
+   *
+   * INVARIANT: an item may only be absent from this snapshot if it is
+   * authoritatively `completed` (committed by `completeDownload`) or
+   * `canceled`. Every other state — including `downloading` and `finalizing` —
+   * MUST be persisted, so a process death can never silently drop pending work.
    * Tokens are stripped from URLs before persistence.
    */
   private async persistQueue(): Promise<void> {
@@ -345,6 +360,27 @@ export class DownloadManager {
   /** Invalidates any in-flight completion for an item (pause/cancel/delete). */
   private invalidateJobGeneration(itemId: string): void {
     this.jobGenerations.set(itemId, (this.jobGenerations.get(itemId) ?? 0) + 1);
+  }
+
+  /**
+   * Non-sensitive lifecycle trace used to diagnose download reliability.
+   *
+   * SECURITY: callers must only pass scalars (status names, byte counts, HTTP
+   * status codes). Never a URL, token, header or credential.
+   */
+  private logLifecycle(itemId: string, event: string, details?: Record<string, unknown>): void {
+    const generation = this.jobGenerations.get(itemId);
+    const suffix = details
+      ? " " +
+        Object.entries(details)
+          .map(([key, value]) => `${key}=${String(value)}`)
+          .join(" ")
+      : "";
+    logger.info(
+      `[DownloadLifecycle] item=${itemId}` +
+        (generation !== undefined ? ` generation=${generation}` : "") +
+        ` ${event}${suffix}`
+    );
   }
 
 
@@ -885,6 +921,8 @@ export class DownloadManager {
     this.speedTrackers.clear();
     this.progressPersistMarkers.clear();
     this.jobGenerations.clear();
+    this.finalizationInFlight.clear();
+    this.completionNotified.clear();
     this.authContext = null;
     this.activeScope = null;
     this.initialized = false;
@@ -1030,6 +1068,10 @@ export class DownloadManager {
       return existing;
     }
 
+    // A fresh attempt owns a fresh finalization/notification budget.
+    this.finalizationInFlight.delete(item.itemId);
+    this.completionNotified.delete(item.itemId);
+
     let localPath = item.localPath;
     if (!localPath || !localPath.includes("://")) {
       if (FileSystem.documentDirectory) {
@@ -1168,6 +1210,7 @@ export class DownloadManager {
     };
 
     this.downloads.set(item.itemId, downloadItem);
+    this.logLifecycle(item.itemId, shouldQueue ? "queued" : "downloading");
 
     if (shouldQueue) {
       if (!this.queue.includes(item.itemId)) {
@@ -1316,6 +1359,10 @@ export class DownloadManager {
       `[DownloadManager] Result ${itemId}: HTTP ${status}, ` +
       `resumeOffset=${resumeOffset}, uri=${result.uri ? "present" : "absent"}`
     );
+    this.logLifecycle(itemId, "downloadAsync resolved", {
+      http: status,
+      uri: result.uri ? "present" : "absent"
+    });
 
     // Bounded authorization recovery: refresh once, rebuild the request from the
     // fresh session, retry once, never loop.
@@ -1501,6 +1548,10 @@ export class DownloadManager {
 
       this.resumeOffsets.set(item.itemId, resumeOffset);
       this.activeTasks.set(item.itemId, downloadResumable);
+      this.logLifecycle(item.itemId, "native task created", {
+        resumeOffset,
+        appState: AppState.currentState
+      });
       this.syncForegroundService();
 
       // Execute download in background
@@ -1514,6 +1565,7 @@ export class DownloadManager {
         })
         .catch((err) => {
           this.activeTasks.delete(item.itemId);
+          this.logLifecycle(item.itemId, "downloadAsync rejected");
           logger.error(`[DownloadManager] Download error for ${item.itemId}:`, err?.message || err);
           // DWN-01: a full disk is a distinct, actionable failure. The item is
           // never marked completed and the partial file is kept for a later retry.
@@ -1617,20 +1669,26 @@ export class DownloadManager {
       });
     }
 
+    const previouslyAtTotal = item.progress >= 1;
+
     item.bytesDownloaded = bytesDownloaded;
     item.totalBytes = realTotal;
     item.isEstimatedTotal = realTotal === 0 && estimatedTotal > 0;
     item.progress =
       displayTotal > 0 ? Math.min(1, bytesDownloaded / displayTotal) : 0;
 
-    if (bytesDownloaded >= totalBytes && totalBytes > 0) {
-      item.status = "completed";
-      item.completedAt = Date.now();
-      this.speedTrackers.delete(itemId);
-      // A state transition is always persisted immediately.
-      this.schedulePersist();
-      this.notify();
-      return;
+    // PROGRESS != COMPLETION.
+    //
+    // A progress callback only reports bytes handed to the native writer. It does
+    // NOT prove the transfer is closed, that the HTTP result is valid, that the
+    // file is whole, or that the offline catalog was saved. Reaching the reported
+    // total must therefore never finalize the job: the item stays `downloading`
+    // and only `completeDownload()` — driven by a resolved `downloadAsync()` —
+    // may commit it. Falling through also guarantees the 100 % sample still flows
+    // into the throttled persistence + foreground refresh below instead of being
+    // dropped by an early return.
+    if (bytesDownloaded >= totalBytes && totalBytes > 0 && !previouslyAtTotal) {
+      this.logLifecycle(itemId, "progress=100% waiting-native-completion");
     }
 
     // Progress ticks are throttled — writing on every tick would hammer storage
@@ -1738,6 +1796,7 @@ export class DownloadManager {
     this.resumeOffsets.delete(itemId);
     this.authRetried.delete(itemId);
     this.corruptionRestarted.delete(itemId);
+    this.completionNotified.delete(itemId);
     // DWN-05: any in-flight finalization for this item must be discarded.
     this.invalidateJobGeneration(itemId);
     this.queue = this.queue.filter((id) => id !== itemId);
@@ -1766,7 +1825,13 @@ export class DownloadManager {
     this.syncForegroundService();
   }
 
-  public markCompleted(itemId: string, totalBytes: number): void {
+  /**
+   * Commits the terminal `completed` state.
+   *
+   * PRIVATE BY DESIGN: only `completeDownload()` may call this, never a progress
+   * callback. Any other caller would reintroduce progress != completion.
+   */
+  private markCompleted(itemId: string, totalBytes: number): void {
     const item = this.downloads.get(itemId);
     if (!item) return;
 
@@ -1780,12 +1845,51 @@ export class DownloadManager {
     item.bytesDownloaded = totalBytes;
     item.totalBytes = totalBytes;
     item.completedAt = Date.now();
+    this.logLifecycle(itemId, "completed", { bytes: totalBytes });
     this.schedulePersist();
     this.notify();
     this.syncForegroundService();
   }
 
+  /**
+   * Authoritative completion entry point — the ONLY path that may transition a
+   * download to `completed`.
+   *
+   * Idempotent: a second request while the first is finalizing, or after the item
+   * is already completed, is ignored. The transaction itself (file verification,
+   * catalog save, generation guard, exactly-once notification) lives in
+   * `finalizeDownload()`. A progress callback must never call this.
+   */
   public async completeDownload(
+    itemId: string,
+    totalBytes: number,
+    metadata?: Partial<OfflineMediaRecord>,
+    jobGeneration?: number
+  ): Promise<void> {
+    const item = this.downloads.get(itemId);
+    if (!item) return;
+
+    // Already committed — idempotent no-op (also prevents a duplicate success
+    // notification from a retried/reconciled completion).
+    if (item.status === "completed") return;
+
+    // A finalization for this item is already running — never run two at once.
+    if (this.finalizationInFlight.has(itemId)) {
+      logger.warn(
+        `[DownloadManager] Duplicate completion request for ${itemId} ignored (finalization in flight).`
+      );
+      return;
+    }
+
+    this.finalizationInFlight.add(itemId);
+    try {
+      await this.finalizeDownload(itemId, totalBytes, metadata, jobGeneration);
+    } finally {
+      this.finalizationInFlight.delete(itemId);
+    }
+  }
+
+  private async finalizeDownload(
     itemId: string,
     totalBytes: number,
     metadata?: Partial<OfflineMediaRecord>,
@@ -1809,6 +1913,8 @@ export class DownloadManager {
     item.progress = 1.0;
     item.bytesDownloaded = totalBytes;
     item.totalBytes = totalBytes;
+
+    this.logLifecycle(itemId, "finalizing", { bytes: totalBytes });
 
     // Persist immediately in finalizing state to protect crash window
     this.schedulePersist();
@@ -1874,6 +1980,8 @@ export class DownloadManager {
       return;
     }
 
+    this.logLifecycle(itemId, "catalog saved", { bytes: verifiedSize });
+
     // Delete race guard: the catalog write is the slow step. If the item was
     // removed or its job invalidated while it was in flight, undo the catalog
     // entry and never claim completion.
@@ -1893,8 +2001,14 @@ export class DownloadManager {
     // 4. Completed: mark completed only after persistent catalog save is guaranteed
     this.markCompleted(itemId, verifiedSize);
 
-    // 5. Notify user of completed download
-    notificationService.notifyDownloadComplete(item.title, item.itemId, item.type).catch(() => {});
+    // 5. Notify user of completed download — EXACTLY ONCE per committed
+    // completion, and only after the catalog write succeeded.
+    if (!this.completionNotified.has(itemId)) {
+      this.completionNotified.add(itemId);
+      notificationService
+        .notifyDownloadComplete(item.title, item.itemId, item.type)
+        .catch(() => {});
+    }
 
     // 6. Retrait de la queue & promotion suivante
     this.schedulePersist();
