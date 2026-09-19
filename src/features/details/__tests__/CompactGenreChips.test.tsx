@@ -37,7 +37,7 @@ describe("CompactGenreChips", () => {
       );
     });
 
-    expect(root!.root.findAllByProps({ children: "Drama" })).toHaveLength(1);
-    expect(root!.root.findByProps({ children: "Crime" })).toBeTruthy();
+    expect(root!.root.findAllByProps({ testID: "compact-genre-chip-drama" })).toHaveLength(1);
+    expect(root!.root.findAllByProps({ testID: "compact-genre-chip-crime" })).toHaveLength(1);
   });
 });

@@ -39,7 +39,11 @@ export function CompactGenreChips({
   return (
     <View style={styles.row} testID="compact-genre-chips">
       {visibleGenres.map((genre) => (
-        <View key={genre} style={styles.chip}>
+        <View
+          key={genre}
+          style={styles.chip}
+          testID={`compact-genre-chip-${genre.trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+        >
           <FinoraText variant="caption" color="textSecondary" numberOfLines={1}>
             {getLocalizedGenre(genre, language)}
           </FinoraText>
