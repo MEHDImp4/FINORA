@@ -22,28 +22,61 @@ describe("UserDataRepository", () => {
   });
 
   describe("setFavorite", () => {
-    it("sends POST when isFavorite is true", async () => {
+    it("marks favorite with the field-merge user-data endpoint (POST)", async () => {
       await repository.setFavorite("user-1", "item-100", true, mockHttpClient);
 
-      expect(mockHttpClient.request).toHaveBeenCalledWith(
-        "/Users/user-1/FavoriteItems/item-100",
-        { method: "POST" }
-      );
+      expect(mockHttpClient.request).toHaveBeenCalledTimes(1);
+      expect(mockHttpClient.request).toHaveBeenCalledWith("/UserItems/item-100/UserData", {
+        method: "POST",
+        params: { userId: "user-1" },
+        body: JSON.stringify({ IsFavorite: true })
+      });
     });
 
-    it("sends DELETE when isFavorite is false", async () => {
+    it("unmarks favorite through the same field-merge endpoint", async () => {
       await repository.setFavorite("user-1", "item-100", false, mockHttpClient);
 
-      expect(mockHttpClient.request).toHaveBeenCalledWith(
-        "/Users/user-1/FavoriteItems/item-100",
-        { method: "DELETE" }
+      expect(mockHttpClient.request).toHaveBeenCalledTimes(1);
+      expect(mockHttpClient.request).toHaveBeenCalledWith("/UserItems/item-100/UserData", {
+        method: "POST",
+        params: { userId: "user-1" },
+        body: JSON.stringify({ IsFavorite: false })
+      });
+    });
+
+    it("never touches played state or resume (regression: toggling favorite must preserve progress)", async () => {
+      await repository.setFavorite("user-1", "item-100", true, mockHttpClient);
+      await repository.setFavorite("user-1", "item-100", false, mockHttpClient);
+
+      const endpoints = (mockHttpClient.request as jest.Mock).mock.calls.map(
+        ([endpoint]: [string]) => endpoint
       );
+      expect(endpoints).toEqual([
+        "/UserItems/item-100/UserData",
+        "/UserItems/item-100/UserData"
+      ]);
+      expect(endpoints).not.toContain("/Users/user-1/PlayedItems/item-100");
+      expect(endpoints).not.toContain("/PlayingItems/item-100");
+      expect(endpoints).not.toContain("/Users/user-1/FavoriteItems/item-100");
+    });
+
+    it("sends only IsFavorite and no playback-progress fields", async () => {
+      await repository.setFavorite("user-1", "item-100", true, mockHttpClient);
+
+      const [, options] = (mockHttpClient.request as jest.Mock).mock.calls[0];
+      const payload = JSON.parse(options.body);
+      expect(payload).toEqual({ IsFavorite: true });
+      expect(payload).not.toHaveProperty("PlaybackPositionTicks");
+      expect(payload).not.toHaveProperty("Played");
+      expect(payload).not.toHaveProperty("PlayCount");
+      expect(payload).not.toHaveProperty("LastPlayedDate");
     });
 
     it("throws FinoraError when userId or itemId is missing", async () => {
       await expect(repository.setFavorite("", "item-100", true, mockHttpClient)).rejects.toThrow(
         FinoraError
       );
+      expect(mockHttpClient.request).not.toHaveBeenCalled();
     });
   });
 

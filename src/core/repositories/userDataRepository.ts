@@ -24,13 +24,21 @@ export class UserDataRepository {
     }
 
     const http = this.getHttp(customClient);
-    const endpoint = `/Users/${userId}/FavoriteItems/${itemId}`;
 
-    if (isFavorite) {
-      await http.request(endpoint, { method: "POST" });
-    } else {
-      await http.request(endpoint, { method: "DELETE" });
-    }
+    // Jellyfin's dedicated favorite endpoints (POST/DELETE /Users/{userId}/FavoriteItems/{itemId})
+    // read then save the *entire* UserItemData record server-side. If the server's in-memory copy
+    // is stale or absent, that rewrite can zero PlaybackPositionTicks (and flip Played), which
+    // silently drops an in-progress item from Continue Watching.
+    //
+    // POST /UserItems/{itemId}/UserData accepts a partial UpdateUserItemDataDto and applies only the
+    // fields that are present, so sending IsFavorite alone can never touch playback progress.
+    // Endpoint + query parameter verified against @jellyfin/sdk `ItemsApi.updateItemUserData`
+    // (userId is a query parameter, body is UpdateUserItemDataDto).
+    await http.request(`/UserItems/${itemId}/UserData`, {
+      method: "POST",
+      params: { userId },
+      body: JSON.stringify({ IsFavorite: isFavorite })
+    });
   }
 
   public async markPlayed(
