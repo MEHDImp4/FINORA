@@ -61,7 +61,6 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
     const downloadTapScale = useRef(new Animated.Value(1)).current;
     const wasDownloadCompleteRef = useRef(isDownloadComplete);
     const [isDownloadStarting, setIsDownloadStarting] = useState(false);
-    const downloadStartingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
       // Keep the liquid fill visually close to the latest native progress tick.
@@ -94,21 +93,8 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
       // DownloadManager publishes its authoritative queued/downloading state.
       if (downloadStatus || isDownloaded) {
         setIsDownloadStarting(false);
-        if (downloadStartingTimerRef.current) {
-          clearTimeout(downloadStartingTimerRef.current);
-          downloadStartingTimerRef.current = null;
-        }
       }
     }, [downloadStatus, isDownloaded]);
-
-    useEffect(
-      () => () => {
-        if (downloadStartingTimerRef.current) {
-          clearTimeout(downloadStartingTimerRef.current);
-        }
-      },
-      []
-    );
 
     const downloadFillTranslateY = downloadFillProgress.interpolate({
       inputRange: [0, 1],
@@ -281,14 +267,6 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
                 tension: 220,
                 useNativeDriver: true
               }).start();
-
-              if (downloadStartingTimerRef.current) {
-                clearTimeout(downloadStartingTimerRef.current);
-              }
-              downloadStartingTimerRef.current = setTimeout(() => {
-                downloadStartingTimerRef.current = null;
-                setIsDownloadStarting(false);
-              }, 5000);
 
               hapticService.impactMedium();
               onDownload(episode);

@@ -199,18 +199,19 @@ describe("SeriesDetailsView", () => {
     });
 
     const epDownloadButton = root!.root.findByProps({ testID: "download-button-ep-101" });
-    // Direct press
-    act(() => {
-      epDownloadButton.props.onPress({ stopPropagation: jest.fn() });
-    });
-    expect(onDownloadEpisodes).toHaveBeenCalledWith([mockEpisodes[0]], "1080p");
 
-    // Long press
+    // Long press is available before a download starts and opens quality choice.
     act(() => {
       epDownloadButton.props.onLongPress({ stopPropagation: jest.fn() });
     });
     const modal = root!.root.findByProps({ testID: "download-quality-modal" });
     expect(modal).toBeTruthy();
+
+    // Direct press starts immediately with the configured default quality.
+    act(() => {
+      epDownloadButton.props.onPress({ stopPropagation: jest.fn() });
+    });
+    expect(onDownloadEpisodes).toHaveBeenCalledWith([mockEpisodes[0]], "1080p");
   });
 
   it("forwards per-episode download progress and persistent downloaded state to cards", () => {
