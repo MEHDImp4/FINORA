@@ -1,6 +1,9 @@
 import React from "react";
 import renderer, { act } from "react-test-renderer";
-import { CompactGenreChips } from "../components/CompactGenreChips";
+import {
+  CompactGenreChips,
+  normalizeCompactGenres
+} from "../components/CompactGenreChips";
 
 describe("CompactGenreChips", () => {
   it("shows only four chips by default and exposes the rest behind +N", () => {
@@ -30,14 +33,9 @@ describe("CompactGenreChips", () => {
   });
 
   it("deduplicates tags case-insensitively", () => {
-    let root: renderer.ReactTestRenderer;
-    act(() => {
-      root = renderer.create(
-        <CompactGenreChips genres={["Drama", "drama", " Drama ", "Crime"]} language="en" />
-      );
-    });
-
-    expect(root!.root.findAllByProps({ testID: "compact-genre-chip-drama" })).toHaveLength(1);
-    expect(root!.root.findAllByProps({ testID: "compact-genre-chip-crime" })).toHaveLength(1);
+    expect(normalizeCompactGenres(["Drama", "drama", " Drama ", "Crime"])).toEqual([
+      "Drama",
+      "Crime"
+    ]);
   });
 });

@@ -10,6 +10,18 @@ export interface CompactGenreChipsProps {
   maxVisible?: number;
 }
 
+export function normalizeCompactGenres(genres: string[] = []): string[] {
+  const seen = new Set<string>();
+  return genres.filter((genre) => {
+    const value = genre?.trim();
+    if (!value) return false;
+    const key = value.toLocaleLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function CompactGenreChips({
   genres = [],
   language,
@@ -17,17 +29,7 @@ export function CompactGenreChips({
 }: CompactGenreChipsProps) {
   const [expanded, setExpanded] = useState(false);
 
-  const normalizedGenres = useMemo(() => {
-    const seen = new Set<string>();
-    return genres.filter((genre) => {
-      const value = genre?.trim();
-      if (!value) return false;
-      const key = value.toLocaleLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [genres]);
+  const normalizedGenres = useMemo(() => normalizeCompactGenres(genres), [genres]);
 
   if (normalizedGenres.length === 0) return null;
 
