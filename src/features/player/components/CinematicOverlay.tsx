@@ -35,7 +35,6 @@ export interface CinematicOverlayProps {
   onBack: () => void;
   onOpenTracks: () => void;
   onOpenStats?: () => void;
-  onToggleOrientation?: () => void;
   isLandscape?: boolean;
   onScrubbingChange?: (isScrubbing: boolean) => void;
   onScrubMove?: (seconds: number, percent: number) => void;
@@ -82,7 +81,6 @@ export function CinematicOverlay({
   onBack,
   onOpenTracks,
   onOpenStats,
-  onToggleOrientation,
   isLandscape = false,
   onScrubbingChange,
   onScrubMove,
@@ -418,7 +416,7 @@ export function CinematicOverlay({
             </Pressable>
           )}
 
-          {(onOpenStats || onToggleOrientation) && (
+          {Boolean(onOpenStats) && (
             <Pressable
               style={({ pressed }) => [
                 styles.bottomActionItem,
@@ -504,39 +502,6 @@ export function CinematicOverlay({
 
             {/* Options List */}
             <View style={styles.moreActionsList}>
-              {Boolean(onToggleOrientation) && (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.moreActionRow,
-                    pressed && styles.moreActionRowPressed
-                  ]}
-                  onPress={() => {
-                    setMoreOpen(false);
-                    onToggleOrientation?.();
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={isLandscape ? t("player.portraitMode") : t("player.landscapeMode")}
-                  testID="overlay-orientation-button"
-                >
-                  <View style={styles.moreIconBox}>
-                    <Ionicons
-                      name={isLandscape ? "phone-portrait-outline" : "scan-outline"}
-                      size={20}
-                      color="#FFFFFF"
-                    />
-                  </View>
-                  <View style={styles.moreActionTextCol}>
-                    <FinoraText variant="body" style={styles.moreActionLabel}>
-                      {isLandscape ? t("player.portraitMode") : t("player.landscapeMode")}
-                    </FinoraText>
-                    <FinoraText variant="caption" style={styles.moreActionSub}>
-                      {isLandscape ? t("player.portraitModeDesc") : t("player.landscapeModeDesc")}
-                    </FinoraText>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color="rgba(255, 255, 255, 0.3)" />
-                </Pressable>
-              )}
-
               {Boolean(onOpenStats) && (
                 <Pressable
                   style={({ pressed }) => [

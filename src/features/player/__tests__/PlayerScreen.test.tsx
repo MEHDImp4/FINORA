@@ -74,6 +74,43 @@ describe("PlayerScreen", () => {
     });
   });
 
+  it("locks the player to landscape and exposes no portrait/orientation control", () => {
+    const ScreenOrientation = require("expo-screen-orientation");
+    ScreenOrientation.lockAsync.mockClear();
+
+    const mockRepo = createMockRepo();
+    let root: any;
+    act(() => {
+      root = renderer.create(
+        <QueryClientProvider client={queryClient}>
+          <PlayerScreen
+            item={mockItem}
+            serverUrl="https://demo.jellyfin.org"
+            token="test-token"
+            onBack={jest.fn()}
+            playbackRepository={mockRepo}
+            overlayAutoHideMs={0}
+          />
+        </QueryClientProvider>
+      );
+    });
+
+    expect(ScreenOrientation.lockAsync).toHaveBeenCalledWith(
+      ScreenOrientation.OrientationLock.LANDSCAPE
+    );
+
+    const moreButton = root.root.findByProps({ testID: "overlay-more-button" });
+    act(() => {
+      moreButton.props.onPress();
+    });
+
+    expect(root.root.findAllByProps({ testID: "overlay-orientation-button" })).toHaveLength(0);
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
   it("triggers onBack when back button is pressed", () => {
     const onBackMock = jest.fn();
     const mockRepo = createMockRepo();

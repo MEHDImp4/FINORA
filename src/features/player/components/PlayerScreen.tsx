@@ -107,7 +107,7 @@ export function PlayerScreen({
   } | null>(null);
   const playbackFallbackAttemptedRef = useRef<string | null>(null);
   const forcedMode = playbackFallback?.contentId === item.id ? playbackFallback.mode : undefined;
-  const [isLandscape, setIsLandscape] = useState(false);
+  const isLandscape = true;
   const [showSubtitleStyleModal, setShowSubtitleStyleModal] = useState(false);
   const [currentSpeed, setCurrentSpeed] = useState(preferredPlaybackSpeed);
 
@@ -158,47 +158,18 @@ export function PlayerScreen({
     }
   }, [bestSubtitleIndex]);
 
-  // Auto/Manual screen orientation handling
+  // Player policy: video playback is landscape-only. The rest of FINORA stays
+  // portrait-first, and leaving the player restores portrait. A next-episode
+  // handoff preserves landscape between player screens to avoid orientation flicker.
   useEffect(() => {
-    ScreenOrientation.unlockAsync().catch(() => {});
-
-    ScreenOrientation.getOrientationAsync()
-      .then((orientation) => {
-        const isLand =
-          orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
-          orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT;
-        setIsLandscape(isLand);
-      })
-      .catch(() => {});
-
-    const subscription = ScreenOrientation.addOrientationChangeListener((event) => {
-      const isLand =
-        event.orientationInfo.orientation === ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
-        event.orientationInfo.orientation === ScreenOrientation.Orientation.LANDSCAPE_RIGHT;
-      setIsLandscape(isLand);
-    });
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(() => {});
 
     return () => {
-      subscription.remove();
       if (!preserveOrientationOnUnmountRef.current) {
         ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
       }
     };
   }, []);
-
-  const handleToggleOrientation = async () => {
-    try {
-      if (isLandscape) {
-        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-        setIsLandscape(false);
-      } else {
-        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-        setIsLandscape(true);
-      }
-    } catch {
-      // Ignored
-    }
-  };
 
   // VideoView ref & Picture-in-Picture (PiP) state
   const videoViewRef = useRef<any>(null);
@@ -905,7 +876,6 @@ export function PlayerScreen({
           onBack={handleBack}
           onOpenTracks={() => setTracksModalVisible(true)}
           onOpenStats={() => setStatsModalVisible(true)}
-          onToggleOrientation={handleToggleOrientation}
           isLandscape={isLandscape}
           onScrubbingChange={setIsScrubbing}
           onScrubMove={(seconds, percent) => {
