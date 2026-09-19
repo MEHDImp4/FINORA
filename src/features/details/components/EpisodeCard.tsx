@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { View, StyleSheet, Pressable, DimensionValue } from "react-native";
+import { View, StyleSheet, Pressable, DimensionValue, Animated } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { MediaItem } from "../../../types/media";
 import { getMediaThumbnailUrls } from "../../../core/repositories/imageUrlBuilder";
 import { FinoraText } from "../../../design-system/components/FinoraText";
 import { colors, spacing } from "../../../design-system/tokens";
+import { DownloadStatus } from "../../offline/types";
 
 import { hapticService } from "../../../core/feedback/hapticService";
 import { useTranslation } from "../../../i18n";
@@ -17,14 +18,85 @@ export interface EpisodeCardProps {
   onLongPress?: (episode: MediaItem) => void;
   onDownload?: (episode: MediaItem) => void;
   onLongPressDownload?: (episode: MediaItem) => void;
+  downloadStatus?: DownloadStatus;
+  downloadProgress?: number;
+  isDownloaded?: boolean;
 }
 
 const THUMBNAIL_WIDTH = 130;
 const THUMBNAIL_HEIGHT = 73;
+const DOWNLOAD_INDICATOR_SIZE = 28;
 
 export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
-  ({ episode, serverUrl, onPlay, onLongPress, onDownload, onLongPressDownload }) => {
+  ({
+    episode,
+    serverUrl,
+    onPlay,
+    onLongPress,
+    onDownload,
+    onLongPressDownload,
+    downloadStatus,
+    downloadProgress = 0,
+    isDownloaded = false
+  }) => {
     const { t } = useTranslation();
+
+    const isDownloadComplete = isDownloaded || downloadStatus === "completed";
+    const isDownloadActive =
+      downloadStatus === "downloading" ||
+      downloadStatus === "finalizing" ||
+      downloadStatus === "queued";
+    const isDownloadPaused = downloadStatus === "paused";
+    const isDownloadFailed = downloadStatus === "failed";
+    const normalizedDownloadProgress = isDownloadComplete
+      ? 1
+      : downloadStatus === "finalizing"
+        ? Math.max(0.96, Math.min(0.99, downloadProgress))
+        : Math.max(0, Math.min(0.99, downloadProgress));
+    const downloadPercent = Math.round(normalizedDownloadProgress * 100);
+    const downloadFillProgress = useRef(
+      new Animated.Value(normalizedDownloadProgress)
+    ).current;
+    const completionScale = useRef(new Animated.Value(1)).current;
+    const wasDownloadCompleteRef = useRef(isDownloadComplete);
+
+    useEffect(() => {
+      Animated.timing(downloadFillProgress, {
+        toValue: normalizedDownloadProgress,
+        duration: 280,
+        useNativeDriver: true
+      }).start();
+
+      if (isDownloadComplete && !wasDownloadCompleteRef.current) {
+        completionScale.setValue(0.82);
+        Animated.spring(completionScale, {
+          toValue: 1,
+          friction: 5,
+          tension: 150,
+          useNativeDriver: true
+        }).start();
+      }
+      wasDownloadCompleteRef.current = isDownloadComplete;
+    }, [
+      completionScale,
+      downloadFillProgress,
+      isDownloadComplete,
+      normalizedDownloadProgress
+    ]);
+
+    const downloadFillTranslateY = downloadFillProgress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [DOWNLOAD_INDICATOR_SIZE, 0],
+      extrapolate: "clamp"
+    });
+
+    const downloadA11yLabel = isDownloadComplete
+      ? `${episode.name} · ${t("details.downloaded")}`
+      : isDownloadActive
+        ? `${t("details.downloading")} ${episode.name} · ${downloadPercent}%`
+        : t("details.downloadEpisodeA11y", { name: episode.name });
+
+    const isDownloadButtonLocked = isDownloadComplete || isDownloadActive;
     const candidateUrls = useMemo(
       () => getMediaThumbnailUrls(serverUrl, episode, 300),
       [serverUrl, episode]
@@ -161,11 +233,12 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
           ) : null}
         </View>
 
-        {/* Download Action Button */}
+        {/* Netflix-style Download State Button */}
         {onDownload ? (
           <Pressable
             testID={`download-button-${episode.id}`}
             style={styles.downloadButton}
+            disabled={isDownloadButtonLocked}
             onPress={(e) => {
               e.stopPropagation();
               hapticService.impactMedium();
@@ -173,7 +246,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
             }}
             onLongPress={(e) => {
               e.stopPropagation();
-              if (onLongPressDownload) {
+              if (!isDownloadButtonLocked && onLongPressDownload) {
                 hapticService.impactHeavy();
                 onLongPressDownload(episode);
               }
@@ -181,9 +254,57 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
             delayLongPress={350}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel={t("details.downloadEpisodeA11y", { name: episode.name })}
+            accessibilityLabel={downloadA11yLabel}
+            accessibilityState={{ disabled: isDownloadButtonLocked }}
+            accessibilityValue={
+              isDownloadActive || isDownloadPaused
+                ? { min: 0, max: 100, now: downloadPercent }
+                : undefined
+            }
           >
-            <Ionicons name="arrow-down-circle-outline" size={24} color={colors.textSecondary} />
+            {isDownloadComplete ? (
+              <Animated.View
+                testID={`download-complete-${episode.id}`}
+                style={[
+                  styles.downloadCompleteCircle,
+                  { transform: [{ scale: completionScale }] }
+                ]}
+              >
+                <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+              </Animated.View>
+            ) : isDownloadActive || isDownloadPaused || isDownloadFailed ? (
+              <View
+                testID={`download-progress-${episode.id}`}
+                style={styles.downloadProgressCircle}
+              >
+                <Animated.View
+                  testID={`download-progress-fill-${episode.id}`}
+                  style={[
+                    styles.downloadProgressFill,
+                    { transform: [{ translateY: downloadFillTranslateY }] }
+                  ]}
+                />
+                <View style={styles.downloadProgressIcon}>
+                  <Ionicons
+                    name={
+                      isDownloadFailed
+                        ? "refresh"
+                        : isDownloadPaused
+                          ? "play"
+                          : downloadStatus === "queued"
+                            ? "time"
+                            : "arrow-down"
+                    }
+                    size={15}
+                    color="#FFFFFF"
+                  />
+                </View>
+              </View>
+            ) : (
+              <View style={styles.downloadIdleCircle}>
+                <Ionicons name="arrow-down" size={17} color={colors.textSecondary} />
+              </View>
+            )}
           </Pressable>
         ) : null}
       </Pressable>
@@ -195,7 +316,10 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
     prev.episode.isPlayed === next.episode.isPlayed &&
     prev.episode.primaryImageTag === next.episode.primaryImageTag &&
     prev.episode.thumbImageTag === next.episode.thumbImageTag &&
-    prev.serverUrl === next.serverUrl
+    prev.serverUrl === next.serverUrl &&
+    prev.downloadStatus === next.downloadStatus &&
+    prev.downloadProgress === next.downloadProgress &&
+    prev.isDownloaded === next.isDownloaded
 );
 
 EpisodeCard.displayName = "EpisodeCard";
@@ -310,7 +434,44 @@ const styles = StyleSheet.create({
     lineHeight: 16
   },
   downloadButton: {
-    padding: spacing.xs,
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  downloadIdleCircle: {
+    width: DOWNLOAD_INDICATOR_SIZE,
+    height: DOWNLOAD_INDICATOR_SIZE,
+    borderRadius: DOWNLOAD_INDICATOR_SIZE / 2,
+    borderWidth: 2,
+    borderColor: colors.textSecondary,
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  downloadProgressCircle: {
+    width: DOWNLOAD_INDICATOR_SIZE,
+    height: DOWNLOAD_INDICATOR_SIZE,
+    borderRadius: DOWNLOAD_INDICATOR_SIZE / 2,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.55)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    overflow: "hidden",
+    position: "relative"
+  },
+  downloadProgressFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.primary
+  },
+  downloadProgressIcon: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  downloadCompleteCircle: {
+    width: DOWNLOAD_INDICATOR_SIZE,
+    height: DOWNLOAD_INDICATOR_SIZE,
+    borderRadius: DOWNLOAD_INDICATOR_SIZE / 2,
+    backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center"
   }

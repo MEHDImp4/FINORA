@@ -51,7 +51,29 @@ export default function DetailsScreen() {
   const removeFromResumeMutation = useRemoveFromResume(userId);
 
   const [offlineRecord, setOfflineRecord] = React.useState<OfflineMediaRecord | null>(null);
+  const [offlineCatalog, setOfflineCatalog] = React.useState<OfflineMediaRecord[]>([]);
   const [activeDownload, setActiveDownload] = React.useState<DownloadItem | undefined>(undefined);
+  const [allDownloads, setAllDownloads] = React.useState<DownloadItem[]>([]);
+
+  const offlineScope = React.useMemo(
+    () =>
+      session?.serverId && session?.userId
+        ? { serverId: session.serverId, userId: session.userId }
+        : undefined,
+    [session?.serverId, session?.userId]
+  );
+
+  const refreshOfflineCatalog = React.useCallback(async () => {
+    if (!offlineScope) {
+      setOfflineCatalog([]);
+      setOfflineRecord(null);
+      return;
+    }
+
+    const records = await offlineStorageService.getAllOfflineMedia(offlineScope);
+    setOfflineCatalog(records);
+    setOfflineRecord(records.find((record) => record.itemId === id) ?? null);
+  }, [id, offlineScope]);
 
   const { failureType, isChecking: isDiagChecking, runDiagnostic } = useNetworkDiagnostic(
     serverUrl,
@@ -63,15 +85,39 @@ export default function DetailsScreen() {
   }, [refetch, runDiagnostic]);
 
   React.useEffect(() => {
-    if (id) {
-      offlineStorageService.getOfflineMedia(id).then(setOfflineRecord).catch(() => {});
-    }
+    let mounted = true;
+    let completedSignature = "";
+
+    refreshOfflineCatalog().catch(() => {});
+
     const unsub = downloadManager.subscribe((downloads) => {
-      const found = downloads.find((d) => d.itemId === id);
-      setActiveDownload(found);
+      if (!mounted) return;
+
+      setAllDownloads(downloads);
+      setActiveDownload(downloads.find((d) => d.itemId === id));
+
+      // Completion is committed only after the offline catalog transaction
+      // succeeds. Refresh here so episode cards morph to the persistent
+      // downloaded/check state immediately, without leaving the series page.
+      const nextCompletedSignature = downloads
+        .filter((download) => download.status === "completed")
+        .map((download) => `${download.itemId}:${download.completedAt ?? 0}`)
+        .sort()
+        .join("|");
+
+      if (nextCompletedSignature !== completedSignature) {
+        completedSignature = nextCompletedSignature;
+        if (nextCompletedSignature) {
+          refreshOfflineCatalog().catch(() => {});
+        }
+      }
     });
-    return unsub;
-  }, [id]);
+
+    return () => {
+      mounted = false;
+      unsub();
+    };
+  }, [id, refreshOfflineCatalog]);
 
   const handlePlay = (mediaId?: string | MediaItem) => {
     hapticService.impactMedium();
@@ -176,6 +222,35 @@ export default function DetailsScreen() {
 
     hapticService.notificationSuccess();
   };
+
+  const episodeDownloadStates = React.useMemo(() => {
+    const states: Record<
+      string,
+      { status?: DownloadItem["status"]; progress?: number; isDownloaded?: boolean }
+    > = {};
+
+    for (const download of allDownloads) {
+      if (download.type !== "Episode") continue;
+      states[download.itemId] = {
+        status: download.status,
+        progress: download.progress,
+        isDownloaded: download.status === "completed"
+      };
+    }
+
+    // The offline catalog is authoritative after app restarts, when completed
+    // jobs are intentionally no longer restored into DownloadManager.
+    for (const record of offlineCatalog) {
+      if (record.type !== "Episode") continue;
+      states[record.itemId] = {
+        status: "completed",
+        progress: 1,
+        isDownloaded: true
+      };
+    }
+
+    return states;
+  }, [allDownloads, offlineCatalog]);
 
   const seriesTargetId =
     (item?.type === "Season" || item?.type === "Episode") && (item?.seriesId || item?.parentId)
@@ -291,6 +366,7 @@ export default function DetailsScreen() {
             removeFromResumeMutation.mutate({ itemId: mediaItem.id });
           }}
           onDownloadEpisodes={handleDownloadSeriesEpisodes}
+          episodeDownloadStates={episodeDownloadStates}
         />
       ) : item.type === "BoxSet" ? (
         <CollectionDetailsView

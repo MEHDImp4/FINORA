@@ -217,6 +217,52 @@ describe("EpisodeCard", () => {
     expect(onLongPressDownload).toHaveBeenCalledWith(mockEpisode);
   });
 
+  it("shows live download progress and locks duplicate download presses", () => {
+    const onDownload = jest.fn();
+    let root: renderer.ReactTestRenderer;
+
+    act(() => {
+      root = renderer.create(
+        <EpisodeCard
+          episode={mockEpisode}
+          serverUrl="https://jellyfin.example.com"
+          onPlay={jest.fn()}
+          onDownload={onDownload}
+          downloadStatus="downloading"
+          downloadProgress={0.42}
+        />
+      );
+    });
+
+    const button = root!.root.findByProps({ testID: "download-button-ep-1" });
+    expect(button.props.disabled).toBe(true);
+    expect(button.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 42 });
+    expect(root!.root.findByProps({ testID: "download-progress-ep-1" })).toBeTruthy();
+    expect(root!.root.findByProps({ testID: "download-progress-fill-ep-1" })).toBeTruthy();
+  });
+
+  it("renders a persistent full check state for an already downloaded episode", () => {
+    const onDownload = jest.fn();
+    let root: renderer.ReactTestRenderer;
+
+    act(() => {
+      root = renderer.create(
+        <EpisodeCard
+          episode={mockEpisode}
+          serverUrl="https://jellyfin.example.com"
+          onPlay={jest.fn()}
+          onDownload={onDownload}
+          isDownloaded
+        />
+      );
+    });
+
+    const button = root!.root.findByProps({ testID: "download-button-ep-1" });
+    expect(button.props.disabled).toBe(true);
+    expect(button.props.accessibilityLabel).toContain("Downloaded");
+    expect(root!.root.findByProps({ testID: "download-complete-ep-1" })).toBeTruthy();
+  });
+
   it("renders watched badge, 100% progress bar, and watched tag when episode is played", () => {
     const watchedEpisode: MediaItem = {
       ...mockEpisode,

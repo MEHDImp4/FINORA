@@ -20,6 +20,7 @@ jest.mock("../../../stores/authStore", () => ({
   useAuthStore: jest.fn((selector) =>
     selector({
       session: {
+        serverId: "server-1",
         userId: "user-1",
         serverUrl: "https://jellyfin.example.com",
         token: "token-abc"
@@ -61,7 +62,8 @@ jest.mock("../../../features/offline/downloadManager", () => ({
 
 jest.mock("../../../features/offline/offlineStorage", () => ({
   offlineStorageService: {
-    getOfflineMedia: jest.fn().mockResolvedValue(null)
+    getOfflineMedia: jest.fn().mockResolvedValue(null),
+    getAllOfflineMedia: jest.fn().mockResolvedValue([])
   }
 }));
 

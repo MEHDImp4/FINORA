@@ -194,4 +194,28 @@ describe("SeriesDetailsView", () => {
     const modal = root!.root.findByProps({ testID: "download-quality-modal" });
     expect(modal).toBeTruthy();
   });
+
+  it("forwards per-episode download progress and persistent downloaded state to cards", () => {
+    let root: renderer.ReactTestRenderer;
+    act(() => {
+      root = renderer.create(
+        <SeriesDetailsView
+          series={mockSeries}
+          serverUrl="https://jellyfin.example.com"
+          userId="user-123"
+          onPlayEpisode={jest.fn()}
+          onBack={jest.fn()}
+          onDownloadEpisodes={jest.fn()}
+          episodeDownloadStates={{
+            "ep-101": { status: "downloading", progress: 0.37 },
+            "ep-102": { status: "completed", progress: 1, isDownloaded: true }
+          }}
+        />
+      );
+    });
+
+    const activeButton = root!.root.findByProps({ testID: "download-button-ep-101" });
+    expect(activeButton.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 37 });
+    expect(root!.root.findByProps({ testID: "download-complete-ep-102" })).toBeTruthy();
+  });
 });

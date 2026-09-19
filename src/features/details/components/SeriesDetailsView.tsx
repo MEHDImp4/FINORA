@@ -30,12 +30,19 @@ import { CastList } from "./CastList";
 import { DownloadSeriesModal } from "./DownloadSeriesModal";
 import { DownloadQualityModal } from "./DownloadQualityModal";
 import { DownloadQuality } from "../../offline/downloadQuality";
+import { DownloadStatus } from "../../offline/types";
 import { hapticService } from "../../../core/feedback/hapticService";
 import { MediaCarousel } from "../../home/components/MediaCarousel";
 import { useSimilarItems } from "../../../hooks/useMediaQueries";
 import { MediaQuickActionsModal } from "../../home/components/MediaQuickActionsModal";
 import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
 import { useTranslation } from "../../../i18n";
+
+export interface EpisodeDownloadVisualState {
+  status?: DownloadStatus;
+  progress?: number;
+  isDownloaded?: boolean;
+}
 
 export interface SeriesDetailsViewProps {
   series: MediaItem;
@@ -48,6 +55,7 @@ export interface SeriesDetailsViewProps {
   onTogglePlayed?: (item: MediaItem, played: boolean) => void;
   onRemoveFromResume?: (item: MediaItem) => void;
   onDownloadEpisodes?: (episodes: MediaItem[], quality: DownloadQuality) => void;
+  episodeDownloadStates?: Record<string, EpisodeDownloadVisualState>;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -66,7 +74,8 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
     onToggleFavorite,
     onTogglePlayed,
     onRemoveFromResume,
-    onDownloadEpisodes
+    onDownloadEpisodes,
+    episodeDownloadStates
   }) => {
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();
@@ -370,6 +379,9 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
                   hapticService.impactHeavy();
                   setSelectedEpisodeForDownload(episode);
                 }}
+                downloadStatus={episodeDownloadStates?.[ep.id]?.status}
+                downloadProgress={episodeDownloadStates?.[ep.id]?.progress}
+                isDownloaded={episodeDownloadStates?.[ep.id]?.isDownloaded}
               />
             ))
           ) : (
