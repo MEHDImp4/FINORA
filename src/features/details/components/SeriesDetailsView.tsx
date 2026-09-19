@@ -37,6 +37,7 @@ import { useSimilarItems } from "../../../hooks/useMediaQueries";
 import { MediaQuickActionsModal } from "../../home/components/MediaQuickActionsModal";
 import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
 import { useTranslation } from "../../../i18n";
+import { CompactGenreChips } from "./CompactGenreChips";
 
 export interface EpisodeDownloadVisualState {
   status?: DownloadStatus;
@@ -78,7 +79,7 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
     episodeDownloadStates
   }) => {
     const insets = useSafeAreaInsets();
-    const { t } = useTranslation();
+    const { t, language } = useTranslation();
     const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
     const [selectedSeasonId, setSelectedSeasonId] = useState<string>("");
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
@@ -337,6 +338,8 @@ export const SeriesDetailsView: React.FC<SeriesDetailsViewProps> = React.memo(
             ) : null}
           </Pressable>
         ) : null}
+
+        <CompactGenreChips genres={series.genres} language={language} />
 
         {isLoadingSeasons ? (
           <View style={styles.seasonSkeletonRow}>

@@ -116,6 +116,24 @@ describe("SeriesDetailsView", () => {
     expect(instance.findByProps({ children: "E1 · Pilot" })).toBeTruthy();
   });
 
+  it("renders series genre/tag chips just like movie details", () => {
+    let root: renderer.ReactTestRenderer;
+    act(() => {
+      root = renderer.create(
+        <SeriesDetailsView
+          series={mockSeries}
+          serverUrl="https://jellyfin.example.com"
+          userId="user-123"
+          onPlayEpisode={jest.fn()}
+          onBack={jest.fn()}
+        />
+      );
+    });
+
+    expect(root!.root.findByProps({ testID: "compact-genre-chips" })).toBeTruthy();
+    expect(root!.root.findByProps({ children: "Crime" })).toBeTruthy();
+  });
+
   it("triggers onPlayEpisode with the first unplayed episode when Lire button is pressed", () => {
     const onPlayEpisode = jest.fn();
 

@@ -27,7 +27,7 @@ import { MediaCarousel } from "../../home/components/MediaCarousel";
 import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferencesStore";
 import { useSimilarItems } from "../../../hooks/useMediaQueries";
 import { useTranslation } from "../../../i18n";
-import { getLocalizedGenre } from "../../library/libraryLocalization";
+import { CompactGenreChips } from "./CompactGenreChips";
 
 export interface MovieDetailsViewProps {
   item: MediaItem;
@@ -331,17 +331,7 @@ export const MovieDetailsView: React.FC<MovieDetailsViewProps> = React.memo(
           </Pressable>
         ) : null}
 
-        {item.genres && item.genres.length > 0 ? (
-          <View style={styles.genresRow}>
-            {item.genres.map((genre, idx) => (
-              <View key={`${genre}-${idx}`} style={styles.genreChip}>
-                <FinoraText variant="caption" color="textSecondary" numberOfLines={1}>
-                  {getLocalizedGenre(genre, language)}
-                </FinoraText>
-              </View>
-            ))}
-          </View>
-        ) : null}
+        <CompactGenreChips genres={item.genres} language={language} />
 
         {item.people && item.people.length > 0 ? (
           <CastList people={item.people} serverUrl={serverUrl} />
@@ -485,17 +475,4 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: "600"
   },
-  genresRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: spacing.md,
-    gap: spacing.xs,
-    marginBottom: spacing.md
-  },
-  genreChip: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12
-  }
 });
