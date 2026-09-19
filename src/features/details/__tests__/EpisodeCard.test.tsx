@@ -217,6 +217,77 @@ describe("EpisodeCard", () => {
     expect(onLongPressDownload).toHaveBeenCalledWith(mockEpisode);
   });
 
+  it("acknowledges a download tap immediately before manager state arrives", () => {
+    const onDownload = jest.fn();
+    let root: renderer.ReactTestRenderer;
+
+    act(() => {
+      root = renderer.create(
+        <EpisodeCard
+          episode={mockEpisode}
+          serverUrl="https://jellyfin.example.com"
+          onPlay={jest.fn()}
+          onDownload={onDownload}
+        />
+      );
+    });
+
+    const button = root!.root.findByProps({ testID: "download-button-ep-1" });
+    act(() => {
+      button.props.onPress({ stopPropagation: jest.fn() });
+    });
+
+    expect(onDownload).toHaveBeenCalledWith(mockEpisode);
+    expect(root!.root.findByProps({ testID: "download-starting-ep-1" })).toBeTruthy();
+    expect(root!.root.findByProps({ testID: "download-button-ep-1" }).props.disabled).toBe(true);
+
+    act(() => {
+      root!.unmount();
+    });
+  });
+
+  it("updates visible download percentage live while the card stays mounted", () => {
+    let root: renderer.ReactTestRenderer;
+
+    act(() => {
+      root = renderer.create(
+        <EpisodeCard
+          episode={mockEpisode}
+          serverUrl="https://jellyfin.example.com"
+          onPlay={jest.fn()}
+          onDownload={jest.fn()}
+          downloadStatus="downloading"
+          downloadProgress={0.1}
+        />
+      );
+    });
+
+    expect(
+      root!.root.findByProps({ testID: "download-button-ep-1" }).props.accessibilityValue
+    ).toEqual({ min: 0, max: 100, now: 10 });
+
+    act(() => {
+      root!.update(
+        <EpisodeCard
+          episode={mockEpisode}
+          serverUrl="https://jellyfin.example.com"
+          onPlay={jest.fn()}
+          onDownload={jest.fn()}
+          downloadStatus="downloading"
+          downloadProgress={0.42}
+        />
+      );
+    });
+
+    expect(
+      root!.root.findByProps({ testID: "download-button-ep-1" }).props.accessibilityValue
+    ).toEqual({ min: 0, max: 100, now: 42 });
+
+    act(() => {
+      root!.unmount();
+    });
+  });
+
   it("shows live download progress and locks duplicate download presses", () => {
     const onDownload = jest.fn();
     let root: renderer.ReactTestRenderer;

@@ -58,12 +58,18 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
       new Animated.Value(normalizedDownloadProgress)
     ).current;
     const completionScale = useRef(new Animated.Value(1)).current;
+    const downloadTapScale = useRef(new Animated.Value(1)).current;
     const wasDownloadCompleteRef = useRef(isDownloadComplete);
+    const [isDownloadStarting, setIsDownloadStarting] = useState(false);
+    const downloadStartingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
+      // Keep the liquid fill visually close to the latest native progress tick.
+      // A long animation here makes fast downloads look frozen or far behind.
+      downloadFillProgress.stopAnimation();
       Animated.timing(downloadFillProgress, {
         toValue: normalizedDownloadProgress,
-        duration: 280,
+        duration: 120,
         useNativeDriver: true
       }).start();
 
@@ -84,19 +90,42 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
       normalizedDownloadProgress
     ]);
 
+    useEffect(() => {
+      // The optimistic acknowledgement only bridges the short gap before the
+      // DownloadManager publishes its authoritative queued/downloading state.
+      if (downloadStatus || isDownloaded) {
+        setIsDownloadStarting(false);
+        if (downloadStartingTimerRef.current) {
+          clearTimeout(downloadStartingTimerRef.current);
+          downloadStartingTimerRef.current = null;
+        }
+      }
+    }, [downloadStatus, isDownloaded]);
+
+    useEffect(
+      () => () => {
+        if (downloadStartingTimerRef.current) {
+          clearTimeout(downloadStartingTimerRef.current);
+        }
+      },
+      []
+    );
+
     const downloadFillTranslateY = downloadFillProgress.interpolate({
       inputRange: [0, 1],
       outputRange: [DOWNLOAD_INDICATOR_SIZE, 0],
       extrapolate: "clamp"
     });
 
+    const showDownloadProgress = isDownloadActive || isDownloadPaused || isDownloadFailed || isDownloadStarting;
+
     const downloadA11yLabel = isDownloadComplete
       ? `${episode.name} · ${t("details.downloaded")}`
-      : isDownloadActive
+      : isDownloadActive || isDownloadStarting
         ? `${t("details.downloading")} ${episode.name} · ${downloadPercent}%`
         : t("details.downloadEpisodeA11y", { name: episode.name });
 
-    const isDownloadButtonLocked = isDownloadComplete || isDownloadActive;
+    const isDownloadButtonLocked = isDownloadComplete || isDownloadActive || isDownloadStarting;
     const candidateUrls = useMemo(
       () => getMediaThumbnailUrls(serverUrl, episode, 300),
       [serverUrl, episode]
@@ -241,6 +270,27 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
             disabled={isDownloadButtonLocked}
             onPress={(e) => {
               e.stopPropagation();
+              if (isDownloadButtonLocked) return;
+
+              // Confirm the tap immediately instead of waiting for async network,
+              // Wi-Fi and disk-space preflight inside DownloadManager.
+              setIsDownloadStarting(true);
+              downloadTapScale.setValue(0.8);
+              Animated.spring(downloadTapScale, {
+                toValue: 1,
+                friction: 5,
+                tension: 220,
+                useNativeDriver: true
+              }).start();
+
+              if (downloadStartingTimerRef.current) {
+                clearTimeout(downloadStartingTimerRef.current);
+              }
+              downloadStartingTimerRef.current = setTimeout(() => {
+                downloadStartingTimerRef.current = null;
+                setIsDownloadStarting(false);
+              }, 5000);
+
               hapticService.impactMedium();
               onDownload(episode);
             }}
@@ -262,49 +312,57 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
                 : undefined
             }
           >
-            {isDownloadComplete ? (
-              <Animated.View
-                testID={`download-complete-${episode.id}`}
-                style={[
-                  styles.downloadCompleteCircle,
-                  { transform: [{ scale: completionScale }] }
-                ]}
-              >
-                <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-              </Animated.View>
-            ) : isDownloadActive || isDownloadPaused || isDownloadFailed ? (
-              <View
-                testID={`download-progress-${episode.id}`}
-                style={styles.downloadProgressCircle}
-              >
+            <Animated.View
+              testID={`download-feedback-${episode.id}`}
+              style={{ transform: [{ scale: downloadTapScale }] }}
+            >
+              {isDownloadComplete ? (
                 <Animated.View
-                  testID={`download-progress-fill-${episode.id}`}
+                  testID={`download-complete-${episode.id}`}
                   style={[
-                    styles.downloadProgressFill,
-                    { transform: [{ translateY: downloadFillTranslateY }] }
+                    styles.downloadCompleteCircle,
+                    { transform: [{ scale: completionScale }] }
                   ]}
-                />
-                <View style={styles.downloadProgressIcon}>
-                  <Ionicons
-                    name={
-                      isDownloadFailed
-                        ? "refresh"
-                        : isDownloadPaused
-                          ? "play"
-                          : downloadStatus === "queued"
-                            ? "time"
-                            : "arrow-down"
-                    }
-                    size={15}
-                    color="#FFFFFF"
+                >
+                  <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                </Animated.View>
+              ) : showDownloadProgress ? (
+                <View
+                  testID={isDownloadStarting ? `download-starting-${episode.id}` : `download-progress-${episode.id}`}
+                  style={[
+                    styles.downloadProgressCircle,
+                    isDownloadStarting && styles.downloadStartingCircle
+                  ]}
+                >
+                  <Animated.View
+                    testID={`download-progress-fill-${episode.id}`}
+                    style={[
+                      styles.downloadProgressFill,
+                      { transform: [{ translateY: downloadFillTranslateY }] }
+                    ]}
                   />
+                  <View style={styles.downloadProgressIcon}>
+                    <Ionicons
+                      name={
+                        isDownloadFailed
+                          ? "refresh"
+                          : isDownloadPaused
+                            ? "play"
+                            : downloadStatus === "queued" || isDownloadStarting
+                              ? "time"
+                              : "arrow-down"
+                      }
+                      size={15}
+                      color="#FFFFFF"
+                    />
+                  </View>
                 </View>
-              </View>
-            ) : (
-              <View style={styles.downloadIdleCircle}>
-                <Ionicons name="arrow-down" size={17} color={colors.textSecondary} />
-              </View>
-            )}
+              ) : (
+                <View style={styles.downloadIdleCircle}>
+                  <Ionicons name="arrow-down" size={17} color={colors.textSecondary} />
+                </View>
+              )}
+            </Animated.View>
           </Pressable>
         ) : null}
       </Pressable>
@@ -461,6 +519,10 @@ const styles = StyleSheet.create({
   downloadProgressFill: {
     ...StyleSheet.absoluteFill,
     backgroundColor: colors.primary
+  },
+  downloadStartingCircle: {
+    borderColor: colors.primary,
+    backgroundColor: "rgba(229, 9, 20, 0.12)"
   },
   downloadProgressIcon: {
     ...StyleSheet.absoluteFill,

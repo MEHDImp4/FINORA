@@ -93,8 +93,12 @@ export default function DetailsScreen() {
     const unsub = downloadManager.subscribe((downloads) => {
       if (!mounted) return;
 
-      setAllDownloads(downloads);
-      setActiveDownload(downloads.find((d) => d.itemId === id));
+      // DownloadManager mutates DownloadItem objects in place for high-frequency
+      // progress updates. Snapshot them here so React memoization always receives
+      // fresh identities while the details screen stays mounted.
+      const snapshot = downloads.map((download) => ({ ...download }));
+      setAllDownloads(snapshot);
+      setActiveDownload(snapshot.find((d) => d.itemId === id));
 
       // Completion is committed only after the offline catalog transaction
       // succeeds. Refresh here so episode cards morph to the persistent
