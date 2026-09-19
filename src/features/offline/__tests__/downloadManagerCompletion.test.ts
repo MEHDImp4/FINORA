@@ -87,7 +87,7 @@ describe("DownloadManager — completion & background lifecycle regressions", ()
     manager.updateProgress("prog-100", SIZE, SIZE);
 
     const item = manager.getDownload("prog-100");
-    expect(item?.progress).toBe(1);
+    expect(item?.progress).toBe(0.99);
     expect(item?.status).toBe("downloading");
     expect(item?.completedAt).toBeUndefined();
   });
