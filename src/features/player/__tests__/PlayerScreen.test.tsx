@@ -207,6 +207,78 @@ describe("PlayerScreen", () => {
     global.fetch = originalFetch;
   });
 
+  it("preserves orientation when handing off to the next episode", async () => {
+    const ScreenOrientation = require("expo-screen-orientation");
+    ScreenOrientation.lockAsync.mockClear();
+
+    const originalFetch = global.fetch;
+    (global as any).fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        Items: [
+          { Id: "orientation-episode-1", Name: "Episode 1", IndexNumber: 1, ParentIndexNumber: 1 },
+          { Id: "orientation-episode-2", Name: "Episode 2", IndexNumber: 2, ParentIndexNumber: 1 }
+        ]
+      })
+    });
+
+    const episodeItem: MediaItem = {
+      id: "orientation-episode-1",
+      name: "Episode 1",
+      type: "Episode",
+      seriesId: "series-orientation",
+      seasonId: "season-orientation",
+      seriesName: "Orientation Series",
+      seasonIndex: 1,
+      episodeIndex: 1,
+      genres: [],
+      playbackPositionTicks: 0,
+      totalTicks: 2400000000,
+      playedPercentage: 0,
+      isPlayed: false,
+      isFavorite: false
+    };
+
+    const onNextEpisode = jest.fn();
+    const mockRepo = createMockRepo();
+    let root: any;
+
+    try {
+      await act(async () => {
+        root = renderer.create(
+          <QueryClientProvider client={queryClient}>
+            <PlayerScreen
+              item={episodeItem}
+              serverUrl="https://demo.jellyfin.org"
+              token="test-token"
+              onBack={jest.fn()}
+              onNextEpisode={onNextEpisode}
+              playbackRepository={mockRepo}
+              overlayAutoHideMs={0}
+            />
+          </QueryClientProvider>
+        );
+      });
+
+      const nextEpisodeBtn = root.root.findByProps({ testID: "overlay-next-episode-button" });
+      await act(async () => {
+        nextEpisodeBtn.props.onPress();
+      });
+
+      expect(onNextEpisode).toHaveBeenCalledWith("orientation-episode-2");
+
+      act(() => {
+        root.unmount();
+      });
+
+      expect(ScreenOrientation.lockAsync).not.toHaveBeenCalledWith(
+        ScreenOrientation.OrientationLock.PORTRAIT_UP
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
   it("falls back from direct play to transcode exactly once, then surfaces a terminal error (PLR-01)", () => {
     const mockRepo = createMockRepo();
     let root: any;

@@ -121,6 +121,9 @@ export function PlayerScreen({
   const [nextEpisode, setNextEpisode] = useState<{ id: string; name: string; label: string } | null>(null);
   const [showNextEpisode, setShowNextEpisode] = useState(false);
   const nextEpisodeFetchedRef = useRef(false);
+  // A player-to-player transition (next episode) must preserve the current
+  // device orientation. A real exit still restores portrait.
+  const preserveOrientationOnUnmountRef = useRef(false);
 
   // High-fidelity custom subtitle cues
   const { cues, isCustomSubtitleActive } = useSubtitleCues({
@@ -175,7 +178,9 @@ export function PlayerScreen({
 
     return () => {
       subscription.remove();
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+      if (!preserveOrientationOnUnmountRef.current) {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+      }
     };
   }, []);
 
@@ -627,6 +632,7 @@ export function PlayerScreen({
   }, [autoSkipIntro, hasAutoSkipped, item.chapters, snapshot.currentTimeSeconds, controls]);
 
   const handleBack = () => {
+    preserveOrientationOnUnmountRef.current = false;
     stopSession();
     controls.pause();
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
@@ -640,8 +646,13 @@ export function PlayerScreen({
     stopSession();
     controls.pause();
     if (onNextEpisode) {
+      // router.replace() unmounts this PlayerScreen before mounting the next
+      // episode. Do not force portrait during that player-to-player handoff.
+      preserveOrientationOnUnmountRef.current = true;
       onNextEpisode(nextEpisode.id);
     } else {
+      preserveOrientationOnUnmountRef.current = false;
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
       onBack();
     }
   };
