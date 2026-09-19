@@ -43,10 +43,15 @@ export function DownloadProgressCard({
   const isPaused = download.status === "paused";
   const isFinalizing = download.status === "finalizing";
   const isDownloading = download.status === "downloading" || isFinalizing;
-  const progressPercent = Math.round(download.progress * 100);
+  // UI completion is authoritative: 100 % is reserved for a committed
+  // completed download. Estimated/transferring states are capped below 100.
+  const progressPercent =
+    download.status === "completed"
+      ? 100
+      : Math.min(99, Math.round(download.progress * 100));
 
-  // Jellyfin sends no Content-Length for transcoded downloads, so fall back to
-  // the duration-based estimate to keep a meaningful percentage and size.
+  // Jellyfin sends no Content-Length for transcoded downloads. expectedBytes is
+  // an estimate only and must never be presented as an exact denominator.
   const hasRealTotal = download.totalBytes > 0;
   const displayTotal = hasRealTotal
     ? download.totalBytes
@@ -156,7 +161,7 @@ export function DownloadProgressCard({
                   : hasRealTotal
                   ? `${formatBytes(download.bytesDownloaded)} / ${formatBytes(download.totalBytes)}`
                   : isEstimated
-                  ? `${formatBytes(download.bytesDownloaded)} / ~${formatBytes(displayTotal)}`
+                  ? t("downloads.bytesReceived", { bytes: formatBytes(download.bytesDownloaded) })
                   : download.bytesDownloaded > 0
                   ? t("downloads.bytesReceived", { bytes: formatBytes(download.bytesDownloaded) })
                   : t("downloads.statusConnecting")}

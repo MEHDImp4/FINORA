@@ -40,7 +40,7 @@ describe("DownloadManager", () => {
     // completeDownload() verifies the file and commits the catalog.
     manager.updateProgress("movie-2", 1000000, 1000000);
     item = manager.getDownload("movie-2");
-    expect(item?.progress).toBe(1);
+    expect(item?.progress).toBe(0.99);
     expect(item?.status).toBe("downloading");
     expect(item?.completedAt).toBeUndefined();
   });

@@ -146,6 +146,15 @@ const PROGRESS_PERSIST_INTERVAL_MS = 3000;
 const PROGRESS_PERSIST_MIN_DELTA = 0.01;
 
 /**
+ * Transcoded downloads are live Jellyfin streams, not stable byte-addressable
+ * artifacts. Only the original-file endpoint is safe to reconstruct with a
+ * persisted HTTP Range offset after task loss/process death.
+ */
+function isTranscodedQuality(quality?: DownloadQuality): boolean {
+  return (quality ?? "original") !== "original";
+}
+
+/**
  * Strips authentication tokens from a URL query string.
  * Tokens must come from the live secure session, never from persisted storage.
  */
@@ -669,31 +678,57 @@ export class DownloadManager {
         // Completed / canceled carry no pending work
         if (entry.status === "completed" || entry.status === "canceled") continue;
 
-        const fileSizeBytes = await this.getExistingFileSize(entry.localPath);
+        let fileSizeBytes = await this.getExistingFileSize(entry.localPath);
+        const isTranscode = isTranscodedQuality(entry.quality);
 
         logger.info(
           `[DownloadManager] Restore ${entry.itemId}: ` +
           `fileSize=${fileSizeBytes}, persistedBytes=${entry.bytesDownloaded}, ` +
-          `persistedStatus=${entry.status}, hasFile=${fileSizeBytes > 0}`
+          `persistedStatus=${entry.status}, quality=${entry.quality ?? "original"}, ` +
+          `hasFile=${fileSizeBytes > 0}`
         );
 
-        // Case D — already fully downloaded on disk. Uses the effective expected
-        // size so a completed transcode (totalBytes = 0, expectedBytes = X) is
-        // reconciled as completed instead of being re-downloaded (DWN-02).
-        if (isFileComplete(fileSizeBytes, entry.totalBytes, entry.expectedBytes)) {
+        // A persisted transcode in FINALIZING is special: finalizing is entered
+        // only after downloadAsync resolved successfully, so the file is already
+        // a complete artifact and only the catalog transaction was interrupted.
+        // Any other persisted transcode file is an unsafe partial stream and must
+        // never be resumed by byte offset after task/process loss.
+        if (isTranscode && entry.status === "finalizing" && fileSizeBytes > 0) {
           const reconciled = await this.reconcileCompletedOnDisk(entry, fileSizeBytes);
           if (reconciled) {
             continue;
           }
-          // Failed to save in catalog — keep item in failed state so it is not lost
+          entry.status = "failed";
+          entry.error = "Échec de l'enregistrement dans le catalogue hors-ligne";
+        } else if (
+          !isTranscode &&
+          entry.totalBytes > 0 &&
+          isFileComplete(fileSizeBytes, entry.totalBytes)
+        ) {
+          // Original files have an authoritative byte total and can be safely
+          // reconciled after a crash.
+          const reconciled = await this.reconcileCompletedOnDisk(entry, fileSizeBytes);
+          if (reconciled) {
+            continue;
+          }
           entry.status = "failed";
           entry.error = "Échec de l'enregistrement dans le catalogue hors-ligne";
         }
 
+        if (isTranscode && fileSizeBytes > 0) {
+          logger.info(
+            `[DownloadLifecycle] item=${entry.itemId} transcode partial discarded after task loss bytes=${fileSizeBytes}`
+          );
+          await FileSystem.deleteAsync(entry.localPath, { idempotent: true }).catch(() => {});
+          fileSizeBytes = 0;
+          entry.bytesDownloaded = 0;
+          entry.totalBytes = 0;
+          entry.progress = 0;
+        }
+
         // Case B — metadata claims progress but nothing is on disk. Never show a
         // fake percentage: reset the counters so the restart is honest.
-        // Case A — a real partial file exists, so reconcile the byte counters
-        // against it rather than trusting the last persisted sample.
+        // Case A — only an original-file partial is resumable after task loss.
         const hasPartialFile = fileSizeBytes > 0;
         const bytesDownloaded = hasPartialFile
           ? Math.max(entry.bytesDownloaded, fileSizeBytes)
@@ -714,9 +749,9 @@ export class DownloadManager {
         );
         const restoredProgress =
           restoredDenominator > 0
-            ? Math.min(1, bytesDownloaded / restoredDenominator)
+            ? Math.min(isTranscode ? 0.95 : 0.99, bytesDownloaded / restoredDenominator)
             : hasPartialFile
-              ? entry.progress
+              ? Math.min(0.99, entry.progress)
               : 0;
 
         const restoredItem: DownloadItem = {
@@ -780,8 +815,10 @@ export class DownloadManager {
           restored: true
         });
 
-        if (hasPartialFile) {
+        if (hasPartialFile && !isTranscode) {
           this.resumeOffsets.set(entry.itemId, bytesDownloaded);
+        } else {
+          this.resumeOffsets.set(entry.itemId, 0);
         }
 
         restoredCount++;
@@ -983,8 +1020,14 @@ export class DownloadManager {
       }
 
       const primary = active[0];
-      const hasTotal = primary.totalBytes > 0 || (primary.expectedBytes ?? 0) > 0;
-      const percent = Math.round(primary.progress * 100);
+      const primaryConfig = this.downloadConfigs.get(primary.itemId);
+      const primaryQuality =
+        primaryConfig?.quality ?? primaryConfig?.options?.quality ?? "original";
+      const primaryIsTranscode = isTranscodedQuality(primaryQuality);
+      const hasTotal =
+        primary.totalBytes > 0 ||
+        (primaryIsTranscode && (primary.expectedBytes ?? 0) > 0);
+      const percent = Math.min(99, Math.round(primary.progress * 100));
       const percentLabel = primary.isEstimatedTotal ? `~${percent} %` : `${percent} %`;
 
       const details: string[] = [];
@@ -993,11 +1036,9 @@ export class DownloadManager {
         details.push(
           `${formatBytes(primary.bytesDownloaded)} / ${formatBytes(primary.totalBytes)}`
         );
-      } else if (primary.expectedBytes) {
-        details.push(
-          `${formatBytes(primary.bytesDownloaded)} / ~${formatBytes(primary.expectedBytes)}`
-        );
       } else {
+        // Transcode estimate is deliberately NOT rendered as a denominator:
+        // "900 MB / ~600 MB" is misleading when the final encoded size is unknown.
         details.push(formatBytes(primary.bytesDownloaded));
       }
       const speed = formatSpeed(primary.speedBytesPerSecond);
@@ -1325,7 +1366,12 @@ export class DownloadManager {
    * embeds the original request headers (i.e. the access token), so it is never
    * persisted — a partial file with no live in-memory task is restarted instead.
    */
-  private resolveResumeOffset(partialBytes: number, totalBytes: number): number {
+  private resolveResumeOffset(
+    partialBytes: number,
+    totalBytes: number,
+    quality?: DownloadQuality
+  ): number {
+    if (isTranscodedQuality(quality)) return 0;
     if (partialBytes <= 0) return 0;
     if (totalBytes > 0 && partialBytes >= totalBytes) return 0;
     return Platform.OS === "android" ? partialBytes : 0;
@@ -1383,6 +1429,9 @@ export class DownloadManager {
 
     const status = result.status ?? 0;
     const resumeOffset = this.resumeOffsets.get(itemId) ?? 0;
+    const config = this.downloadConfigs.get(itemId);
+    const quality = config?.quality ?? config?.options?.quality ?? "original";
+    const isTranscode = isTranscodedQuality(quality);
 
     logger.info(
       `[DownloadManager] Result ${itemId}: HTTP ${status}, ` +
@@ -1417,9 +1466,9 @@ export class DownloadManager {
 
     // 416 — requested range not satisfiable: either the file is already whole,
     // or the recorded offset is stale and the transfer must start over.
-    if (status === 416) {
+    if (status === 416 && !isTranscode) {
       const size = await this.getExistingFileSize(localPath);
-      if (isFileComplete(size, downloadItem.totalBytes, downloadItem.expectedBytes)) {
+      if (downloadItem.totalBytes > 0 && isFileComplete(size, downloadItem.totalBytes)) {
         await this.completeDownload(itemId, size, { ...metadata, localPath }, jobGeneration);
         return;
       }
@@ -1429,7 +1478,7 @@ export class DownloadManager {
 
     // We asked to continue from an offset but the server returned the FULL body.
     // The native layer appends on resume, so the file is now corrupt.
-    if (resumeOffset > 0 && status === 200) {
+    if (!isTranscode && resumeOffset > 0 && status === 200) {
       logger.warn(
         `[DownloadManager] Source ignored Range for ${itemId} — discarding corrupt partial file.`
       );
@@ -1447,15 +1496,16 @@ export class DownloadManager {
     if (!result.uri) return;
 
     // Integrity check — never mark a file complete that is missing or short.
-    // Uses the effective expected size so a completed transcode is accepted.
+    // For a transcode, expectedBytes is presentation/disk-planning metadata only:
+    // it is NOT an integrity boundary because the final encoded size is unknown.
     const finalSize = await this.getExistingFileSize(result.uri);
-    const expectedSize = getEffectiveExpectedBytes(
-      downloadItem.totalBytes,
-      downloadItem.expectedBytes
-    );
-    if (finalSize <= 0 || (expectedSize > 0 && finalSize < expectedSize)) {
+    const authoritativeExpectedSize = isTranscode ? 0 : downloadItem.totalBytes;
+    if (
+      finalSize <= 0 ||
+      (authoritativeExpectedSize > 0 && finalSize < authoritativeExpectedSize)
+    ) {
       logger.error(
-        `[DownloadManager] Incomplete file for ${itemId} (${finalSize}/${expectedSize} bytes).`
+        `[DownloadManager] Incomplete file for ${itemId} (${finalSize}/${authoritativeExpectedSize} bytes).`
       );
       this.markFailed(itemId, "Fichier téléchargé incomplet");
       return;
@@ -1469,6 +1519,16 @@ export class DownloadManager {
     const downloadItem = this.downloads.get(itemId);
     const config = this.downloadConfigs.get(itemId);
     if (!downloadItem || !config) return;
+
+    // Exactly one native transfer per item. A duplicate retry/processQueue tick
+    // must never create a second writer for the same destination file.
+    if (this.activeTasks.has(itemId)) {
+      this.logLifecycle(itemId, "native task already active; duplicate start ignored");
+      return;
+    }
+
+    const quality = config.quality ?? config.options?.quality ?? "original";
+    const isTranscode = isTranscodedQuality(quality);
 
     const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
     if (wifiOnly) {
@@ -1515,15 +1575,37 @@ export class DownloadManager {
 
     try {
       // Reconcile against the real partial file before starting.
-      const partialBytes = await this.getExistingFileSize(localPath);
+      let partialBytes = await this.getExistingFileSize(localPath);
 
       logger.info(
         `[DownloadManager] Resume check ${itemId}: partialBytes=${partialBytes}, ` +
-        `totalBytes=${downloadItem.totalBytes}, platform=${Platform.OS}`
+        `totalBytes=${downloadItem.totalBytes}, quality=${quality}, platform=${Platform.OS}`
       );
 
-      if (isFileComplete(partialBytes, downloadItem.totalBytes, downloadItem.expectedBytes)) {
-        // The file on disk is already complete — no transfer needed.
+      // Reconstructed transcoded requests are new live streams, not resumable
+      // artifacts. Never append a new stream onto bytes from an older request.
+      if (isTranscode && partialBytes > 0) {
+        this.logLifecycle(itemId, "transcode restart from zero", {
+          partialBytes,
+          reason: "task-loss-or-retry"
+        });
+        await FileSystem.deleteAsync(localPath, { idempotent: true }).catch(() => {});
+        partialBytes = 0;
+        downloadItem.bytesDownloaded = 0;
+        downloadItem.totalBytes = 0;
+        downloadItem.progress = 0;
+        downloadItem.isEstimatedTotal = (downloadItem.expectedBytes ?? 0) > 0;
+        this.resumeOffsets.set(itemId, 0);
+        this.schedulePersist();
+        this.notify();
+      }
+
+      if (
+        !isTranscode &&
+        downloadItem.totalBytes > 0 &&
+        isFileComplete(partialBytes, downloadItem.totalBytes)
+      ) {
+        // Original-file download already complete on disk — no transfer needed.
         await this.completeDownload(item.itemId, partialBytes, { ...metadata, localPath });
         return;
       }
@@ -1545,19 +1627,26 @@ export class DownloadManager {
       }
 
       const jobGeneration = this.beginJobGeneration(item.itemId);
-      const resumeOffset = this.resolveResumeOffset(partialBytes, downloadItem.totalBytes);
+      const resumeOffset = this.resolveResumeOffset(
+        partialBytes,
+        downloadItem.totalBytes,
+        quality
+      );
       logger.info(
         `[DownloadManager] resumeOffset=${resumeOffset} for ${itemId} ` +
         `(will pass resumeData=${resumeOffset > 0 ? String(resumeOffset) : "none"})`
       );
 
-      if (resumeOffset === 0 && partialBytes > 0 && Platform.OS !== "android") {
-        // Cannot safely continue this partial file without persisting credentials.
+      if (resumeOffset === 0 && partialBytes > 0) {
+        // A zero-offset reconstruction must never append to an existing file.
+        // This covers iOS originals and any defensive fallback path.
         logger.info(
-          `[DownloadManager] Discarding partial file for ${item.itemId} (resume unsupported on this platform).`
+          `[DownloadManager] Discarding non-resumable partial file for ${item.itemId}.`
         );
         await FileSystem.deleteAsync(localPath, { idempotent: true }).catch(() => {});
+        partialBytes = 0;
         downloadItem.bytesDownloaded = 0;
+        downloadItem.totalBytes = 0;
         downloadItem.progress = 0;
       }
 
@@ -1578,6 +1667,7 @@ export class DownloadManager {
       this.resumeOffsets.set(item.itemId, resumeOffset);
       this.activeTasks.set(item.itemId, downloadResumable);
       this.logLifecycle(item.itemId, "native task created", {
+        mode: isTranscode ? "transcode" : "original",
         resumeOffset,
         appState: AppState.currentState
       });
@@ -1638,12 +1728,24 @@ export class DownloadManager {
 
   public async retryDownload(itemId: string): Promise<void> {
     const config = this.downloadConfigs.get(itemId);
-    if (config) {
-      // A manual retry gets a fresh authorization and restart budget.
-      this.authRetried.delete(itemId);
-      this.corruptionRestarted.delete(itemId);
-      await this.startDownload(config.item, config.metadata, config.options);
+    if (!config) return;
+
+    // Never spawn a second writer while the original native task is still live.
+    if (this.activeTasks.has(itemId)) {
+      this.logLifecycle(itemId, "retry ignored; native task still active");
+      return;
     }
+
+    // A manual retry gets a fresh authorization and restart budget.
+    this.authRetried.delete(itemId);
+    this.corruptionRestarted.delete(itemId);
+
+    const retryOptions: DownloadOptions = {
+      ...(config.options ?? {}),
+      quality: config.quality ?? config.options?.quality,
+      identity: config.identity ?? config.options?.identity
+    };
+    await this.startDownload(config.item, config.metadata, retryOptions);
   }
 
   public updateProgress(
@@ -1654,12 +1756,18 @@ export class DownloadManager {
     const item = this.downloads.get(itemId);
     if (!item || item.status !== "downloading") return;
 
-    // Jellyfin sends no Content-Length for transcode responses. Fall back to the
-    // duration-based estimate for DISPLAY only — the real total stays
-    // authoritative for the completion and integrity checks below.
-    const realTotal = totalBytes > 0 ? totalBytes : 0;
+    const config = this.downloadConfigs.get(itemId);
+    const quality = config?.quality ?? config?.options?.quality ?? "original";
+    const isTranscode = isTranscodedQuality(quality);
+
+    // For live transcodes, callback totalBytesExpectedToWrite is not an
+    // authoritative final media size. Keep it out of totalBytes/integrity and use
+    // the duration/bitrate estimate for presentation only.
+    const realTotal = !isTranscode && totalBytes > 0 ? totalBytes : 0;
     const estimatedTotal =
-      item.expectedBytes && item.expectedBytes > 0 ? item.expectedBytes : 0;
+      isTranscode && item.expectedBytes && item.expectedBytes > 0
+        ? item.expectedBytes
+        : 0;
     const displayTotal = realTotal > 0 ? realTotal : estimatedTotal;
 
     // Calculate speed and ETA
@@ -1698,13 +1806,25 @@ export class DownloadManager {
       });
     }
 
-    const previouslyAtTotal = item.progress >= 1;
+    const previouslyAtTransportTotal =
+      totalBytes > 0 && bytesDownloaded >= totalBytes;
 
     item.bytesDownloaded = bytesDownloaded;
     item.totalBytes = realTotal;
-    item.isEstimatedTotal = realTotal === 0 && estimatedTotal > 0;
-    item.progress =
-      displayTotal > 0 ? Math.min(1, bytesDownloaded / displayTotal) : 0;
+    item.isEstimatedTotal = isTranscode && estimatedTotal > 0;
+    if (isTranscode) {
+      // An estimate may be lower than the real encoded size. Never display 100 %
+      // before the authoritative completion transaction commits.
+      item.progress =
+        estimatedTotal > 0
+          ? Math.min(0.95, bytesDownloaded / estimatedTotal)
+          : 0;
+    } else {
+      item.progress =
+        realTotal > 0
+          ? Math.min(0.99, bytesDownloaded / realTotal)
+          : 0;
+    }
 
     // PROGRESS != COMPLETION.
     //
@@ -1716,8 +1836,10 @@ export class DownloadManager {
     // may commit it. Falling through also guarantees the 100 % sample still flows
     // into the throttled persistence + foreground refresh below instead of being
     // dropped by an early return.
-    if (bytesDownloaded >= totalBytes && totalBytes > 0 && !previouslyAtTotal) {
-      this.logLifecycle(itemId, "progress=100% waiting-native-completion");
+    if (previouslyAtTransportTotal) {
+      this.logLifecycle(itemId, "transport progress reached reported total; waiting-native-completion", {
+        mode: isTranscode ? "transcode" : "original"
+      });
     }
 
     // Progress ticks are throttled — writing on every tick would hammer storage
@@ -1939,7 +2061,7 @@ export class DownloadManager {
     item.speedBytesPerSecond = undefined;
     item.estimatedSecondsRemaining = undefined;
     item.status = "finalizing";
-    item.progress = 1.0;
+    item.progress = Math.min(0.99, Math.max(item.progress, 0.95));
     item.bytesDownloaded = totalBytes;
     item.totalBytes = totalBytes;
 

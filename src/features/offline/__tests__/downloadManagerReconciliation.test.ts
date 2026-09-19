@@ -32,7 +32,7 @@ function persistedEntry(overrides: Record<string, unknown>) {
   };
 }
 
-describe("DWN-02 completed transcode restart reconciliation", () => {
+describe("DWN-02 transcode restart reconciliation", () => {
   let manager: DownloadManager;
 
   beforeEach(async () => {
@@ -52,28 +52,45 @@ describe("DWN-02 completed transcode restart reconciliation", () => {
     DownloadManager.destroyAll();
   });
 
-  it("reconciles a completed transcode (totalBytes=0, expectedBytes=X) without re-downloading", async () => {
+  it("reconciles a transcode persisted in finalizing without re-downloading", async () => {
     const localPath = "file:///dl/transcode.mp4";
     fileSystem.__setFileSize(localPath, 1000);
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(
-      JSON.stringify([persistedEntry({ localPath, expectedBytes: 1000, progress: 1 })])
+      JSON.stringify([
+        persistedEntry({
+          localPath,
+          downloadUrl: "https://server/Videos/item-1/stream.mp4?static=false",
+          quality: "720p",
+          status: "finalizing",
+          expectedBytes: 1000,
+          progress: 0.99
+        })
+      ])
     );
 
     await manager.restorePersistedDownloads();
 
-    // Completed: not tracked as pending work, no transfer, no deletion.
+    // FINALIZING proves downloadAsync already resolved; only catalog commit was pending.
     expect(manager.getDownload("item-1")).toBeUndefined();
     expect(FileSystem.createDownloadResumable).not.toHaveBeenCalled();
     expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
   });
 
-  it("keeps a genuinely partial transcode resumable on restart", async () => {
+  it("discards a genuinely partial transcode after task loss instead of byte-range resuming it", async () => {
     const localPath = "file:///dl/partial.mp4";
     fileSystem.__setFileSize(localPath, 400);
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
     (AsyncStorage.getItem as jest.Mock).mockResolvedValueOnce(
-      JSON.stringify([persistedEntry({ localPath, expectedBytes: 1000, progress: 0.4 })])
+      JSON.stringify([
+        persistedEntry({
+          localPath,
+          downloadUrl: "https://server/Videos/item-1/stream.mp4?static=false",
+          quality: "720p",
+          expectedBytes: 1000,
+          progress: 0.4
+        })
+      ])
     );
 
     await manager.restorePersistedDownloads();
@@ -81,8 +98,9 @@ describe("DWN-02 completed transcode restart reconciliation", () => {
     const item = manager.getDownload("item-1");
     expect(item).toBeDefined();
     expect(item?.status).toBe("queued");
-    expect(item?.progress).toBeCloseTo(0.4, 5);
-    expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+    expect(item?.bytesDownloaded).toBe(0);
+    expect(item?.progress).toBe(0);
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(localPath, { idempotent: true });
   });
 });
 

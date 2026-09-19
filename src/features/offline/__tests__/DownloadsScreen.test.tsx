@@ -316,7 +316,7 @@ describe("DownloadsScreen & OfflineSyncManager", () => {
     };
     const rendered = collectText(tree.toJSON()).join(" • ");
 
-    expect(rendered).toContain("553 MB / ~1.3 GB");
+    expect(rendered).toContain(translate("downloads.bytesReceived", { bytes: "553 MB" }));
     expect(rendered).toContain("~42%");
   });
 });
