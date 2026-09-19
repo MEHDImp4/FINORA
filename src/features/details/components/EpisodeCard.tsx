@@ -66,7 +66,6 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = React.memo(
     useEffect(() => {
       // Keep the liquid fill visually close to the latest native progress tick.
       // A long animation here makes fast downloads look frozen or far behind.
-      downloadFillProgress.stopAnimation();
       Animated.timing(downloadFillProgress, {
         toValue: normalizedDownloadProgress,
         duration: 120,
