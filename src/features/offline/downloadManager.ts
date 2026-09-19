@@ -550,12 +550,32 @@ export class DownloadManager {
       this.appStateSubscription = AppState.addEventListener(
         "change",
         (state: AppStateStatus) => {
+          // AppState transitions are OBSERVATION ONLY. Backgrounding must never
+          // pause, cancel, fail or complete a transfer: the Android foreground
+          // service keeps the process — and therefore the native task — alive.
+          const activeTransfers = Array.from(this.downloads.values()).filter(
+            (d) => d.status === "downloading" || d.status === "finalizing"
+          ).length;
+          logger.info(
+            `[DownloadLifecycle] appState=${state} activeTransfers=${activeTransfers}`
+          );
+
           if (state === "background" || state === "inactive") {
+            // Persist immediately so a hard kill loses as little as possible.
+            // No download state is mutated here.
             this.flushPersist().catch(() => {});
+            if (activeTransfers > 0) {
+              // Re-assert process protection before the OS can reclaim the
+              // process. The foreground service keeps the native transfer alive.
+              this.syncForegroundService();
+            }
           } else if (state === "active") {
             // Wi-Fi only downloads may have been waiting for the network while
             // the app was backgrounded. Re-evaluate on return to foreground.
             this.processQueue();
+            // Defensive: re-assert the foreground service if a real transfer is
+            // still active (e.g. it was reclaimed by the OS while backgrounded).
+            this.syncForegroundService();
           }
         }
       );
@@ -949,11 +969,15 @@ export class DownloadManager {
    */
   private async syncForegroundService(): Promise<void> {
     try {
+      // A transfer is protected until its transaction has fully committed.
+      // `finalizing` (file verification + catalog save) is just as much "still
+      // working" as `downloading`, so it must keep the foreground service alive.
       const active = Array.from(this.downloads.values()).filter(
-        (d) => d.status === "downloading"
+        (d) => d.status === "downloading" || d.status === "finalizing"
       );
 
       if (active.length === 0) {
+        logger.info("[DownloadLifecycle] foregroundService stop (no active transfer)");
         await stopDownloadForeground();
         return;
       }
@@ -986,6 +1010,11 @@ export class DownloadManager {
       const description = isMultiple
         ? `${primary.title} — ${details.join(" · ")}`
         : details.join(" · ");
+
+      logger.info(
+        `[DownloadLifecycle] foregroundService active count=${active.length} ` +
+          `status=${primary.status} percent=${percent}`
+      );
 
       // Unknown total with no estimate → indeterminate bar, never a fake 0 %.
       await startDownloadForeground(title, description, hasTotal ? percent : undefined);
