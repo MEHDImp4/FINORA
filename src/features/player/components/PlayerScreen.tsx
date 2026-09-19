@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -37,6 +37,7 @@ import { usePlaybackPreferencesStore } from "../../../stores/playbackPreferences
 import { useSubtitleCues } from "../useSubtitleCues";
 import { useTranslation } from "../../../i18n";
 import { hapticService } from "../../../core/feedback/hapticService";
+import { getNextEpisodePromptStartSeconds } from "../nextEpisodeTiming";
 
 const SPEED_OPTIONS = [1.0, 1.25, 1.5, 2.0];
 
@@ -121,7 +122,7 @@ export function PlayerScreen({
   // Next episode state (for series)
   const [nextEpisode, setNextEpisode] = useState<{ id: string; name: string; label: string } | null>(null);
   const [showNextEpisode, setShowNextEpisode] = useState(false);
-  const nextEpisodeFetchedRef = useRef(false);
+  const nextEpisodeTransitionedRef = useRef(false);
   // A player-to-player transition (next episode) must preserve the current
   // device orientation. A real exit still restores portrait.
   const preserveOrientationOnUnmountRef = useRef(false);
@@ -384,6 +385,29 @@ export function PlayerScreen({
     allowBackground: isInPiP
   });
 
+  const handlePlayNextEpisode = useCallback(() => {
+    if (!nextEpisode || nextEpisodeTransitionedRef.current) return;
+
+    nextEpisodeTransitionedRef.current = true;
+    setShowNextEpisode(false);
+    stopSession();
+    controls.pause();
+
+    if (onNextEpisode) {
+      preserveOrientationOnUnmountRef.current = true;
+      onNextEpisode(nextEpisode.id);
+    } else {
+      preserveOrientationOnUnmountRef.current = false;
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+      onBack();
+    }
+  }, [nextEpisode, stopSession, controls, onNextEpisode, onBack]);
+
+  useEffect(() => {
+    nextEpisodeTransitionedRef.current = false;
+    setShowNextEpisode(false);
+  }, [item.id]);
+
   // Track and synchronize native audio tracks from expo-video
   useEffect(() => {
     if (!player) return;
@@ -607,13 +631,48 @@ export function PlayerScreen({
     };
   }, [item.id, item.type, item.seriesId, item.seasonId, item.episodeIndex, item.seasonIndex, serverUrl, token, localPath]);
 
-  // Trigger next episode countdown overlay when playback ends
+  const effectivePlaybackDuration =
+    snapshot.durationSeconds > 0 ? snapshot.durationSeconds : initialDurationSeconds;
+
+  const nextEpisodePromptStartSeconds = useMemo(
+    () => getNextEpisodePromptStartSeconds(item.chapters, effectivePlaybackDuration),
+    [item.chapters, effectivePlaybackDuration]
+  );
+
+  const nextEpisodeRemainingSeconds =
+    effectivePlaybackDuration > 0
+      ? Math.max(0, Math.ceil(effectivePlaybackDuration - snapshot.currentTimeSeconds))
+      : undefined;
+
+  // Offer the next episode at the beginning of credits when Jellyfin exposes a
+  // marker, otherwise about ten seconds before the end. The prompt stays visible
+  // and never owns a countdown. Only the real native playToEnd event advances
+  // automatically.
   useEffect(() => {
-    if (snapshot.state === "ended" && nextEpisode && !nextEpisodeFetchedRef.current) {
-      nextEpisodeFetchedRef.current = true;
-      setShowNextEpisode(true);
+    if (!nextEpisode || nextEpisodeTransitionedRef.current) {
+      setShowNextEpisode(false);
+      return;
     }
-  }, [snapshot.state, nextEpisode]);
+
+    if (snapshot.state === "ended") {
+      handlePlayNextEpisode();
+      return;
+    }
+
+    const shouldShow =
+      nextEpisodePromptStartSeconds !== null &&
+      snapshot.currentTimeSeconds >= nextEpisodePromptStartSeconds &&
+      (effectivePlaybackDuration <= 0 || snapshot.currentTimeSeconds < effectivePlaybackDuration);
+
+    setShowNextEpisode(shouldShow);
+  }, [
+    nextEpisode,
+    snapshot.state,
+    snapshot.currentTimeSeconds,
+    nextEpisodePromptStartSeconds,
+    effectivePlaybackDuration,
+    handlePlayNextEpisode
+  ]);
 
   // Automatic intro skip if preference is enabled
   useEffect(() => {
@@ -664,24 +723,6 @@ export function PlayerScreen({
     controls.pause();
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
     onBack();
-  };
-
-  const handlePlayNextEpisode = () => {
-    if (!nextEpisode) return;
-    setShowNextEpisode(false);
-    nextEpisodeFetchedRef.current = false;
-    stopSession();
-    controls.pause();
-    if (onNextEpisode) {
-      // router.replace() unmounts this PlayerScreen before mounting the next
-      // episode. Do not force portrait during that player-to-player handoff.
-      preserveOrientationOnUnmountRef.current = true;
-      onNextEpisode(nextEpisode.id);
-    } else {
-      preserveOrientationOnUnmountRef.current = false;
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
-      onBack();
-    }
   };
 
   const handleToggleControls = () => {
@@ -998,12 +1039,8 @@ export function PlayerScreen({
         visible={showNextEpisode && Boolean(nextEpisode)}
         nextEpisodeName={nextEpisode?.name || ""}
         nextEpisodeLabel={nextEpisode?.label || ""}
-        countdownSeconds={8}
+        remainingSeconds={nextEpisodeRemainingSeconds}
         onPlayNext={handlePlayNextEpisode}
-        onCancel={() => {
-          setShowNextEpisode(false);
-          nextEpisodeFetchedRef.current = false;
-        }}
       />
 
       {/* Stats for Nerds Technical Diagnostic Modal */}
