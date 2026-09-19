@@ -207,38 +207,6 @@ export function PlayerScreen({
   const pipExitGuardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (nextState) => {
-      // Android can report the PiP stop event just before the Activity finishes
-      // moving to the background. If the user actually dismissed PiP (instead
-      // of restoring the app), stop playback as soon as that transition lands.
-      if (
-        nextState !== "active" &&
-        pipRecentlyStoppedRef.current &&
-        !isInPiPRef.current
-      ) {
-        controls.pause();
-        pipRecentlyStoppedRef.current = false;
-        if (pipExitGuardTimerRef.current) {
-          clearTimeout(pipExitGuardTimerRef.current);
-          pipExitGuardTimerRef.current = null;
-        }
-      }
-    });
-
-    return () => {
-      subscription.remove();
-      if (pipTimerRef.current) {
-        clearTimeout(pipTimerRef.current);
-        pipTimerRef.current = null;
-      }
-      if (pipExitGuardTimerRef.current) {
-        clearTimeout(pipExitGuardTimerRef.current);
-        pipExitGuardTimerRef.current = null;
-      }
-    };
-  }, [controls]);
-
   const handleTogglePiP = () => {
     hapticService.impactLight();
     setControlsVisible(false);
@@ -331,6 +299,38 @@ export function PlayerScreen({
       controls.setRate(preferredPlaybackSpeed);
     }
   }, [preferredPlaybackSpeed, controls]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      // Android can report the PiP stop event just before the Activity finishes
+      // moving to the background. If the user actually dismissed PiP (instead
+      // of restoring the app), stop playback as soon as that transition lands.
+      if (
+        nextState !== "active" &&
+        pipRecentlyStoppedRef.current &&
+        !isInPiPRef.current
+      ) {
+        controls.pause();
+        pipRecentlyStoppedRef.current = false;
+        if (pipExitGuardTimerRef.current) {
+          clearTimeout(pipExitGuardTimerRef.current);
+          pipExitGuardTimerRef.current = null;
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      if (pipTimerRef.current) {
+        clearTimeout(pipTimerRef.current);
+        pipTimerRef.current = null;
+      }
+      if (pipExitGuardTimerRef.current) {
+        clearTimeout(pipExitGuardTimerRef.current);
+        pipExitGuardTimerRef.current = null;
+      }
+    };
+  }, [controls]);
 
   const lastBrightnessNativeCallRef = useRef(0);
   const pendingBrightnessNativeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
