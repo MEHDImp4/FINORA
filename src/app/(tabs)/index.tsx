@@ -557,7 +557,7 @@ export default function HomeScreen() {
             items={resumeItems}
             serverUrl={serverUrl}
             variant="poster"
-            onItemPress={handleItemPress}
+            onItemPress={handlePlay}
             onItemLongPress={handleItemLongPress}
           />
         ) : null}

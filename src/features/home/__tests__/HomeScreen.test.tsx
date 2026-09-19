@@ -220,6 +220,41 @@ describe("HomeScreen", () => {
     });
   });
 
+  it("resumes playback directly from Continue Watching instead of opening details", () => {
+    const component = ReactTestRenderer.create(
+      <QueryClientProvider client={queryClient}>
+        <HomeScreen />
+      </QueryClientProvider>
+    );
+    const root = component.root;
+
+    const continueCarousel = root.findByProps({
+      title: translate("home.continueWatching", undefined, "en")
+    });
+
+    ReactTestRenderer.act(() => {
+      continueCarousel.props.onItemPress({
+        id: "resume-1",
+        name: "Breaking Bad - S01E02",
+        type: "Episode",
+        seriesId: "series-999",
+        playbackPositionTicks: 123000000,
+        playedPercentage: 45,
+        isPlayed: false,
+        isFavorite: false
+      });
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: "/player/[id]",
+      params: { id: "resume-1" }
+    });
+
+    ReactTestRenderer.act(() => {
+      component.unmount();
+    });
+  });
+
   it("navigates to series details when an episode item with seriesId is pressed", () => {
     (useRecentlyAdded as jest.Mock).mockReturnValue({
       data: [
