@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FinoraText } from "../../../design-system/components/FinoraText";
@@ -10,97 +10,84 @@ export interface NextEpisodeOverlayProps {
   visible: boolean;
   nextEpisodeName: string;
   nextEpisodeLabel: string;
-  countdownSeconds?: number;
+  remainingSeconds?: number;
   onPlayNext: () => void;
-  onCancel: () => void;
+}
+
+function formatRemaining(seconds?: number): string | null {
+  if (seconds === undefined || !Number.isFinite(seconds) || seconds < 0) return null;
+  const whole = Math.max(0, Math.ceil(seconds));
+  const mins = Math.floor(whole / 60);
+  const secs = whole % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 export function NextEpisodeOverlay({
   visible,
   nextEpisodeName,
   nextEpisodeLabel,
-  countdownSeconds = 8,
-  onPlayNext,
-  onCancel
+  remainingSeconds,
+  onPlayNext
 }: NextEpisodeOverlayProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const [remaining, setRemaining] = useState(countdownSeconds);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (!visible) {
-      setRemaining(countdownSeconds);
-      return;
-    }
-
-    setRemaining(countdownSeconds);
-
-    timerRef.current = setInterval(() => {
-      setRemaining((prev) => {
-        if (prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          onPlayNext();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [visible, countdownSeconds, onPlayNext]);
 
   if (!visible) return null;
 
-  const progress = 1 - remaining / countdownSeconds;
+  const remainingLabel = formatRemaining(remainingSeconds);
 
   return (
     <View
       style={[
         styles.container,
         {
-          paddingBottom: Math.max(insets.bottom, spacing.xl) + 20,
-          paddingRight: Math.max(insets.right, spacing.lg)
+          paddingBottom: Math.max(insets.bottom, spacing.lg) + 18,
+          paddingRight: Math.max(insets.right, spacing.lg),
+          paddingLeft: Math.max(insets.left, spacing.lg)
         }
       ]}
       pointerEvents="box-none"
       testID="next-episode-overlay"
     >
       <View style={styles.card}>
-        <View style={styles.infoRow}>
-          <View style={styles.textColumn}>
+        <View style={styles.headerRow}>
+          <View style={styles.upNextPill}>
             <FinoraText variant="caption" style={styles.upNextLabel}>
               {t("player.upNext")}
             </FinoraText>
-            <FinoraText variant="body" style={styles.episodeName} numberOfLines={1}>
-              {nextEpisodeLabel}
-            </FinoraText>
-            <FinoraText variant="caption" style={styles.episodeTitle} numberOfLines={1}>
-              {nextEpisodeName}
-            </FinoraText>
           </View>
+          {remainingLabel ? (
+            <FinoraText variant="caption" style={styles.remainingLabel} testID="next-episode-remaining">
+              {remainingLabel}
+            </FinoraText>
+          ) : null}
+        </View>
+
+        <FinoraText variant="body" style={styles.episodeLabel} numberOfLines={1}>
+          {nextEpisodeLabel}
+        </FinoraText>
+        <FinoraText variant="caption" style={styles.episodeTitle} numberOfLines={2}>
+          {nextEpisodeName}
+        </FinoraText>
+
+        <View style={styles.footerRow}>
+          <FinoraText variant="caption" style={styles.autoPlayHint}>
+            {t("player.autoPlayAtEnd")}
+          </FinoraText>
 
           <Pressable
-            style={styles.playButton}
+            style={({ pressed }) => [styles.playButton, pressed && styles.playButtonPressed]}
             onPress={onPlayNext}
             testID="next-episode-play-button"
+            accessibilityRole="button"
+            accessibilityLabel={t("player.nextEpisodeA11y")}
           >
-            <Ionicons name="play" size={28} color="#FFFFFF" />
+            <Ionicons name="play" size={17} color="#FFFFFF" />
+            <FinoraText variant="caption" style={styles.playButtonText}>
+              {t("player.playNextNow")}
+            </FinoraText>
           </Pressable>
         </View>
-
-        {/* Countdown progress bar */}
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
-        </View>
-
-        <Pressable onPress={onCancel} style={styles.cancelButton} testID="next-episode-cancel">
-          <FinoraText variant="caption" style={styles.cancelText}>
-            {t("player.cancelCountdown", { seconds: remaining })}
-          </FinoraText>
-        </Pressable>
       </View>
     </View>
   );
@@ -113,80 +100,86 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 30,
-    paddingHorizontal: spacing.lg
+    alignItems: "flex-end"
   },
   card: {
-    backgroundColor: "rgba(16, 16, 24, 0.95)",
+    width: "100%",
+    maxWidth: 390,
+    backgroundColor: "rgba(10, 10, 14, 0.97)",
     borderRadius: 18,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)",
+    borderColor: "rgba(255, 255, 255, 0.16)",
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 16,
-    elevation: 14
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.65,
+    shadowRadius: 20,
+    elevation: 16
   },
-  infoRow: {
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    marginBottom: spacing.sm
   },
-  textColumn: {
-    flex: 1,
-    marginRight: spacing.md
+  upNextPill: {
+    backgroundColor: "rgba(229, 9, 20, 0.16)",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4
   },
   upNextLabel: {
     color: colors.primary,
     fontSize: 10,
     fontWeight: "800",
-    letterSpacing: 1.5,
-    marginBottom: 4
+    letterSpacing: 1.2
   },
-  episodeName: {
+  remainingLabel: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontVariant: ["tabular-nums"]
+  },
+  episodeLabel: {
     color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 15,
-    marginBottom: 2
+    fontWeight: "800",
+    fontSize: 17,
+    marginBottom: 3
   },
   episodeTitle: {
     color: colors.textSecondary,
-    fontSize: 13
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: spacing.md
+  },
+  footerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm
+  },
+  autoPlayHint: {
+    flex: 1,
+    color: colors.textMuted,
+    fontSize: 11
   },
   playButton: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    minHeight: 38,
+    borderRadius: 20,
     backgroundColor: colors.primary,
-    justifyContent: "center",
+    flexDirection: "row",
     alignItems: "center",
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 8
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8
   },
-  progressTrack: {
-    height: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
-    borderRadius: 2,
-    marginTop: spacing.md,
-    overflow: "hidden"
+  playButtonPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.98 }]
   },
-  progressBar: {
-    height: "100%",
-    backgroundColor: colors.primary,
-    borderRadius: 2
-  },
-  cancelButton: {
-    alignSelf: "flex-end",
-    marginTop: spacing.xs,
-    paddingVertical: 4,
-    paddingHorizontal: 8
-  },
-  cancelText: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: "600"
+  playButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800"
   }
 });

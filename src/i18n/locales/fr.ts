@@ -408,6 +408,8 @@ export const fr: Translations = {
     nextEpisodeCountdown: "Épisode suivant ({seconds}s)",
     cancelCountdown: "Annuler ({seconds}s)",
     upNext: "SUIVANT",
+    autoPlayAtEnd: "Lecture automatique à la fin de l'épisode",
+    playNextNow: "Lire maintenant",
     cantPlayMedia: "Lecture impossible",
     corruptedFile: "Le fichier téléchargé ne peut pas être lu ou est endommagé.",
     serverLostMedia: "Ce média n'est plus accessible sur le serveur Jellyfin.",

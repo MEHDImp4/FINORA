@@ -423,6 +423,8 @@ export interface PlayerTranslations {
   nextEpisodeCountdown: string;
   cancelCountdown: string;
   upNext: string;
+  autoPlayAtEnd: string;
+  playNextNow: string;
   cantPlayMedia: string;
   corruptedFile: string;
   serverLostMedia: string;
