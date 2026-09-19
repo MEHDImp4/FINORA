@@ -774,6 +774,7 @@ export function PlayerScreen({
         onSingleTap={handleToggleControls}
         onLongPressStart={() => controls.setRate(2.0)}
         onLongPressEnd={() => controls.setRate(preferredPlaybackSpeed)}
+        isPlaying={snapshot.state === "playing"}
         brightness={brightness}
         onBrightnessChange={handleBrightnessChange}
         volume={volume}

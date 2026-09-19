@@ -29,6 +29,7 @@ export interface PlayerGesturesProps {
   onSingleTap: () => void;
   onLongPressStart?: () => void;
   onLongPressEnd?: () => void;
+  isPlaying?: boolean;
   brightness?: number;
   onBrightnessChange?: (brightness: number) => void;
   volume?: number;
@@ -45,6 +46,7 @@ export function PlayerGestures({
   onSingleTap,
   onLongPressStart,
   onLongPressEnd,
+  isPlaying = true,
   brightness,
   onBrightnessChange,
   volume,
@@ -247,6 +249,13 @@ export function PlayerGestures({
   };
 
   const handleLongPress = () => {
+    // Speed boost is meaningful only while media is actively playing.
+    // Holding the screen while paused must be a complete no-op: no rate
+    // mutation and, importantly, no misleading "2×" indicator.
+    if (!isPlaying) {
+      return;
+    }
+
     if (singleTapTimerRef.current) {
       clearTimeout(singleTapTimerRef.current);
       singleTapTimerRef.current = null;
@@ -263,6 +272,16 @@ export function PlayerGestures({
       onLongPressEnd?.();
     }
   };
+
+  // If playback is paused while the finger is still held down, end the
+  // temporary boost immediately and restore the configured playback speed.
+  useEffect(() => {
+    if (!isPlaying && isLongPressingRef.current) {
+      isLongPressingRef.current = false;
+      setIs2xActive(false);
+      onLongPressEnd?.();
+    }
+  }, [isPlaying, onLongPressEnd]);
 
   const hudPercentage = Math.round(swipeValue * 100);
 
@@ -355,13 +374,12 @@ export function PlayerGestures({
           </Animated.View>
         )}
 
-        {/* 2x Speed Hold Badge */}
+        {/* Minimal 2x speed hold indicator */}
         {is2xActive && (
           <View style={styles.speedBadge} testID="speed-2x-badge">
             <FinoraText variant="caption" style={styles.speedBadgeText}>
-              2.0x
+              2×
             </FinoraText>
-            <Ionicons name="play-forward" size={13} color="#FFFFFF" style={{ marginLeft: 4 }} />
           </View>
         )}
 
@@ -463,25 +481,20 @@ const styles = StyleSheet.create({
   },
   speedBadge: {
     position: "absolute",
-    top: spacing.xl,
+    top: 18,
     alignSelf: "center",
-    backgroundColor: "rgba(16, 16, 22, 0.88)",
-    borderColor: colors.primary,
-    borderWidth: 1.5,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: 20,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6
+    backgroundColor: "rgba(0, 0, 0, 0.46)",
+    borderColor: "rgba(255, 255, 255, 0.14)",
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999
   },
   speedBadgeText: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 0.5
+    color: "rgba(255, 255, 255, 0.94)",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.2
   },
   swipeHUD: {
     position: "absolute",

@@ -221,6 +221,92 @@ describe("PlayerGestures", () => {
     });
   });
 
+  it("does not activate the 2x hold gesture while playback is paused", () => {
+    const onLongPressStart = jest.fn();
+    const onLongPressEnd = jest.fn();
+
+    let root: any;
+    act(() => {
+      root = renderer.create(
+        <PlayerGestures
+          onSingleTap={jest.fn()}
+          onDoubleTapLeft={jest.fn()}
+          onDoubleTapRight={jest.fn()}
+          onLongPressStart={onLongPressStart}
+          onLongPressEnd={onLongPressEnd}
+          isPlaying={false}
+        >
+          <View testID="child-view" />
+        </PlayerGestures>
+      );
+    });
+
+    const surface = root.root.findByProps({ testID: "gesture-touch-surface" });
+    act(() => {
+      surface.props.onLongPress();
+    });
+
+    expect(onLongPressStart).not.toHaveBeenCalled();
+    expect(onLongPressEnd).not.toHaveBeenCalled();
+    expect(root.root.findAllByProps({ testID: "speed-2x-badge" })).toHaveLength(0);
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  it("ends an active 2x hold immediately if playback becomes paused", () => {
+    const onLongPressStart = jest.fn();
+    const onLongPressEnd = jest.fn();
+
+    let root: any;
+    act(() => {
+      root = renderer.create(
+        <PlayerGestures
+          onSingleTap={jest.fn()}
+          onDoubleTapLeft={jest.fn()}
+          onDoubleTapRight={jest.fn()}
+          onLongPressStart={onLongPressStart}
+          onLongPressEnd={onLongPressEnd}
+          isPlaying
+        >
+          <View testID="child-view" />
+        </PlayerGestures>
+      );
+    });
+
+    const surface = root.root.findByProps({ testID: "gesture-touch-surface" });
+    act(() => {
+      surface.props.onLongPress();
+    });
+
+    expect(onLongPressStart).toHaveBeenCalledTimes(1);
+    expect(root.root.findByProps({ testID: "speed-2x-badge" })).toBeTruthy();
+    expect(root.root.findByProps({ children: "2×" })).toBeTruthy();
+
+    act(() => {
+      root.update(
+        <PlayerGestures
+          onSingleTap={jest.fn()}
+          onDoubleTapLeft={jest.fn()}
+          onDoubleTapRight={jest.fn()}
+          onLongPressStart={onLongPressStart}
+          onLongPressEnd={onLongPressEnd}
+          isPlaying={false}
+        >
+          <View testID="child-view" />
+        </PlayerGestures>
+      );
+    });
+
+    expect(onLongPressEnd).toHaveBeenCalledTimes(1);
+    expect(root.root.findAllByProps({ testID: "speed-2x-badge" })).toHaveLength(0);
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
   it("renders the volume HUD testID element structure when provided", () => {
     let root: any;
     act(() => {
