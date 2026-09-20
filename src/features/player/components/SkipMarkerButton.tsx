@@ -1,5 +1,5 @@
-import React from "react";
-import { StyleSheet, Pressable } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, StyleSheet, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { ChapterMarker } from "../../../types/media";
@@ -13,6 +13,69 @@ export interface SkipMarkerButtonProps {
   durationSeconds?: number;
   onSeek: (seconds: number) => void;
 }
+
+interface SkipActionProps {
+  label: string;
+  testID: string;
+  bottom: number;
+  right: number;
+  onPress: () => void;
+}
+
+function SkipAction({ label, testID, bottom, right, onPress }: SkipActionProps) {
+  const entrance = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    entrance.setValue(0);
+    Animated.spring(entrance, {
+      toValue: 1,
+      friction: 8,
+      tension: 120,
+      useNativeDriver: true
+    }).start();
+  }, [entrance, testID]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.animatedContainer,
+        {
+          bottom,
+          right,
+          opacity: entrance,
+          transform: [
+            {
+              translateY: entrance.interpolate({
+                inputRange: [0, 1],
+                outputRange: [8, 0]
+              })
+            },
+            {
+              scale: entrance.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.96, 1]
+              })
+            }
+          ]
+        }
+      ]}
+    >
+      <Pressable
+        style={({ pressed }) => [styles.container, pressed && styles.containerPressed]}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        testID={testID}
+      >
+        <FinoraText variant="caption" style={styles.buttonText}>
+          {label}
+        </FinoraText>
+        <Ionicons name="chevron-forward" size={13} color="rgba(255, 255, 255, 0.82)" />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 
 export function SkipMarkerButton({
   chapters = [],
@@ -63,22 +126,13 @@ export function SkipMarkerButton({
   if (isInsideIntro && introEndTicks !== null) {
     const targetSeconds = introEndTicks / 10000000;
     return (
-      <Pressable
-        style={[
-          styles.container,
-          {
-            bottom: Math.max(insets.bottom, 20) + 75,
-            right: Math.max(insets.right, spacing.lg)
-          }
-        ]}
-        onPress={() => onSeek(targetSeconds)}
+      <SkipAction
+        label={t("player.skipIntro")}
         testID="skip-intro-button"
-      >
-        <FinoraText variant="body" style={styles.buttonText}>
-          {t("player.skipIntro")}
-        </FinoraText>
-        <Ionicons name="play-skip-forward" size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
-      </Pressable>
+        bottom={Math.max(insets.bottom, 20) + 72}
+        right={Math.max(insets.right, spacing.lg)}
+        onPress={() => onSeek(targetSeconds)}
+      />
     );
   }
 
@@ -102,22 +156,13 @@ export function SkipMarkerButton({
   if (isInsideCredits) {
     const targetSeconds = durationSeconds > 0 ? durationSeconds : currentTimeSeconds + 30;
     return (
-      <Pressable
-        style={[
-          styles.container,
-          {
-            bottom: Math.max(insets.bottom, 20) + 75,
-            right: Math.max(insets.right, spacing.lg)
-          }
-        ]}
-        onPress={() => onSeek(targetSeconds)}
+      <SkipAction
+        label={t("player.skipOutro")}
         testID="skip-credits-button"
-      >
-        <FinoraText variant="body" style={styles.buttonText}>
-          {t("player.skipOutro")}
-        </FinoraText>
-        <Ionicons name="play-skip-forward" size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
-      </Pressable>
+        bottom={Math.max(insets.bottom, 20) + 72}
+        right={Math.max(insets.right, spacing.lg)}
+        onPress={() => onSeek(targetSeconds)}
+      />
     );
   }
 
@@ -125,29 +170,30 @@ export function SkipMarkerButton({
 }
 
 const styles = StyleSheet.create({
-  container: {
+  animatedContainer: {
     position: "absolute",
-    bottom: 85,
-    right: spacing.lg,
-    backgroundColor: "rgba(16, 16, 24, 0.88)",
-    borderColor: "rgba(255, 255, 255, 0.35)",
-    borderWidth: 1.5,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 10,
-    elevation: 8,
     zIndex: 25
   },
+  container: {
+    minHeight: 34,
+    backgroundColor: "rgba(8, 8, 10, 0.62)",
+    borderColor: "rgba(255, 255, 255, 0.16)",
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4
+  },
+  containerPressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.98 }]
+  },
   buttonText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 0.3
+    color: "rgba(255, 255, 255, 0.96)",
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 0.15
   }
 });
