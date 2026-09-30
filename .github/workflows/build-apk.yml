@@ -173,29 +173,13 @@ jobs:
           make_latest: false
           generate_release_notes: true
           fail_on_unmatched_files: true
-          fail_on_unmatched_files: true
           files: |
             ${{ steps.meta.outputs.apk_name }}
             ${{ steps.meta.outputs.apk_name }}.sha256
-            apk-inspection.txt
-            apksigner-verify.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Direct APK download
-        shell: bash
-        run: |
-          {
-            echo "## FINORA Stable Release"
-            echo ""
-            echo "⬇️ [Download APK directly](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }})"
-            echo ""
-            echo "🔐 [SHA-256 checksum](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }}.sha256)"
-            echo ""
-            echo "_Release assets are published directly; no GitHub Actions ZIP artifact is created._"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Direct APK download
+      - name: Show direct APK download
         shell: bash
         run: |
           {
@@ -205,7 +189,7 @@ jobs:
             echo ""
             echo "🔐 [SHA-256 checksum](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }}.sha256)"
             echo ""
-            echo "_Release assets are published directly; no GitHub Actions ZIP artifact is created._"
+            echo "_The APK is attached directly to the GitHub Release. No ZIP artifact is created for this release channel._"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── Beta (prerelease, never Latest) ─────────────────────────────────────────
@@ -289,7 +273,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Direct APK download
+      - name: Show direct APK download
         shell: bash
         run: |
           {
@@ -299,7 +283,7 @@ jobs:
             echo ""
             echo "🔐 [SHA-256 checksum](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }}.sha256)"
             echo ""
-            echo "_Release assets are published directly; no GitHub Actions ZIP artifact is created._"
+            echo "_The APK is attached directly to the GitHub Release. No ZIP artifact is created for this release channel._"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── Stable (release-signed, Latest) — fail-closed on signing ────────────────
@@ -474,8 +458,24 @@ jobs:
           prerelease: false
           make_latest: true
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             ${{ steps.meta.outputs.apk_name }}
             ${{ steps.meta.outputs.apk_name }}.sha256
+            apk-inspection.txt
+            apksigner-verify.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show direct APK download
+        shell: bash
+        run: |
+          {
+            echo "## FINORA Stable Release"
+            echo ""
+            echo "⬇️ [Download APK directly](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }})"
+            echo ""
+            echo "🔐 [SHA-256 checksum](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }}.sha256)"
+            echo ""
+            echo "_The APK is attached directly to the GitHub Release. No ZIP artifact is created for this release channel._"
+          } >> "$GITHUB_STEP_SUMMARY"
