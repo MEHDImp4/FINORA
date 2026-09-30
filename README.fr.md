@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/MEHDImp4/FINORA/releases"><img src="https://img.shields.io/github/v/release/MEHDImp4/FINORA?color=6366f1&label=derni%C3%A8re%20version%20apk" alt="Dernière Release" /></a>
+  <a href="https://github.com/MEHDImp4/FINORA/releases"><img src="https://img.shields.io/github/v/release/MEHDImp4/FINORA?color=6366f1&label=versions%20apk" alt="Versions APK" /></a>
   <a href="https://github.com/MEHDImp4/FINORA/actions/workflows/ci.yml"><img src="https://github.com/MEHDImp4/FINORA/actions/workflows/ci.yml/badge.svg" alt="Statut CI" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Licence-GPL--3.0-blue.svg" alt="Licence: GPL-3.0" /></a>
   <a href="https://expo.dev"><img src="https://img.shields.io/badge/Expo-SDK%2057-000020.svg?logo=expo" alt="Expo SDK 57" /></a>
