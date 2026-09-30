@@ -4,6 +4,7 @@ import {
   IFinoraPlayerEngine,
   PlayerPlaybackState
 } from "./types";
+import { logger } from "../../core/network/logger";
 
 export class FinoraPlayerEngine implements IFinoraPlayerEngine {
   private player: VideoPlayer | null = null;
@@ -273,7 +274,7 @@ export class FinoraPlayerEngine implements IFinoraPlayerEngine {
       try {
         listener(this.snapshot);
       } catch (err) {
-        console.error("Error in FinoraPlayerEngine listener:", err);
+        logger.error("[FinoraPlayerEngine] Listener error:", err);
       }
     }
   }
