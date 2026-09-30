@@ -7,14 +7,18 @@ Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/)
 
 ---
 
-## [1.0.0] - 2026-09-16
+## [1.0.0] - Non publiée
 
 ### ✨ Fonctionnalités majeures (Features)
 - **Lecteur Vidéo Avancé** : Intégration moderne d'Expo Video / Media3 avec reprise de lecture, contrôle gestuel (luminosité, volume, double-tap seek), changement de pistes audio et sous-titres avec modal de style personnalisable.
 - **Téléchargements Offline Fiables** : Gestionnaire de téléchargements (`DownloadManager`) résistant aux interruptions de réseau, aux arrêts d'application et aux redémarrages de l'OS avec reprise de téléchargement (HTTP Range), limitation de bande passante et service d'arrière-plan Android.
 - **Navigation & Découverte** : Interface cinématique avec bannière héro dynamique, carrousels par bibliothèque, reprise de lecture rapide, recherche avec suggestions et historique isolé par serveur et utilisateur.
-- **Sécurité Renforcée** : Chiffrement des jetons d'accès via `expo-secure-store`, masquage automatique des secrets et jetons dans les logs (`[REDACTED]`), avertissement et validation stricte des connexions HTTP locales claires.
+- **Stockage Sécurisé des Identifiants** : Stockage des jetons via `expo-secure-store`, masquage automatique des identifiants sensibles dans les logs (`[REDACTED]`), avertissement strict pour les connexions HTTP locales et absence d’analytics.
 - **Distribution Continue** : Workflows GitHub Actions pour la génération automatisée d'APK autonomes (`preview`, `beta`, `release`) publiés directement dans les GitHub Releases avec checksums SHA-256.
+
+### 🔧 Durcissement de la Release
+- **Quality Gates Cohérents** : Les pipelines Android stable et RC exécutent le même audit des dépendances de production, TypeScript, version, i18n, Jest et Expo Doctor informatif avant validation du build.
+- **Erreurs Player Sanitisées** : Les erreurs des listeners du lecteur passent par le logger FINORA avec masquage des données sensibles au lieu d'un `console.error` direct.
 
 ### 🐛 Corrections de bugs (Fixes)
 - **Écran noir au démarrage (Build Preview)** : Passage de `assembleDebug` à `assembleRelease` pour embarquer le bundle JavaScript Hermes et les assets dans l'APK sans nécessiter de serveur Metro local.
