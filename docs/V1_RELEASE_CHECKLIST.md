@@ -131,6 +131,15 @@ unless its quality gate passes.
 
 ## 7. Production Release (Stable)
 
+Before tagging a stable release, `.github/workflows/rc-build-validation.yml` must validate
+the same Android production path used by `.github/workflows/build-apk.yml`: Node 22,
+Java 17, Expo prebuild, Gradle setup, `assembleRelease -PreactNativeReleaseLevel=stable`,
+production keystore signing, `apksigner verify`, manifest inspection, and SHA-256.
+The RC differs only by stopping before publication: it creates no stable tag and no GitHub Release.
+
+RC validation is **fail-closed** on the same four Android signing secrets as stable. An
+unsigned or debug-signed APK is never accepted as release-candidate evidence.
+
 Stable releases are produced by `.github/workflows/build-apk.yml` from a tag matching
 `vX.Y.Z`. The job is **fail-closed**: if any precondition is missing it fails instead of
 publishing a degraded artifact.
