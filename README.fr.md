@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/MEHDImp4/FINORA/releases/latest"><img src="https://img.shields.io/github/v/release/MEHDImp4/FINORA?color=6366f1&label=derni%C3%A8re%20version%20apk" alt="Dernière Release" /></a>
+  <a href="https://github.com/MEHDImp4/FINORA/releases"><img src="https://img.shields.io/github/v/release/MEHDImp4/FINORA?color=6366f1&label=derni%C3%A8re%20version%20apk" alt="Dernière Release" /></a>
   <a href="https://github.com/MEHDImp4/FINORA/actions/workflows/ci.yml"><img src="https://github.com/MEHDImp4/FINORA/actions/workflows/ci.yml/badge.svg" alt="Statut CI" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Licence-GPL--3.0-blue.svg" alt="Licence: GPL-3.0" /></a>
   <a href="https://expo.dev"><img src="https://img.shields.io/badge/Expo-SDK%2057-000020.svg?logo=expo" alt="Expo SDK 57" /></a>
@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/MEHDImp4/FINORA/releases/latest">📥 <strong>Télécharger le dernier APK</strong></a> •
+  <a href="https://github.com/MEHDImp4/FINORA/releases">📥 <strong>Voir les APK disponibles</strong></a> •
   <a href="#-démarrage-rapide-développeurs">🚀 <strong>Démarrage rapide</strong></a> •
   <a href="CONTRIBUTING.fr.md">🤝 <strong>Contribuer</strong></a> •
   <a href="https://github.com/MEHDImp4/FINORA/discussions">💬 <strong>Discussions</strong></a> •
@@ -101,7 +101,7 @@ Développé avec Expo SDK 57, React Native 0.86 et TypeScript, il associe lectur
 
 - 🎬 **Lecture Jellyfin Native** — Décodage matériel basse consommation via AndroidX Media3 (ExoPlayer) et AVPlayer.
 - 📥 **Téléchargements Hors-Ligne Résilients** — Mise en cache d'arrière-plan avec reprise HTTP Range en cas de coupure réseau ou redémarrage de l'application.
-- 🔐 **Stockage Sécurisé des Identifiants** — Stockage matériel sécurisé (`expo-secure-store`) ; mots de passe immédiatement détruits de la mémoire vive après authentification.
+- 🔐 **Stockage Sécurisé des Identifiants** — Les jetons d’accès utilisent `expo-secure-store` lorsque disponible ; les mots de passe ne sont jamais persistés et leurs références locales sont abandonnées immédiatement après authentification.
 - 🔎 **Recherche Rapide en Bibliothèque** — Suggestions instantanées à la frappe et isolation de l'historique par utilisateur et par serveur.
 - 🎞️ **Saut d'Intros et de Génériques** — Boutons de saut dynamiques synchronisés avec les marqueurs de chapitres Jellyfin.
 - 🔊 **Pistes Audio & Sous-Titres Multiples** — Sélection fluide des pistes et calque de rendu de sous-titres dédié (SRT, WebVTT, styles ASS).
@@ -115,8 +115,8 @@ Développé avec Expo SDK 57, React Native 0.86 et TypeScript, il associe lectur
 ### Android (APK Direct)
 
 <p align="center">
-  <a href="https://github.com/MEHDImp4/FINORA/releases/latest">
-    <img src="https://img.shields.io/badge/Télécharger-Dernier%20APK-6366f1?style=for-the-badge&logo=android&logoColor=white" alt="Télécharger le dernier APK" height="40" />
+  <a href="https://github.com/MEHDImp4/FINORA/releases">
+    <img src="https://img.shields.io/badge/Voir-APK%20disponibles-6366f1?style=for-the-badge&logo=android&logoColor=white" alt="Voir les APK disponibles" height="40" />
   </a>
 </p>
 
@@ -124,11 +124,11 @@ Des fichiers APK autonomes sont générés et publiés automatiquement à chaque
 
 | Canal de Build | Recommandé Pour | Lien de Téléchargement |
 |---|---|---|
-| **Version Stable (Latest)** | Tous les utilisateurs recherchant une stabilité maximale | [**Télécharger le dernier APK**](https://github.com/MEHDImp4/FINORA/releases/latest) |
-| **Toutes les Releases** | Historique des versions, préversions et notes de mise à jour | [**Voir toutes les releases**](https://github.com/MEHDImp4/FINORA/releases) |
+| **Release Candidates / Previews** | Testeurs validant la future version stable | [**Voir les APK disponibles**](https://github.com/MEHDImp4/FINORA/releases) |
+| **Stable** | À utiliser après publication d’une release stable `vX.Y.Z` | [**Voir toutes les releases**](https://github.com/MEHDImp4/FINORA/releases) |
 
 #### Guide d'installation sous Android :
-1. Téléchargez le fichier `.apk` directement sur votre appareil depuis la [page de la dernière version](https://github.com/MEHDImp4/FINORA/releases/latest).
+1. Téléchargez le fichier `.apk` directement sur votre appareil depuis la [page GitHub Releases](https://github.com/MEHDImp4/FINORA/releases).
 2. Ouvrez le fichier téléchargé depuis le centre de notifications ou votre explorateur de fichiers.
 3. Si le système vous y invite, autorisez l'option **"Installer des applications de sources inconnues"** pour votre navigateur.
 4. Appuyez sur **Installer** et lancez FINORA.
@@ -311,7 +311,7 @@ FINORA/
 | Commande | Action |
 |---|---|
 | `npm start` | Démarre le bundler de développement Metro |
-| `npm test` | Exécute l'ensemble de la suite de tests Jest (87 suites, 575 tests) |
+| `npm test` | Exécute l’ensemble de la suite de tests Jest |
 | `npm run typecheck` | Vérifie le typage TypeScript en mode strict sans générer de fichiers |
 | `npm run android` | Compile et démarre le build de développement natif Android |
 | `npm run ios` | Compile et démarre le build de développement natif iOS |
@@ -331,17 +331,18 @@ npm run typecheck
 ```
 
 L'intégration continue est déclenchée sur chaque push et pull request vers la branche `master` via GitHub Actions :
-- **Validation TypeScript stricte** (0 erreur)
-- **Exécution des tests Jest** (87 suites, 575 tests validés)
-- **Audit de sécurité des dépendances** (`npm audit`)
-- **Contrôle d'intégrité Expo Doctor**
+- **Validation TypeScript stricte**
+- **Exécution des tests Jest**
+- **Contrôles de cohérence de version et i18n**
+- **Audit des dépendances de production** (`npm audit --omit=dev --audit-level=high`)
+- **Expo Doctor** (informatif)
 - **Génération automatisée des APK autonomes** via GitHub Actions (`build-apk.yml`)
 
 ---
 
 ## 🛡️ Sécurité & Confidentialité
 
-- **Zéro Secret en Texte Clair** : Les mots de passe sont détruits de la mémoire vive dès l'authentification et ne sont jamais journalisés ni persistés.
+- **Gestion des Identifiants** : Les mots de passe ne sont jamais persistés ; leurs références locales sont abandonnées immédiatement après l’authentification et les valeurs sensibles sont masquées dans les logs.
 - **Keystore Chiffré Matériellement** : Les jetons d'accès sont stockés dans le stockage sécurisé de l'appareil (`expo-secure-store`) selon le matériel disponible.
 - **Journaux Réseau Sanitizés** : Tous les logs de requêtes et de débogage masquent automatiquement les en-têtes d'autorisation, jetons et identifiants (`[REDACTED]`).
 - **Aucun Traqueur Tiers** : Ni télémétrie, ni analytique externe, ni profilage d'usage.
