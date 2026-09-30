@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-status: Awaiting next milestone
-stopped_at: Milestone v1.0 complete and archived; ready for /gsd-new-milestone
-last_updated: "2026-09-18T02:42:00.000Z"
-last_activity: 2026-09-18
-last_activity_desc: Quick task add-github-community-feedback-settings completed (added GitHub repo, bug reporting, and feature suggestion links to Settings screen)
-state_head: 82d83c8
+status: Final v1.0 RC hardening
+stopped_at: Feature milestone complete; final signed RC validation remains before stable v1.0.0
+last_updated: "2026-09-30T18:00:00.000Z"
+last_activity: 2026-09-30
+last_activity_desc: Release hardening audit aligned CI gates, security claims, and canonical V1 release verification
+state_head: e5bef0f
 progress:
   total_phases: 10
   completed_phases: 10
@@ -23,23 +23,24 @@ current_phase_name: null
 See: .planning/PROJECT.md (updated 2026-09-11)
 
 **Core value:** The flawless, instant core loop: Open FINORA → Browse instantly → Choose content → Play → Watch smoothly → Resume anywhere.
-**Current focus:** Planning next milestone
+**Current focus:** Final Android RC validation and stable v1.0.0 release
 
 ## Current Position
 
 Phase: Milestone v1.0 complete (Phases 1–10)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-09-17 — Completed quick task community-infrastructure (deployed branch rulesets, CODEOWNERS, 29 curated labels, Issue/PR templates, and community guides)
+Status: Feature-complete; release validation in progress
+Last activity: 2026-09-30 — Release hardening audit and CI/documentation alignment
 
 ## Performance Metrics
 
 **Velocity:**
 
 - Total plans completed: 26
-- Total test suites: 42 passed
-- Total tests: 161 passed
-- TypeScript check: 0 errors
+- Latest recorded test suites: 97 passed
+- Latest recorded tests: 659 passed
+- Latest recorded TypeScript check: 0 errors
+- Final RC gates: pending rerun on the release-hardening HEAD
 
 **By Phase:**
 
@@ -70,7 +71,7 @@ Recent decisions affecting current work:
 - [Phase 1]: Implemented `FinoraScreen`, `FinoraButton`, `FinoraIconButton`, and `FinoraText` with dark OLED palette
 - [Phase 2]: Generated persistent device UUID via `expo-crypto` saved in `SecureTokenStorage` for FINORA client headers
 - [Phase 2]: Strictly enforced URL validation with explicit unencrypted HTTP security warning banner
-- [Phase 2]: Guaranteed immediate memory purging of passwords post-auth
+- [Phase 2]: Passwords are never persisted and local password references are discarded immediately post-auth
 - [Phase 2]: Isolated multi-server auth tokens by `${serverId}_${userId}` in SecureStore to prevent credential cross-contamination
 - [Phase 2]: Implemented remote `/Sessions/Logout` revocation and local token wiping
 - [Phase 2]: Integrated Server Diagnostics panel in Settings reporting ping latency, TLS status, and server health
@@ -91,7 +92,9 @@ None yet.
 
 ### Blockers/Concerns
 
-None yet.
+- Final signed Android RC must be built and validated from the current release-hardening HEAD before tagging `v1.0.0`.
+- Foreground new-media notification test 10.1 remains pending in the historical device QA log.
+- iOS physical-device validation remains unavailable and is not a V1 Android release gate.
 
 ## Deferred Items
 
