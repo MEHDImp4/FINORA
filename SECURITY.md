@@ -12,8 +12,8 @@ We provide security patches for the following versions of FINORA:
 
 | Version | Supported          | Notes |
 | ------- | ------------------ | ----- |
-| `master` | :white_check_mark: | Active development branch |
-| `v1.0.x` | :white_check_mark: | Latest release line |
+| `master` | :white_check_mark: | Active development / release-candidate branch |
+| `v1.0.x` | :hourglass_flowing_sand: | Supported stable line once published |
 | `< 1.0`  | :x:                | Pre-release development tags |
 
 ---
@@ -48,8 +48,8 @@ Please provide as much detail as possible to help us reproduce and address the i
 ## 🔐 Built-in Security Architecture
 
 FINORA is built with security-by-design principles:
-- **Hardware-Backed Keystore**: User authentication tokens are stored strictly within the device's hardware-backed secure storage (`Android Keystore` on Android, `Keychain` on iOS via `expo-secure-store`).
-- **Memory Hygiene**: Passwords are wiped from JavaScript memory immediately following server authentication.
+- **Platform Secure Storage**: User authentication tokens are stored through `expo-secure-store` using the platform secure-storage facilities (Android Keystore-backed encryption / iOS Keychain; hardware-backed properties depend on the device and OS).
+- **Credential Lifetime**: Passwords are never persisted; FINORA drops its local password reference immediately after the authentication request completes.
 - **Sanitized Logging**: All network debug outputs automatically redact authorization headers, tokens, and sensitive query strings (`[REDACTED]`).
 - **TLS / HTTPS**: Cleartext HTTP connections display explicit security warnings to the user.
 - **Zero Telemetry**: No third-party trackers, analytics, or behavioral telemetry are embedded in the app.
