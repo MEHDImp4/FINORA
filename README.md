@@ -170,8 +170,8 @@ Due to platform restrictions on third-party streaming clients, running FINORA on
 - **Rich Metadata Display**: Detailed cast lists, community ratings, studio badges, and media resolution tags (4K, HDR, 1080p, 5.1 Surround).
 
 ### 5. Zero-Trust Security Architecture
-- **Hardware Keystore**: Authentication tokens are stored in hardware-backed storage (`expo-secure-store`) where available on device.
-- **Memory Hygiene**: Passwords are wiped from JavaScript memory immediately following server authentication.
+- **Platform Secure Storage**: Authentication tokens are stored through `expo-secure-store`; hardware-backed properties depend on the device and operating system.
+- **Credential Lifetime**: Passwords are never persisted and FINORA discards its local password reference immediately after authentication completes.
 - **Sanitized Logging**: All network logs and debugging outputs automatically redact authorization headers, passwords, and tokens (`[REDACTED]`).
 - **Zero Third-Party Trackers**: No analytics, telemetry, or third-party ads.
 
@@ -192,7 +192,7 @@ Due to platform restrictions on third-party streaming clients, running FINORA on
 | **Player** | [`expo-video`](https://docs.expo.dev/versions/latest/sdk/video/) | AndroidX Media3 / ExoPlayer on Android & AVPlayer on iOS |
 | **Images** | [`expo-image`](https://docs.expo.dev/versions/latest/sdk/image/) | Native disk/memory caching with blurhash support |
 | **State** | [TanStack Query v5](https://tanstack.com/query) + [Zustand](https://zustand.docs.pmnd.rs) | Server state caching & lightweight atomic UI stores |
-| **Security** | [`expo-secure-store`](https://docs.expo.dev/versions/latest/sdk/securestore/) | Hardware-backed keystore (Android Keystore / iOS Keychain) where supported |
+| **Security** | [`expo-secure-store`](https://docs.expo.dev/versions/latest/sdk/securestore/) | Platform secure storage for Jellyfin access tokens; hardware-backed properties depend on device/OS |
 | **SDK** | [`@jellyfin/sdk`](https://github.com/jellyfin/jellyfin-sdk-typescript) | Official typed Jellyfin API client |
 | **Language** | [TypeScript](https://www.typescriptlang.org/) | Strict mode type-safety across the entire codebase |
 
