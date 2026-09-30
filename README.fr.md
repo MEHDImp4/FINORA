@@ -64,7 +64,7 @@ Développé avec Expo SDK 57, React Native 0.86 et TypeScript, il associe lectur
 - **Navigation Fluide** : Optimisée pour les écrans à haut rafraîchissement (jusqu'à 120 Hz) grâce à la Nouvelle Architecture React Native (moteur de rendu Fabric et runtime Hermes).
 - **Design Sombre Cinématique** : Esthétique sombre OLED soignée, navigation fluide inspirée de Netflix, cartes épurées et hiérarchie visuelle claire.
 - **Moteur Vidéo Natif** : Propulsé par `expo-video` (basé sur AndroidX Media3 / ExoPlayer sur Android et AVPlayer sur iOS) avec négociation automatisée des flux.
-- **Confidentialité par Défaut** : Jetons d'authentification stockés dans le Keystore matériel selon les capacités de l'appareil, mots de passe purgés de la mémoire après connexion et zéro traceur tiers.
+- **Confidentialité par Défaut** : Jetons d’authentification stockés via `expo-secure-store`, mots de passe jamais persistés et références locales abandonnées après connexion, sans traceur tiers.
 
 ---
 
@@ -170,8 +170,8 @@ En raison des règles encadrant les clients multimédias tiers sur iOS, l'instal
 - **Métadonnées Détaillées** : Distribution des acteurs, notes de la communauté, studios et indicateurs de qualité (4K, HDR, 1080p, audio 5.1).
 
 ### 5. Architecture de Sécurité Zéro-Trust
-- **Keystore Matériel** : Jetons d'accès conservés dans le stockage sécurisé matériel (`expo-secure-store`) selon les fonctionnalités de l'appareil.
-- **Hygiène Mémoire** : Mots de passe supprimés de la mémoire JavaScript dès l'authentification réussie auprès du serveur.
+- **Stockage Sécurisé de la Plateforme** : Jetons d’accès conservés via `expo-secure-store` ; le caractère matériel dépend de l’appareil et de l’OS.
+- **Durée de Vie des Identifiants** : Les mots de passe ne sont jamais persistés et FINORA abandonne leur référence locale dès la fin de l’authentification.
 - **Journaux Réseau Protégés** : Masquage systématique des en-têtes d'autorisation, mots de passe et jetons dans les logs (`[REDACTED]`).
 - **Absence de Télémétrie** : Aucun outil analytique, aucune publicité et aucun traqueur comportemental.
 
@@ -192,7 +192,7 @@ En raison des règles encadrant les clients multimédias tiers sur iOS, l'instal
 | **Lecteur** | [`expo-video`](https://docs.expo.dev/versions/latest/sdk/video/) | AndroidX Media3 / ExoPlayer sous Android et AVPlayer sous iOS |
 | **Images** | [`expo-image`](https://docs.expo.dev/versions/latest/sdk/image/) | Mise en cache mémoire/disque native et prise en charge Blurhash |
 | **État** | [TanStack Query v5](https://tanstack.com/query) + [Zustand](https://zustand.docs.pmnd.rs) | Cache d'état serveur et stores d'état atomiques légers |
-| **Sécurité** | [`expo-secure-store`](https://docs.expo.dev/versions/latest/sdk/securestore/) | Keystore matériel (Android Keystore / iOS Keychain) selon l'appareil |
+| **Sécurité** | [`expo-secure-store`](https://docs.expo.dev/versions/latest/sdk/securestore/) | Stockage sécurisé de la plateforme pour les jetons Jellyfin ; le caractère matériel dépend de l’appareil et de l’OS |
 | **SDK** | [`@jellyfin/sdk`](https://github.com/jellyfin/jellyfin-sdk-typescript) | Client API officiel du projet Jellyfin en TypeScript typé |
 | **Langage** | [TypeScript](https://www.typescriptlang.org/) | Typage strict garantissant la robustesse de l'ensemble du projet |
 
