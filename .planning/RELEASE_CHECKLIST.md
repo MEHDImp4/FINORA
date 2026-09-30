@@ -1,7 +1,8 @@
 # FINORA 1.0 RC — Release Checklist
 
-> Manual validation checklist for real Android/iOS devices before declaring FINORA 1.0 stable.  
-> Perform full top-to-bottom on a **clean install** (fresh uninstall + install) and again on an **upgrade install**.
+> **Historical QA evidence.** This file records device checks already performed against earlier preview/RC builds.
+> The canonical checklist for certifying the current HEAD is [`docs/V1_RELEASE_CHECKLIST.md`](../docs/V1_RELEASE_CHECKLIST.md).
+> Existing ✅ marks below must not be interpreted as certification of newer commits; the critical smoke tests and automated gates must be rerun on the final signed RC.
 
 ---
 
@@ -165,10 +166,15 @@
 | Gate | Status |
 |------|--------|
 | `npm ci` → PASS | ⬜ |
+| `npm audit --omit=dev --audit-level=high` → PASS | ⬜ |
 | `npm run typecheck` → 0 errors | ⬜ |
+| `npm run version:check` → PASS | ⬜ |
+| `npm run i18n:check` → PASS | ⬜ |
 | `npm test` → all suites pass | ⬜ |
+| `npx expo-doctor` → reviewed | ⬜ |
+| Signed RC build + `apksigner verify` → PASS | ⬜ |
 | GitHub Actions → GREEN | ⬜ |
-| Manual checklist above → all ✅ | ⬜ |
+| Critical device smoke tests rerun on final signed RC | ⬜ |
 
 **FINORA 1.0 RC sign-off date:** ___________  
 **Tested by:** ___________  
