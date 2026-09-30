@@ -37,10 +37,13 @@ Last activity: 2026-09-30 — Release hardening audit and CI/documentation align
 **Velocity:**
 
 - Total plans completed: 26
-- Latest recorded test suites: 97 passed
-- Latest recorded tests: 659 passed
+- Latest recorded test suites: 102 passed
+- Latest recorded tests: 689 passed
+- Latest recorded i18n parity: 730 keys (EN/FR)
 - Latest recorded TypeScript check: 0 errors
-- Final RC gates: pending rerun on the release-hardening HEAD
+- Production dependency audit: 0 high/critical vulnerabilities (14 moderate remain)
+- Expo Doctor: 20/21; only SDK 57 patch-version drift is advisory
+- Final signed Android RC + physical-device smoke tests: still pending
 
 **By Phase:**
 
