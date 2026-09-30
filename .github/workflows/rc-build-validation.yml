@@ -6,7 +6,7 @@ name: RC Android Build Validation
 # assembleRelease -> production signing -> apksigner verify -> checksum) but
 # NEVER publishes a GitHub Release, NEVER creates a tag and NEVER marks Latest.
 #
-# - Push to `rc/v1.0.0-build-validation`, or run it manually.
+# - Push to `rc/vX.Y.Z-build-validation`, or run it manually.
 # - The same four ANDROID_* signing secrets required by stable are mandatory here.
 #   Missing signing material fails closed: an unsigned/debug-signed RC is never
 #   accepted as release validation evidence.
@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - rc/v1.0.0-build-validation
+      - 'rc/v*-build-validation'
 
 permissions:
   contents: read
