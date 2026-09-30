@@ -181,12 +181,18 @@ event into exactly one channel. **At most one publication job is eligible per ev
 
 Any other `v*` tag is rejected by the `classify` job (the workflow fails without building).
 
-### Artifacts
-| Channel | APK | Checksum |
+### Release assets (direct downloads)
+Preview, Beta and Stable builds attach the APK **directly to GitHub Releases**. They intentionally
+do not use GitHub Actions `upload-artifact`, because Actions artifacts are always downloaded as ZIP archives.
+
+| Channel | Direct APK asset | Checksum |
 |---|---|---|
 | Preview | `FINORA-v<version>-preview-<sha>.apk` | `FINORA-v<version>-preview-<sha>.apk.sha256` |
 | Beta | `FINORA-v<version>-beta.N.apk` | `FINORA-v<version>-beta.N.apk.sha256` |
 | Stable | `FINORA-v<version>.apk` | `FINORA-v<version>.apk.sha256` |
+
+The GitHub Actions job summary also exposes a direct link to the APK Release asset.
+RC validation remains an Actions artifact because it is deliberately **not** a published release.
 
 ### Signing secrets (stable only, all four required)
 - `ANDROID_KEYSTORE_BASE64`: Base64 of the keystore (`base64 -w 0 release.keystore`).

@@ -163,14 +163,6 @@ jobs:
           cp "$RELEASE_APK" "$APK_NAME"
           sha256sum "$APK_NAME" > "$APK_NAME.sha256"
           cat "$APK_NAME.sha256"
-      - name: Upload preview artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: finora-preview-apk
-          path: |
-            FINORA-v*-preview-*.apk
-            FINORA-v*-preview-*.apk.sha256
-          retention-days: 14
       - name: Publish preview GitHub Release
         if: success()
         uses: softprops/action-gh-release@v2
@@ -180,11 +172,25 @@ jobs:
           prerelease: true
           make_latest: false
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             ${{ steps.meta.outputs.apk_name }}
             ${{ steps.meta.outputs.apk_name }}.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show direct APK download
+        shell: bash
+        run: |
+          {
+            echo "## FINORA Preview"
+            echo ""
+            echo "⬇️ [Download APK directly](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }})"
+            echo ""
+            echo "🔐 [SHA-256 checksum](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }}.sha256)"
+            echo ""
+            echo "_The APK is attached directly to the GitHub Release. No ZIP artifact is created for this release channel._"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ── Beta (prerelease, never Latest) ─────────────────────────────────────────
   build-beta:
@@ -251,14 +257,6 @@ jobs:
           cp "$RELEASE_APK" "$APK_NAME"
           sha256sum "$APK_NAME" > "$APK_NAME.sha256"
           cat "$APK_NAME.sha256"
-      - name: Upload beta artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: finora-beta-apk
-          path: |
-            FINORA-v*-beta.*.apk
-            FINORA-v*-beta.*.apk.sha256
-          retention-days: 30
       - name: Publish beta GitHub Release
         if: success()
         uses: softprops/action-gh-release@v2
@@ -268,11 +266,25 @@ jobs:
           prerelease: true
           make_latest: false
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             ${{ steps.meta.outputs.apk_name }}
             ${{ steps.meta.outputs.apk_name }}.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show direct APK download
+        shell: bash
+        run: |
+          {
+            echo "## FINORA Beta"
+            echo ""
+            echo "⬇️ [Download APK directly](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }})"
+            echo ""
+            echo "🔐 [SHA-256 checksum](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }}.sha256)"
+            echo ""
+            echo "_The APK is attached directly to the GitHub Release. No ZIP artifact is created for this release channel._"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ── Stable (release-signed, Latest) — fail-closed on signing ────────────────
   build-release:
@@ -437,16 +449,6 @@ jobs:
           APK_NAME='${{ steps.meta.outputs.apk_name }}'
           sha256sum "$APK_NAME" > "$APK_NAME.sha256"
           cat "$APK_NAME.sha256"
-      - name: Upload stable artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: finora-release-apk
-          path: |
-            FINORA-v*.apk
-            FINORA-v*.apk.sha256
-            apk-inspection.txt
-            apksigner-verify.txt
-          retention-days: 90
       - name: Publish stable GitHub Release (Latest)
         if: success()
         uses: softprops/action-gh-release@v2
@@ -456,8 +458,24 @@ jobs:
           prerelease: false
           make_latest: true
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             ${{ steps.meta.outputs.apk_name }}
             ${{ steps.meta.outputs.apk_name }}.sha256
+            apk-inspection.txt
+            apksigner-verify.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show direct APK download
+        shell: bash
+        run: |
+          {
+            echo "## FINORA Stable Release"
+            echo ""
+            echo "⬇️ [Download APK directly](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }})"
+            echo ""
+            echo "🔐 [SHA-256 checksum](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }}.sha256)"
+            echo ""
+            echo "_The APK is attached directly to the GitHub Release. No ZIP artifact is created for this release channel._"
+          } >> "$GITHUB_STEP_SUMMARY"
