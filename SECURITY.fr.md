@@ -12,8 +12,8 @@ Nous fournissons des correctifs de sécurité pour les versions suivantes de FIN
 
 | Version | Prise en charge    | Notes |
 | ------- | ------------------ | ----- |
-| `master` | :white_check_mark: | Branche de développement actif |
-| `v1.0.x` | :white_check_mark: | Ligne de versions stables actuelle |
+| `master` | :white_check_mark: | Branche active de développement / release candidate |
+| `v1.0.x` | :hourglass_flowing_sand: | Ligne stable prise en charge une fois publiée |
 | `< 1.0`  | :x:                | Versions de pré-développement antérieures |
 
 ---
@@ -48,8 +48,8 @@ Afin de nous aider à reproduire et corriger rapidement la vulnérabilité, veui
 ## 🔐 Architecture de Sécurité Native de FINORA
 
 FINORA a été conçu selon des principes stricts de sécurité dès la conception (*Security by Design*) :
-- **Keystore Matériel** : Les jetons d'authentification utilisateur sont stockés exclusivement dans le coffre-fort matériel de l'appareil (`Android Keystore` sur Android, `Keychain` sur iOS via `expo-secure-store`).
-- **Hygiène Mémoire** : Les mots de passe sont immédiatement détruits de la mémoire vive JavaScript après la connexion au serveur.
+- **Stockage Sécurisé de la Plateforme** : Les jetons d’authentification passent par `expo-secure-store` et les mécanismes sécurisés de la plateforme (chiffrement adossé à Android Keystore / iOS Keychain ; le caractère matériel dépend de l’appareil et de l’OS).
+- **Durée de Vie des Identifiants** : Les mots de passe ne sont jamais persistés ; FINORA abandonne sa référence locale au mot de passe dès la fin de la requête d’authentification.
 - **Journaux Réseau Sanitizés** : Les journaux de débogage masquent systématiquement les en-têtes d'autorisation, tokens et identifiants (`[REDACTED]`).
 - **Avertissement TLS / HTTPS** : Les connexions HTTP locales non chiffrées affichent un avertissement de sécurité explicite à l'utilisateur.
 - **Zéro Télémétrie** : Aucun traqueur, aucun outil analytique tiers ni publicité n'est intégré dans l'application.
