@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/MEHDImp4/FINORA/releases/latest"><img src="https://img.shields.io/github/v/release/MEHDImp4/FINORA?color=6366f1&label=latest%20apk" alt="Latest Release" /></a>
+  <a href="https://github.com/MEHDImp4/FINORA/releases"><img src="https://img.shields.io/github/v/release/MEHDImp4/FINORA?color=6366f1&label=apk%20releases" alt="APK Releases" /></a>
   <a href="https://github.com/MEHDImp4/FINORA/actions/workflows/ci.yml"><img src="https://github.com/MEHDImp4/FINORA/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="License: GPL-3.0" /></a>
   <a href="https://expo.dev"><img src="https://img.shields.io/badge/Expo-SDK%2057-000020.svg?logo=expo" alt="Expo SDK 57" /></a>
@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/MEHDImp4/FINORA/releases/latest">📥 <strong>Download Latest APK</strong></a> •
+  <a href="https://github.com/MEHDImp4/FINORA/releases">📥 <strong>Browse APK Releases</strong></a> •
   <a href="#-getting-started">🚀 <strong>Quickstart</strong></a> •
   <a href="CONTRIBUTING.md">🤝 <strong>Contributing</strong></a> •
   <a href="https://github.com/MEHDImp4/FINORA/discussions">💬 <strong>Discussions</strong></a> •
@@ -101,7 +101,7 @@ Built with Expo SDK 57, React Native 0.86, and TypeScript, it combines native ha
 
 - 🎬 **Native Jellyfin Playback** — Low-overhead hardware decoding via AndroidX Media3 (ExoPlayer) & AVPlayer.
 - 📥 **Resilient Offline Downloads** — Background media caching with HTTP Range resume after network drops or app restarts.
-- 🔐 **Secure Credential Storage** — Hardware-backed storage (`expo-secure-store`) where available; passwords wiped immediately from memory post-auth.
+- 🔐 **Secure Credential Storage** — Access tokens use `expo-secure-store` where available; passwords are never persisted and local references are discarded immediately after authentication.
 - 🔎 **Fast Library Search** — Instant multi-library search with live suggestions and per-user history isolation.
 - 🎞️ **Intro & Credits Skipping** — Dynamic skip markers based on Jellyfin chapter metadata.
 - 🔊 **Multi-Audio & Subtitles** — Flexible track selection with custom subtitle overlay (SRT, WebVTT, ASS styling).
@@ -115,8 +115,8 @@ Built with Expo SDK 57, React Native 0.86, and TypeScript, it combines native ha
 ### Android (Direct APK)
 
 <p align="center">
-  <a href="https://github.com/MEHDImp4/FINORA/releases/latest">
-    <img src="https://img.shields.io/badge/Download-Latest%20APK-6366f1?style=for-the-badge&logo=android&logoColor=white" alt="Download Latest APK" height="40" />
+  <a href="https://github.com/MEHDImp4/FINORA/releases">
+    <img src="https://img.shields.io/badge/Browse-APK%20Releases-6366f1?style=for-the-badge&logo=android&logoColor=white" alt="Browse APK Releases" height="40" />
   </a>
 </p>
 
@@ -124,11 +124,11 @@ Standalone APKs are built automatically on every release:
 
 | Build Channel | Recommended For | Link |
 |---|---|---|
-| **Stable / Latest** | All users looking for tested stability | [**Download Latest APK**](https://github.com/MEHDImp4/FINORA/releases/latest) |
-| **All Releases** | Release history, preview builds, and changelogs | [**Browse All Releases**](https://github.com/MEHDImp4/FINORA/releases) |
+| **Release Candidates / Previews** | Testers validating the upcoming stable release | [**Browse APK Releases**](https://github.com/MEHDImp4/FINORA/releases) |
+| **Stable** | Use only after a stable `vX.Y.Z` release is published | [**Browse All Releases**](https://github.com/MEHDImp4/FINORA/releases) |
 
 #### How to install on Android:
-1. Download the `.apk` file directly on your Android phone from the [latest release page](https://github.com/MEHDImp4/FINORA/releases/latest).
+1. Download the `.apk` file directly on your Android phone from the [GitHub Releases page](https://github.com/MEHDImp4/FINORA/releases).
 2. Tap the downloaded file in your browser notifications or file manager.
 3. If prompted, allow your browser or file manager to **"Install unknown apps"**.
 4. Tap **Install** and launch FINORA.
@@ -311,7 +311,7 @@ FINORA/
 | Command | Action |
 |---|---|
 | `npm start` | Start Metro development bundler |
-| `npm test` | Run complete automated Jest test suite (87 suites, 575 tests) |
+| `npm test` | Run the complete automated Jest test suite |
 | `npm run typecheck` | Run TypeScript compiler in strict mode without emitting files |
 | `npm run android` | Compile and launch native Android development build |
 | `npm run ios` | Compile and launch native iOS development build |
@@ -331,17 +331,18 @@ npm run typecheck
 ```
 
 Continuous Integration runs on every push and pull request to `master` via GitHub Actions:
-- **Linting & TypeScript Strict Validation** (0 strict errors)
-- **Jest Unit & Integration Test Execution** (87 suites, 575 tests passing)
-- **Dependency Security Audit** (`npm audit`)
-- **Expo Doctor Health Checks**
+- **TypeScript Strict Validation**
+- **Jest Unit & Integration Test Execution**
+- **Version and i18n consistency checks**
+- **Production Dependency Security Audit** (`npm audit --omit=dev --audit-level=high`)
+- **Expo Doctor** (advisory)
 - **Automated Standalone APK Packaging** via GitHub Actions (`build-apk.yml`)
 
 ---
 
 ## 🛡️ Security & Privacy
 
-- **Zero Plaintext Secrets**: Passwords are wiped from memory immediately after authentication and are never logged or persisted.
+- **Credential Handling**: Passwords are never persisted; local references are discarded immediately after authentication and sensitive values are redacted from logs.
 - **Hardware-Encrypted Keystore**: Access tokens are stored in hardware-backed storage (`expo-secure-store`) where available on device.
 - **Sanitized Logging**: All network logs and debugging outputs automatically redact authentication headers, tokens, and query credentials (`[REDACTED]`).
 - **No Third-Party Trackers**: Zero telemetry, zero analytics, zero external user tracking.
