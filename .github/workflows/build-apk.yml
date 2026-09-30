@@ -125,6 +125,16 @@ jobs:
           java-version: '17'
       - name: Install dependencies
         run: npm ci
+
+      - name: Toolchain versions
+        run: |
+          set -euo pipefail
+          node -v
+          java -version
+          node -p "require('expo/package.json').version"
+          node -p "require('react-native/package.json').version"
+          node -p "require('@react-native/gradle-plugin/package.json').version"
+
       - name: Resolve release metadata
         id: meta
         shell: bash
@@ -340,8 +350,17 @@ jobs:
         run: npx expo prebuild --platform android --no-install
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+
       - name: Ensure gradlew is executable
         run: chmod +x android/gradlew
+
+      - name: Gradle wrapper + version
+        run: |
+          set -euo pipefail
+          cat android/gradle/wrapper/gradle-wrapper.properties
+          cd android
+          ./gradlew --version
+
       - name: Build Stable APK
         run: |
           cd android
@@ -389,6 +408,27 @@ jobs:
             echo "::error::APK is signed with the Android debug certificate. Refusing to publish a production release."
             exit 1
           fi
+      - name: Inspect APK manifest and permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_NAME='${{ steps.meta.outputs.apk_name }}'
+          BUILD_TOOLS="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}/build-tools"
+          AAPT=$(find "$BUILD_TOOLS" -name aapt 2>/dev/null | sort -V | tail -n 1)
+          AAPT2=$(find "$BUILD_TOOLS" -name aapt2 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$AAPT" ] || [ -z "$AAPT2" ]; then
+            echo "::error::aapt/aapt2 not found in $BUILD_TOOLS"
+            exit 1
+          fi
+          {
+            echo "### APK: $APK_NAME"
+            echo "## aapt dump badging"
+            "$AAPT" dump badging "$APK_NAME" | grep -E "package:|versionCode|versionName|sdkVersion|targetSdkVersion|uses-permission|application-label|application-debuggable" || true
+            echo ""
+            echo "## Manifest flags (aapt2 xmltree)"
+            "$AAPT2" dump xmltree "$APK_NAME" --file AndroidManifest.xml | grep -iE "debuggable|usesCleartextTraffic|supportsPictureInPicture|foregroundServiceType|allowBackup" || true
+          } | tee apk-inspection.txt
+
       - name: Compute checksum
         shell: bash
         run: |
@@ -403,6 +443,8 @@ jobs:
           path: |
             FINORA-v*.apk
             FINORA-v*.apk.sha256
+            apk-inspection.txt
+            apksigner-verify.txt
           retention-days: 90
       - name: Publish stable GitHub Release (Latest)
         if: success()
