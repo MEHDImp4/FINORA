@@ -1,14 +1,15 @@
 # FINORA — V1.0.0 Release Verification Checklist
 
-This checklist documents the mandatory end-to-end manual and automated verification procedures required prior to deploying a production release of FINORA (v1.0.0).
+This is the **canonical release checklist** for the current FINORA v1.0.0 candidate. Historical device QA results are preserved in `.planning/RELEASE_CHECKLIST.md`, but only results rerun against the final signed RC count toward stable sign-off.
 
 ---
 
 ## 1. Automated Verification Gates (Pre-Release)
 
-These gates run in CI (`.github/workflows/ci.yml`) and again, before any release build,
-in the mandatory `quality` job of `.github/workflows/build-apk.yml`. No APK is built
-unless `quality` passes.
+These gates run in CI (`.github/workflows/ci.yml`), in the RC dry-run
+(`.github/workflows/rc-build-validation.yml`), and again before any published Android release
+in the mandatory `quality` job of `.github/workflows/build-apk.yml`. No release APK is built
+unless its quality gate passes.
 
 - [ ] **Install (reproducible)**
   - `npm ci`
@@ -32,14 +33,14 @@ unless `quality` passes.
 - [ ] **HTTPS Auto-Detection & TLS Validation**
   - Enter server hostname without scheme (e.g. `jellyfin.example.com`).
   - Verify client attempts HTTPS by default.
-  - Verify TLS certificate chain validation blocks invalid / self-signed certificates unless explicitly approved.
+  - Verify TLS certificate chain validation rejects invalid or self-signed certificates; FINORA does not bypass platform TLS validation.
 - [ ] **Cleartext HTTP Warning**
   - Connect to a local HTTP server (`http://192.168.x.x:8096`).
   - Verify the non-secure connection banner/warning displays before login.
-- [ ] **Credential Security & Hardware Keystore**
+- [ ] **Credential Security & SecureStore**
   - Authenticate with valid username and password.
-  - Verify access token is stored exclusively in hardware keystore (`expo-secure-store`).
-  - Inspect device memory / logs: verify password is wiped immediately post-auth and never logged (`Authorization: [REDACTED]`).
+  - Verify access token is stored through `expo-secure-store` and never in AsyncStorage/plaintext preferences.
+  - Verify the password is never persisted, its local reference is discarded after authentication, and credentials never appear in logs (`Authorization: [REDACTED]`).
 - [ ] **Invalid Credentials**
   - Attempt login with incorrect password.
   - Verify user-friendly error message, no app crash, and no token persisted.
