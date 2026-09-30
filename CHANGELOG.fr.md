@@ -19,13 +19,14 @@ Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/)
 ### 🔧 Durcissement de la Release
 - **Quality Gates Cohérents** : Les pipelines Android stable et RC exécutent le même audit des dépendances de production, TypeScript, version, i18n, Jest et Expo Doctor informatif avant validation du build.
 - **Erreurs Player Sanitisées** : Les erreurs des listeners du lecteur passent par le logger FINORA avec masquage des données sensibles au lieu d'un `console.error` direct.
+- **Correction de l’Audit Dépendances** : Mise à jour de l’entrée transitive vulnérable `brace-expansion` du lockfile vers 5.0.12 afin que le gate d’audit high severity passe.
 
 ### 🐛 Corrections de bugs (Fixes)
 - **Écran noir au démarrage (Build Preview)** : Passage de `assembleDebug` à `assembleRelease` pour embarquer le bundle JavaScript Hermes et les assets dans l'APK sans nécessiter de serveur Metro local.
 - **Gestion des Timers & Jest Workers** : Hardening des timeouts réseau (`httpClient`, `networkStatusService`) et nettoyage systématique des instances (`FinoraPlayerEngine`, `DownloadManager`) pour une terminaison propre des tests en CI.
 - **Sauvegarde et Restauration de Téléchargements** : Correction de l'écrasement intempestif des métadonnées lors des debounce de persistance et isolation par serveur/compte.
 - **Luminosité du Système** : Restauration automatique de la luminosité du système lors de la fermeture du lecteur vidéo.
-- **Alignement Dépendances Expo 57** : Rétrogradation de Jest 30 vers Jest 29 pour satisfaire les contraintes strictes d'Expo SDK 57 et passage complet d'`expo-doctor` (21/21 checks).
+- **Alignement des Tests Expo 57** : Jest 29 reste aligné avec la pile de tests SDK 57. `expo-doctor` reste informatif pour les seuls écarts de patch des paquets Expo, revus séparément avant la stable.
 
 ---
 
