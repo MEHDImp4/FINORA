@@ -4,6 +4,7 @@ import { FinoraError } from "../errors";
 export interface ServerDiagnosticsResult {
   serverUrl: string;
   isHttps: boolean;
+  tlsVerified: boolean;
   pingMs: number;
   serverName: string;
   version: string;
@@ -46,6 +47,7 @@ export class DiagnosticsService {
       return {
         serverUrl: cleanUrl,
         isHttps,
+        tlsVerified: isHttps,
         pingMs,
         serverName: info.ServerName || "Jellyfin Server",
         version: info.Version || "Unknown",
@@ -58,6 +60,7 @@ export class DiagnosticsService {
       return {
         serverUrl: cleanUrl,
         isHttps,
+        tlsVerified: false,
         pingMs,
         serverName: "Unreachable",
         version: "Unknown",
