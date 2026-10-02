@@ -43,7 +43,7 @@ jobs:
         run: npm ci
 
       - name: Audit production dependencies
-        run: npm run audit:prod
+        run: node scripts/audit-production.js
 
       - name: Type check
         run: npm run typecheck
