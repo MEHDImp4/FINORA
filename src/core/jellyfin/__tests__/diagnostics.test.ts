@@ -29,11 +29,26 @@ describe("DiagnosticsService", () => {
 
     expect(result.serverUrl).toBe("https://media.finora.org");
     expect(result.isHttps).toBe(true);
+    expect(result.tlsVerified).toBe(true);
     expect(result.serverName).toBe("Finora Media");
     expect(result.version).toBe("10.9.11");
     expect(result.operatingSystem).toBe("Linux");
     expect(result.apiHealthy).toBe(true);
     expect(result.pingMs).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does not claim TLS is verified when an HTTPS server is unreachable", async () => {
+    mockHttpClient.request.mockRejectedValue(new Error("Failed to connect"));
+
+    const result = await service.runDiagnostics(
+      "https://media.finora.org",
+      null,
+      mockHttpClient
+    );
+
+    expect(result.isHttps).toBe(true);
+    expect(result.tlsVerified).toBe(false);
+    expect(result.apiHealthy).toBe(false);
   });
 
   it("identifies HTTP and reports failure if server is unreachable", async () => {
@@ -47,6 +62,7 @@ describe("DiagnosticsService", () => {
 
     expect(result.serverUrl).toBe("http://192.168.1.50:8096");
     expect(result.isHttps).toBe(false);
+    expect(result.tlsVerified).toBe(false);
     expect(result.apiHealthy).toBe(false);
     expect(result.statusMessage).toContain("Connection timed out");
   });
