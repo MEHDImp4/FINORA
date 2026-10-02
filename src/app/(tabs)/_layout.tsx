@@ -7,7 +7,11 @@ import { hapticService } from "../../core/feedback/hapticService";
 const HIDDEN_ROUTES = new Set(["downloads"]);
 
 function FinoraPillTabBar({ state, descriptors, navigation, insets }: any) {
-  const bottomInset = Platform.OS === "ios" ? insets.bottom + 6 : 14;
+  const safeBottom = Math.max(0, insets?.bottom ?? 0);
+  const bottomInset = Math.max(
+    safeBottom + 6,
+    Platform.OS === "ios" ? 6 : 14
+  );
 
   return (
     <View style={[styles.tabBarWrapper, { bottom: bottomInset }]} pointerEvents="box-none">
