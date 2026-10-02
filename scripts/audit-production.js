@@ -15,7 +15,7 @@ const { spawnSync } = require('node:child_process');
 
 const ALLOWLIST = new Map([
   [
-    'GHSA-86w9-cpqp-85rv',
+    'GHSA-86W9-CPQP-85RV',
     {
       expires: '2026-11-15',
       reason:
