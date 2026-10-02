@@ -654,6 +654,7 @@ export interface SettingsTranslations {
   diagTargetServer: string;
   diagSecurity: string;
   diagSecureHttps: string;
+  diagHttpsUnverified: string;
   diagUnencryptedHttp: string;
   diagAvailability: string;
   diagOnline: string;
