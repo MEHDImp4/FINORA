@@ -257,3 +257,12 @@ Rules:
 - The `versionCode` is strictly increasing for increasing SemVer and is never a mutable counter.
 - A stable tag that does not equal the `package.json` version fails the release (`v1.1.0` while the app is `1.0.0` → FAIL).
 - Only these tag shapes are accepted: `vX.Y.Z`, `vX.Y.Z-beta.N`, `vX.Y.Z-preview-<sha>`.
+
+### Temporary production-audit exception
+
+The release/CI/RC production dependency audit remains fail-closed for every **HIGH** or **CRITICAL** advisory except the exact time-bounded allowlist entry below:
+
+- `GHSA-86w9-cpqp-85rv` — `node-forge`, pulled transitively through Expo CLI/build tooling. The exception expires on **2026-11-15** and must be removed or revalidated when upstream publishes a usable fix for the Expo SDK 57 release line.
+
+Do **not** use `npm audit fix --force` for this advisory: npm currently proposes a breaking Expo downgrade rather than an in-line patched dependency. The gate is implemented by `npm run audit:prod` and still fails on any other HIGH/CRITICAL advisory.
+
