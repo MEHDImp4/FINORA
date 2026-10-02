@@ -264,5 +264,5 @@ The release/CI/RC production dependency audit remains fail-closed for every **HI
 
 - `GHSA-86w9-cpqp-85rv` — `node-forge`, pulled transitively through Expo CLI/build tooling. The exception expires on **2026-11-15** and must be removed or revalidated when upstream publishes a usable fix for the Expo SDK 57 release line.
 
-Do **not** use `npm audit fix --force` for this advisory: npm currently proposes a breaking Expo downgrade rather than an in-line patched dependency. The gate is implemented by `npm run audit:prod` and still fails on any other HIGH/CRITICAL advisory.
+Do **not** use `npm audit fix --force` for this advisory: npm currently proposes a breaking Expo downgrade rather than an in-line patched dependency. The gate is implemented by `node scripts/audit-production.js` and still fails on any other HIGH/CRITICAL advisory.
 
