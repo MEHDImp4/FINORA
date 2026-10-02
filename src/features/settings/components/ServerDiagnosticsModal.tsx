@@ -89,7 +89,11 @@ export function ServerDiagnosticsModal({ visible, onClose }: ServerDiagnosticsMo
               <View style={styles.resultsContainer}>
                 <View style={styles.metricRow}>
                   <Text style={styles.metricLabel}>{t("settings.diagTargetServer")}</Text>
-                  <Text style={styles.metricValue} numberOfLines={1}>
+                  <Text
+                    style={styles.metricValue}
+                    numberOfLines={2}
+                    ellipsizeMode="middle"
+                  >
                     {diagResult.serverUrl}
                   </Text>
                 </View>
@@ -120,18 +124,28 @@ export function ServerDiagnosticsModal({ visible, onClose }: ServerDiagnosticsMo
                   <Text style={styles.metricLabel}>{t("settings.diagSecurity")}</Text>
                   <View style={styles.badgeRow}>
                     <Ionicons
-                      name={diagResult.isHttps ? "shield-checkmark" : "warning"}
+                      name={
+                        diagResult.tlsVerified
+                          ? "shield-checkmark"
+                          : diagResult.isHttps
+                          ? "shield-outline"
+                          : "warning"
+                      }
                       size={16}
-                      color={diagResult.isHttps ? "#4BB543" : "#FFB800"}
+                      color={diagResult.tlsVerified ? "#4BB543" : "#FFB800"}
                       style={{ marginRight: 6 }}
                     />
                     <Text
                       style={[
                         styles.metricValue,
-                        { color: diagResult.isHttps ? "#4BB543" : "#FFB800" }
+                        { color: diagResult.tlsVerified ? "#4BB543" : "#FFB800" }
                       ]}
                     >
-                      {diagResult.isHttps ? t("settings.diagSecureHttps") : t("settings.diagUnencryptedHttp")}
+                      {diagResult.tlsVerified
+                        ? t("settings.diagSecureHttps")
+                        : diagResult.isHttps
+                        ? t("settings.diagHttpsUnverified")
+                        : t("settings.diagUnencryptedHttp")}
                     </Text>
                   </View>
                 </View>
@@ -213,7 +227,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "#262633",
-    overflow: "hidden"
+    overflow: "hidden",
+    maxHeight: "90%"
   },
   header: {
     flexDirection: "row",
@@ -259,23 +274,33 @@ const styles = StyleSheet.create({
   metricRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    columnGap: 12,
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#222233"
   },
   badgeRow: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: "row",
-    alignItems: "center"
+    alignItems: "center",
+    justifyContent: "flex-end"
   },
   metricLabel: {
+    maxWidth: "44%",
+    flexShrink: 0,
     fontSize: 13,
     color: "#8A8A9E"
   },
   metricValue: {
+    flex: 1,
+    minWidth: 0,
+    flexShrink: 1,
     fontSize: 13,
     fontWeight: "600",
-    color: "#FFFFFF"
+    color: "#FFFFFF",
+    textAlign: "right"
   },
   statusBox: {
     marginTop: 10,
