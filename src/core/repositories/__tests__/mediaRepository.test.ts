@@ -135,11 +135,13 @@ describe("MediaRepository", () => {
   });
 
   it("getItem calls /Users/{userId}/Items/{itemId} and maps single item", async () => {
-    mockHttpClient.request.mockResolvedValue({
-      Id: "item-99",
-      Name: "Specific Film",
-      Type: "Movie"
-    });
+    mockHttpClient.request
+      .mockResolvedValueOnce({
+        Id: "item-99",
+        Name: "Specific Film",
+        Type: "Movie"
+      })
+      .mockResolvedValueOnce({ Items: [] });
 
     const item = await repository.getItem("user-123", "item-99", mockHttpClient);
 
@@ -151,8 +153,71 @@ describe("MediaRepository", () => {
         })
       })
     );
+    expect(mockHttpClient.request).toHaveBeenCalledWith("/MediaSegments/item-99");
     expect(item.id).toBe("item-99");
     expect(item.name).toBe("Specific Film");
+  });
+
+  it("maps Jellyfin MediaSegments intro/outro timings into player skip markers", async () => {
+    mockHttpClient.request
+      .mockResolvedValueOnce({
+        Id: "episode-1",
+        Name: "Episode 1",
+        Type: "Episode",
+        Chapters: [{ Name: "Chapter 1", StartPositionTicks: 0 }]
+      })
+      .mockResolvedValueOnce({
+        Items: [
+          {
+            Type: "Intro",
+            StartTicks: 100_000_000,
+            EndTicks: 700_000_000
+          },
+          {
+            Type: "Outro",
+            StartTicks: 5_000_000_000,
+            EndTicks: 5_500_000_000
+          }
+        ]
+      });
+
+    const item = await repository.getItem("user-123", "episode-1", mockHttpClient);
+
+    expect(item.chapters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          markerType: "IntroStart",
+          startPositionTicks: 100_000_000
+        }),
+        expect.objectContaining({
+          markerType: "IntroEnd",
+          startPositionTicks: 700_000_000
+        }),
+        expect.objectContaining({
+          markerType: "CreditsStart",
+          startPositionTicks: 5_000_000_000
+        })
+      ])
+    );
+  });
+
+  it("falls back to regular chapters when MediaSegments is unavailable", async () => {
+    mockHttpClient.request
+      .mockResolvedValueOnce({
+        Id: "episode-2",
+        Name: "Episode 2",
+        Type: "Episode",
+        Chapters: [
+          { Name: "Intro", StartPositionTicks: 200_000_000 },
+          { Name: "Main", StartPositionTicks: 600_000_000 }
+        ]
+      })
+      .mockRejectedValueOnce(new Error("404"));
+
+    const item = await repository.getItem("user-123", "episode-2", mockHttpClient);
+
+    expect(item.chapters?.[0].name).toBe("Intro");
+    expect(item.chapters?.[1].name).toBe("Main");
   });
 
   it("getSeasons calls /Shows/{seriesId}/Seasons and maps season list", async () => {
