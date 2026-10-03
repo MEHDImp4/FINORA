@@ -21,6 +21,70 @@ export interface GetItemsOptions {
 const MEDIA_FIELDS =
   "Overview,Genres,GenreItems,Tags,ProductionYear,RunTimeTicks,CommunityRating,ImageTags,BackdropImageTags,ParentBackdropImageTags,ParentBackdropItemId,SeriesPrimaryImageTag,ParentPrimaryImageTag,ParentThumbImageTag,ParentThumbItemId,ParentId,PrimaryImageAspectRatio,ImageBlurHashes,UserData,ParentIndexNumber,IndexNumber,SeriesId,SeriesName,SeasonId,LocationType,MediaSources,ChildCount,RecursiveItemCount,MediaSourceCount,ItemCounts,Chapters,Trickplay";
 
+function mergeMediaSegmentsIntoChapters(dto: any, segmentResponse: any): any {
+  const segments = Array.isArray(segmentResponse?.Items)
+    ? segmentResponse.Items
+    : Array.isArray(segmentResponse?.items)
+    ? segmentResponse.items
+    : [];
+
+  if (segments.length === 0) return dto;
+
+  const chapters = Array.isArray(dto?.Chapters) ? [...dto.Chapters] : [];
+
+  for (const segment of segments) {
+    const type = String(segment?.Type ?? segment?.type ?? "").toLowerCase();
+    const startTicks =
+      typeof segment?.StartTicks === "number"
+        ? segment.StartTicks
+        : typeof segment?.startTicks === "number"
+        ? segment.startTicks
+        : null;
+    const endTicks =
+      typeof segment?.EndTicks === "number"
+        ? segment.EndTicks
+        : typeof segment?.endTicks === "number"
+        ? segment.endTicks
+        : null;
+
+    if (startTicks === null) continue;
+
+    if (type === "intro") {
+      chapters.push({
+        Name: "Intro",
+        StartPositionTicks: startTicks,
+        MarkerType: "IntroStart"
+      });
+      if (endTicks !== null && endTicks > startTicks) {
+        chapters.push({
+          Name: "Intro End",
+          StartPositionTicks: endTicks,
+          MarkerType: "IntroEnd"
+        });
+      }
+    } else if (type === "outro" || type === "credits") {
+      chapters.push({
+        Name: "Credits",
+        StartPositionTicks: startTicks,
+        MarkerType: "CreditsStart"
+      });
+    }
+  }
+
+  if (chapters.length === 0) return dto;
+
+  chapters.sort((a, b) => {
+    const aTicks = typeof a?.StartPositionTicks === "number" ? a.StartPositionTicks : 0;
+    const bTicks = typeof b?.StartPositionTicks === "number" ? b.StartPositionTicks : 0;
+    return aTicks - bTicks;
+  });
+
+  return {
+    ...dto,
+    Chapters: chapters
+  };
+}
+
 export function isValidMediaDto(dto: any): boolean {
   if (!dto) return false;
   if (dto.Type === "Person" || dto.LocationType === "Virtual" || dto.IsMissing === true) {
@@ -246,7 +310,20 @@ export class MediaRepository {
         Fields: `${MEDIA_FIELDS},OfficialRating,Taglines,People,MediaStreams,MediaSources,Chapters`
       }
     });
-    return mapJellyfinItemToMediaItem(dto);
+
+    // Jellyfin 10.10+ exposes intro/outro timing through the Media Segments API.
+    // Modern plugins populate /MediaSegments/{itemId} instead of mutating Chapters,
+    // so merge those timings into the existing chapter model used by the player.
+    // Older servers or items without segments simply fall back to Chapters.
+    let enrichedDto = dto;
+    try {
+      const segments = await http.request<any>(`/MediaSegments/${itemId}`);
+      enrichedDto = mergeMediaSegmentsIntoChapters(dto, segments);
+    } catch {
+      // 404 / unsupported Media Segments / transient plugin failure: keep chapters.
+    }
+
+    return mapJellyfinItemToMediaItem(enrichedDto);
   }
 
   public async getSimilarItems(
