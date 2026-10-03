@@ -6,9 +6,12 @@
  * Fails closed on every HIGH/CRITICAL advisory except explicitly allowlisted,
  * time-bounded upstream advisories that currently have no non-breaking fix.
  *
- * Temporary exception:
+ * Temporary exceptions:
  * - GHSA-86w9-cpqp-85rv (node-forge)
  *   Transitive through Expo CLI/build tooling. Revalidate or remove by expiry.
+ * - GHSA-vfj7-8cjw-p6xm (braces)
+ *   Transitive through Expo/Metro build tooling. Upstream currently has no
+ *   patched npm release, so keep this exception narrow and time-bounded.
  */
 
 const { spawnSync } = require('node:child_process');
@@ -20,6 +23,14 @@ const ALLOWLIST = new Map([
       expires: '2026-11-15',
       reason:
         'node-forge is pulled transitively by Expo CLI/build tooling; no patched npm release is currently available without breaking the Expo SDK 57 release line.',
+    },
+  ],
+  [
+    'GHSA-VFJ7-8CJW-P6XM',
+    {
+      expires: '2026-10-31',
+      reason:
+        'braces <=3.0.3 is pulled transitively by Expo/Metro tooling and the advisory currently has no patched npm release; this exception must be removed as soon as upstream ships a fix.',
     },
   ],
 ]);
