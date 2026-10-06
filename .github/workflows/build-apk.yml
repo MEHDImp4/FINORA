@@ -146,7 +146,7 @@ jobs:
       - name: Generate Android native project (Expo Prebuild)
         run: npx expo prebuild --platform android --no-install
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
       - name: Ensure gradlew is executable
         run: chmod +x android/gradlew
       - name: Build Preview APK
@@ -240,7 +240,7 @@ jobs:
       - name: Generate Android native project (Expo Prebuild)
         run: npx expo prebuild --platform android --no-install
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
       - name: Ensure gradlew is executable
         run: chmod +x android/gradlew
       - name: Build Beta APK
@@ -362,7 +362,7 @@ jobs:
       - name: Generate Android native project (Expo Prebuild)
         run: npx expo prebuild --platform android --no-install
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Ensure gradlew is executable
         run: chmod +x android/gradlew
