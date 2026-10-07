@@ -45,6 +45,57 @@ export function getSanitizedPlaybackUrl(url: string): string {
   return sanitizeData(url);
 }
 
+interface VideoTarget {
+  quality: string;
+  maxWidth: number;
+  maxHeight: number;
+  maxBitrate: number;
+  label: string;
+}
+
+/**
+ * High-quality compatibility target for an automatic H.264 fallback.
+ *
+ * Jellyfin can otherwise pick a conservative encoder default when a client asks
+ * for H.264 without a resolution/bitrate. That is especially visible on large,
+ * high-density tablets. Keep the source resolution when known, cap it to the
+ * device profile, and use a bitrate appropriate for that resolution.
+ */
+function getAutoCompatibilityTarget(
+  sourceWidth: number,
+  sourceHeight: number,
+  deviceProfile: DeviceProfile,
+  quality: string
+): VideoTarget {
+  const profileWidth = Math.max(1, deviceProfile.maxResolution.width || 1920);
+  const profileHeight = Math.max(1, deviceProfile.maxResolution.height || 1080);
+  const maxWidth = Math.min(sourceWidth > 0 ? sourceWidth : 1920, profileWidth);
+  const maxHeight = Math.min(sourceHeight > 0 ? sourceHeight : 1080, profileHeight);
+
+  let maxBitrate: number;
+  if (maxHeight >= 2160 || maxWidth >= 3000) {
+    maxBitrate = 50_000_000;
+  } else if (maxHeight >= 1080 || maxWidth >= 1900) {
+    maxBitrate = 20_000_000;
+  } else if (maxHeight >= 720 || maxWidth >= 1200) {
+    maxBitrate = 8_000_000;
+  } else {
+    maxBitrate = 2_500_000;
+  }
+
+  if (deviceProfile.maxBitrate && deviceProfile.maxBitrate > 0) {
+    maxBitrate = Math.min(maxBitrate, deviceProfile.maxBitrate);
+  }
+
+  return {
+    quality,
+    maxWidth,
+    maxHeight,
+    maxBitrate,
+    label: `${maxWidth}x${maxHeight} @ ${(maxBitrate / 1_000_000).toFixed(1)} Mbps`
+  };
+}
+
 interface ForcedPlanContext {
   cleanServerUrl: string;
   itemId: string;
@@ -56,6 +107,8 @@ interface ForcedPlanContext {
   normVideoCodec?: string;
   normAudioCodec?: string;
   mediaContainer: string;
+  quality: string;
+  transcodeTarget: VideoTarget;
 }
 
 /** Builds a transport plan for a mode that has been explicitly forced by the caller. */
@@ -68,6 +121,7 @@ function buildForcedPlan(mode: PlaybackMode, ctx: ForcedPlanContext): PlaybackPl
       videoCodec: ctx.normVideoCodec,
       audioCodec: ctx.normAudioCodec,
       container: ctx.mediaContainer,
+      quality: ctx.quality,
       reason: "Forced direct play."
     };
   }
@@ -80,20 +134,28 @@ function buildForcedPlan(mode: PlaybackMode, ctx: ForcedPlanContext): PlaybackPl
       videoCodec: ctx.normVideoCodec,
       audioCodec: ctx.normAudioCodec,
       container: ctx.mediaContainer,
+      quality: ctx.quality,
       reason: "Forced direct stream (remux)."
     };
   }
 
-  // Forced transcode re-encodes video to H.264 and audio to AAC: this is the safe
-  // recovery from a decode/container failure, so video must never be copied here.
+  // A decode/container failure requires a real video re-encode. Keep the user's
+  // selected quality authoritative even while transport remains forced to H.264.
+  const target = ctx.transcodeTarget;
+  const qualityParams = `&maxWidth=${target.maxWidth}&maxHeight=${target.maxHeight}&videoBitRate=${target.maxBitrate}&maxVideoBitRate=${target.maxBitrate}&audioBitRate=192000`;
+
   return {
     mode: "transcode",
-    url: `${ctx.cleanServerUrl}/Videos/${ctx.itemId}/master.m3u8?videoCodec=h264&audioCodec=aac&audioChannels=2${ctx.hlsMediaSourceParam}${ctx.audioIndexParam}${ctx.subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`,
+    url: `${ctx.cleanServerUrl}/Videos/${ctx.itemId}/master.m3u8?videoCodec=h264&audioCodec=aac&audioChannels=2${qualityParams}${ctx.hlsMediaSourceParam}${ctx.audioIndexParam}${ctx.subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`,
     mediaSourceId: ctx.mediaSourceId,
     videoCodec: "h264",
     audioCodec: "aac",
     container: "m3u8",
-    reason: "Forced transcode fallback after a direct playback failure."
+    quality: target.quality,
+    bitrate: target.maxBitrate,
+    maxWidth: target.maxWidth,
+    maxHeight: target.maxHeight,
+    reason: `Forced compatibility transcode after a direct playback failure (${target.label}).`
   };
 }
 
@@ -115,6 +177,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     return {
       mode: "direct-play",
       url: localPath,
+      quality,
       reason: "Offline local file playback"
     };
   }
@@ -157,7 +220,39 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   const normVideoCodec = videoCodec === "h265" ? "hevc" : videoCodec;
   const normAudioCodec = audioCodec;
 
-  // A forced transport (PLR-01 fallback) bypasses negotiation entirely.
+  const sourceWidth = videoStream?.width || 0;
+  const sourceHeight = videoStream?.height || 0;
+
+  // Quality evaluation must happen before forced fallback handling. Previously a
+  // forced transcode returned early and silently ignored later quality changes.
+  const qualityPreset = QUALITY_PRESETS[quality] || QUALITY_PRESETS.auto;
+  const isConstrainedQuality =
+    quality !== "auto" &&
+    quality !== "original" &&
+    Boolean(qualityPreset.maxBitrate && qualityPreset.maxWidth && qualityPreset.maxHeight);
+
+  const autoCompatibilityTarget = getAutoCompatibilityTarget(
+    sourceWidth,
+    sourceHeight,
+    deviceProfile,
+    quality === "original" ? "original" : "auto"
+  );
+
+  const selectedTranscodeTarget: VideoTarget =
+    isConstrainedQuality &&
+    qualityPreset.maxBitrate &&
+    qualityPreset.maxWidth &&
+    qualityPreset.maxHeight
+      ? {
+          quality: qualityPreset.id,
+          maxWidth: qualityPreset.maxWidth,
+          maxHeight: qualityPreset.maxHeight,
+          maxBitrate: qualityPreset.maxBitrate,
+          label: qualityPreset.label
+        }
+      : autoCompatibilityTarget;
+
+  // A forced transport (PLR-01 fallback) still obeys the selected quality.
   if (forceMode) {
     return buildForcedPlan(forceMode, {
       cleanServerUrl,
@@ -169,7 +264,9 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
       subtitleIndexParam,
       normVideoCodec,
       normAudioCodec,
-      mediaContainer
+      mediaContainer,
+      quality,
+      transcodeTarget: selectedTranscodeTarget
     });
   }
 
@@ -179,22 +276,12 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   const isAudioSupported =
     !normAudioCodec || deviceProfile.supportedAudioCodecs.includes(normAudioCodec);
 
-  // Quality evaluation
-  const qualityPreset = QUALITY_PRESETS[quality] || QUALITY_PRESETS.auto;
-  const isConstrainedQuality =
-    quality !== "auto" &&
-    quality !== "original" &&
-    Boolean(qualityPreset.maxBitrate && qualityPreset.maxWidth && qualityPreset.maxHeight);
-
   // If user explicitly picked a constrained quality profile (4k, 1080p, 720p, 480p):
   if (isConstrainedQuality && qualityPreset.maxBitrate && qualityPreset.maxWidth && qualityPreset.maxHeight) {
     const qualityParams = `&maxWidth=${qualityPreset.maxWidth}&maxHeight=${qualityPreset.maxHeight}&videoBitRate=${qualityPreset.maxBitrate}&maxVideoBitRate=${qualityPreset.maxBitrate}&audioBitRate=192000`;
 
-    // If video is natively supported and its resolution/bitrate are already <= requested target, we can copy video
-    const sourceWidth = videoStream?.width || 0;
-    const sourceHeight = videoStream?.height || 0;
+    // If video is natively supported and its resolution/bitrate are already <= requested target, we can copy video.
     const sourceBitrate = videoStream?.bitRate || item.bitRate || 0;
-
     const canCopyVideo =
       isVideoSupported &&
       sourceWidth > 0 &&
@@ -225,7 +312,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   }
 
   // If user selected a non-default audio track and video is supported:
-  // Use Direct Stream with copy video and copy/transcode audio with AudioStreamIndex
+  // Use Direct Stream with copy video and copy/transcode audio with AudioStreamIndex.
   if (!isDefaultAudioSelected && isVideoSupported) {
     const isSourceAac = normAudioCodec === "aac";
     const targetAudioCodec = isSourceAac ? "copy" : "aac";
@@ -244,7 +331,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     };
   }
 
-  // Direct Play: container, video codec, and audio codec are all natively supported
+  // Direct Play: container, video codec, and audio codec are all natively supported.
   if (isDefaultAudioSelected && isContainerSupported && isVideoSupported && isAudioSupported) {
     const directPlayUrl = `${cleanServerUrl}/Videos/${item.id}/stream?static=true${mediaSourceParam}`;
 
@@ -260,7 +347,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     };
   }
 
-  // Direct Stream: Video and audio codecs match, but container is incompatible -> remux
+  // Direct Stream: Video and audio codecs match, but container is incompatible -> remux.
   if (isVideoSupported && isAudioSupported && !isContainerSupported) {
     const directStreamUrl = `${cleanServerUrl}/Videos/${item.id}/stream?videoCodec=copy&audioCodec=copy${mediaSourceParam}${audioIndexParam}${subtitleIndexParam}`;
 
@@ -276,9 +363,10 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     };
   }
 
-  // Transcoding: Video or audio codec requires re-encoding -> HLS stream
-  // When video codec is already supported, copy video directly (0% server overhead, 60fps)
-  // and only transcode audio to AAC stereo to fix audio stutter/silence.
+  // Transcoding: Video or audio codec requires re-encoding -> HLS stream.
+  // If video itself is supported, copy it and only transcode audio. If video must
+  // be re-encoded, explicitly request a high-quality source-aware target instead
+  // of relying on Jellyfin's conservative default.
   const unsupportedReasons: string[] = [];
   if (!isVideoSupported && normVideoCodec) {
     unsupportedReasons.push(`video codec '${normVideoCodec}'`);
@@ -291,7 +379,11 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   }
 
   const targetVideoCodec = isVideoSupported ? "copy" : "h264";
-  const transcodeUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=${targetVideoCodec}&audioCodec=aac&audioChannels=2${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`;
+  const compatibilityParams =
+    targetVideoCodec === "h264"
+      ? `&maxWidth=${autoCompatibilityTarget.maxWidth}&maxHeight=${autoCompatibilityTarget.maxHeight}&videoBitRate=${autoCompatibilityTarget.maxBitrate}&maxVideoBitRate=${autoCompatibilityTarget.maxBitrate}&audioBitRate=192000`
+      : "";
+  const transcodeUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=${targetVideoCodec}&audioCodec=aac&audioChannels=2${compatibilityParams}${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`;
 
   return {
     mode: "transcode",
@@ -301,6 +393,12 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     audioCodec: "aac",
     container: "m3u8",
     quality: quality === "original" ? "original" : "auto",
-    reason: `Transcoding required: unsupported ${unsupportedReasons.join(", ") || "format"}.`
+    bitrate: targetVideoCodec === "h264" ? autoCompatibilityTarget.maxBitrate : undefined,
+    maxWidth: targetVideoCodec === "h264" ? autoCompatibilityTarget.maxWidth : undefined,
+    maxHeight: targetVideoCodec === "h264" ? autoCompatibilityTarget.maxHeight : undefined,
+    reason:
+      targetVideoCodec === "h264"
+        ? `Transcoding required: unsupported ${unsupportedReasons.join(", ") || "format"}; compatibility target ${autoCompatibilityTarget.label}.`
+        : `Transcoding required: unsupported ${unsupportedReasons.join(", ") || "format"}.`
   };
 }
