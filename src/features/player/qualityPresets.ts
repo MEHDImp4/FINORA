@@ -11,10 +11,10 @@ export interface QualityPreset {
 export const QUALITY_OPTIONS: QualityPreset[] = [
   { id: "auto", label: "Auto" },
   { id: "original", label: "Original" },
-  { id: "4k", label: "4K (2160p) - 40 Mbps", maxWidth: 3840, maxHeight: 2160, maxBitrate: 40000000 },
-  { id: "1080p", label: "1080p HD - 10 Mbps", maxWidth: 1920, maxHeight: 1080, maxBitrate: 10000000 },
-  { id: "720p", label: "720p HD - 4 Mbps", maxWidth: 1280, maxHeight: 720, maxBitrate: 4000000 },
-  { id: "480p", label: "480p SD - 1.5 Mbps", maxWidth: 854, maxHeight: 480, maxBitrate: 1500000 }
+  { id: "4k", label: "4K (2160p) - 50 Mbps", maxWidth: 3840, maxHeight: 2160, maxBitrate: 50000000 },
+  { id: "1080p", label: "1080p HD - 20 Mbps", maxWidth: 1920, maxHeight: 1080, maxBitrate: 20000000 },
+  { id: "720p", label: "720p HD - 8 Mbps", maxWidth: 1280, maxHeight: 720, maxBitrate: 8000000 },
+  { id: "480p", label: "480p SD - 2.5 Mbps", maxWidth: 854, maxHeight: 480, maxBitrate: 2500000 }
 ];
 
 export const QUALITY_PRESETS: Record<string, QualityPreset> = {
