@@ -17,7 +17,7 @@ describe("StatsForNerdsModal", () => {
     isPlayed: false,
     isFavorite: false,
     mediaStreams: [
-      { type: "Video", codec: "hevc", width: 3840, height: 2160 },
+      { type: "Video", codec: "hevc", width: 3840, height: 2160, bitRate: 24_000_000 },
       { type: "Audio", codec: "eac3", channels: 6 }
     ]
   };
@@ -28,6 +28,7 @@ describe("StatsForNerdsModal", () => {
     videoCodec: "hevc",
     audioCodec: "eac3",
     container: "mkv",
+    quality: "auto",
     reason: "Direct Play supported natively."
   };
 
@@ -63,9 +64,46 @@ describe("StatsForNerdsModal", () => {
     expect(modeStat.props.children).toBe("DIRECT-PLAY");
 
     const urlStat = root.root.findByProps({ testID: "stat-val-stream-url" });
-    // Verify token is redacted
     expect(urlStat.props.children).not.toContain("secret-token-abc");
     expect(urlStat.props.children).toContain("api_key=[REDACTED]");
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  it("separates source video from requested transcode output", () => {
+    const transcodePlan: PlaybackPlan = {
+      mode: "transcode",
+      url: "https://demo.jellyfin.org/Videos/item-nerd-1/master.m3u8?videoCodec=h264",
+      videoCodec: "h264",
+      audioCodec: "aac",
+      container: "m3u8",
+      quality: "480p",
+      bitrate: 1_500_000,
+      maxWidth: 854,
+      maxHeight: 480,
+      reason: "Compatibility fallback"
+    };
+
+    let root: any;
+    act(() => {
+      root = renderer.create(
+        <StatsForNerdsModal
+          visible={true}
+          onClose={jest.fn()}
+          item={mockItem}
+          plan={transcodePlan}
+          snapshot={mockSnapshot}
+        />
+      );
+    });
+
+    expect(root.root.findByProps({ testID: "stat-val-selected-quality" }).props.children).toBe("480P");
+    expect(root.root.findByProps({ testID: "stat-val-source-video" }).props.children).toContain("3840x2160");
+    const output = root.root.findByProps({ testID: "stat-val-requested-output" }).props.children;
+    expect(output).toContain("854x480");
+    expect(output).toContain("1.5 Mbps");
 
     act(() => {
       root.unmount();
