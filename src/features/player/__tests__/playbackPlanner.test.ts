@@ -377,7 +377,7 @@ describe("PlaybackPlanner", () => {
       expect(plan.mode).toBe("transcode");
       expect(plan.url).toContain("master.m3u8");
       expect(plan.url).toContain("videoCodec=h264&audioCodec=aac");
-      expect(plan.reason).toContain("Forced transcode fallback");
+      expect(plan.reason).toContain("Forced compatibility transcode");
     });
 
     it("forces direct stream and direct play when requested", () => {
