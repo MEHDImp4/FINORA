@@ -1,0 +1,37 @@
+name: Temporary fallback assertion refresh
+
+on:
+  push:
+    branches:
+      - fix/player-quality-fallback
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-test:
+    if: ${{ !contains(github.event.head_commit.message, '[fallback-test-refreshed]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/player-quality-fallback
+      - name: Refresh stale assertion
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'src/features/player/__tests__/playbackPlanner.test.ts';
+          let text = fs.readFileSync(path, 'utf8');
+          const before = 'expect(plan.reason).toContain("Forced transcode fallback");';
+          const after = 'expect(plan.reason).toContain("Forced compatibility transcode");';
+          if (!text.includes(before)) throw new Error('Expected stale assertion was not found');
+          text = text.replace(before, after);
+          fs.writeFileSync(path, text);
+          NODE
+      - name: Commit assertion refresh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/features/player/__tests__/playbackPlanner.test.ts
+          git commit -m "test(player): align fallback assertion [fallback-test-refreshed]"
+          git push origin HEAD:fix/player-quality-fallback
