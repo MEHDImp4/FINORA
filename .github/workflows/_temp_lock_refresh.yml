@@ -1,0 +1,44 @@
+name: Temporary dependency lock refresh
+
+on:
+  push:
+    branches:
+      - fix/player-quality-fallback
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lock:
+    if: ${{ !contains(github.event.head_commit.message, '[lock-refreshed]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: fix/player-quality-fallback
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Refresh patched transitive dependencies
+        run: npm update shell-quote source-map-js --package-lock-only --ignore-scripts
+
+      - name: Verify production audit
+        run: node scripts/audit-production.js
+
+      - name: Commit lockfile refresh
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "No lockfile changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore(deps): refresh audited transitive lockfile [lock-refreshed]"
+          git push origin HEAD:fix/player-quality-fallback
