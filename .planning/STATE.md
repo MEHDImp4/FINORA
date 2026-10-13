@@ -1,19 +1,20 @@
 ---
-gsd_state_version: 1.0
+gsd_state_version: "1.0"
+milestone: v1.0
+current_phase_name: null
 status: Final v1.0 RC hardening
 stopped_at: Feature milestone complete; final signed RC validation remains before stable v1.0.0
-last_updated: "2026-09-30T18:00:00.000Z"
+last_updated: "2026-10-13T21:57:16.991Z"
 last_activity: 2026-09-30
 last_activity_desc: Release hardening audit aligned CI gates, security claims, and canonical V1 release verification
-state_head: e5bef0f
+state_head: 345ce8c4b394f0c53e7ab6edd558a9f4cd097ed2
+current_phase: null
 progress:
   total_phases: 10
   completed_phases: 10
   total_plans: 26
   completed_plans: 26
   percent: 100
-current_phase: null
-current_phase_name: null
 ---
 
 # Project State
@@ -30,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-09-11)
 Phase: Milestone v1.0 complete (Phases 1–10)
 Plan: —
 Status: Feature-complete; release validation in progress
-Last activity: 2026-09-30 — Release hardening audit and CI/documentation alignment
+Last activity: 2026-10-13 - Completed quick task 261013-pvt: Fix APK signing: unify release keystore signing across preview/beta/stable channels (fail-closed) with cert fingerprint pinning
 
 ## Performance Metrics
 
@@ -59,7 +60,6 @@ Last activity: 2026-09-30 — Release hardening audit and CI/documentation align
 | 8. Search & Library | 2/2 | Complete | Passed |
 | 9. UX Polish & Accessibility | 2/2 | Complete | Passed |
 | 10. Offline Subsystem | 3/3 | Complete | Passed |
-
 
 ## Accumulated Context
 
@@ -109,27 +109,28 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Quick Tasks Completed
 
-| Slug | Date | Description | Status |
-|------|------|-------------|--------|
-| device-profile-platform-fix | 2026-09-14 | Resolve device profile platform via Platform.OS for iOS & Android | Complete ✓ |
-| player-quality-selector-fix | 2026-09-14 | Implement dynamic player quality selector with real Jellyfin transcoding | Complete ✓ |
-| fix-player-brightness-volume-controls | 2026-09-14 | Fix player brightness/volume controls unavailable and left/right tap not dismissing overlay | Complete ✓ |
-| add-vertical-brightness-and-volume-sliders | 2026-09-14 | Add vertical brightness and volume sliders to the player overlay | Complete ✓ |
-| lazy-load-series-episodes | 2026-09-14 | Render series episodes incrementally (10 at a time on scroll) instead of all at once | Complete ✓ |
-| true-download-resume-after-process-death | 2026-09-14 | Reconstruct and truly resume downloads after a process death from the existing partial file, re-authenticating from SecureStore | Complete ✓ |
-| github-presentation-polish | 2026-09-17 | Professionalize GitHub presentation, screenshots section, highlights, accurate technical claims, and bilingual sync | Complete ✓ |
-| community-infrastructure | 2026-09-17 | Deploy branch rulesets, CODEOWNERS, 29 curated labels, Issue/PR templates, and community guides | Complete ✓ |
-| fix-resume-progress-display | 2026-09-17 | Fix resume button progress placeholder in MovieDetailsView and i18n locales | Complete ✓ |
-| revert-liquid-glass-to-netflix-dark | 2026-09-17 | Replace Apple Liquid Glass effects across app with simple Netflix dark design | Complete ✓ |
-| fix-series-rating-season-plural-and-genre-tags | 2026-09-17 | Fix series rating layout, season count plural, and genre tag resolution | Complete ✓ |
-| fix-download-quality-onboarding-and-direct-download | 2026-09-17 | Add download quality cards to onboarding, optimize 1080p profile (2-3 GB target), and enable direct one-tap download with long-press quality picker | Complete ✓ |
-| fix-episode-thumbnail-display | 2026-09-17 | Prioritize episode still frame screenshots over series poster in episode cards and lists | Complete ✓ |
-| fix-server-change-and-profile-detection | 2026-09-17 | Fix Jellyfin profile detection via clean unauthenticated client + /Users fallback, separate server change from user login | Complete ✓ |
-| fix-server-connect-modal-scroll-layout | 2026-09-18 | Fix server connect modal cut-off layout, safe insets, and scroll touch responder conflicts | Complete ✓ |
-| add-github-community-feedback-settings | 2026-09-18 | Add GitHub repository, bug reporting, and feature suggestion links in Settings | Complete ✓ |
-| fix-hero-genre-badge-action-and-empty | 2026-09-18 | Prevent hero genre badge line-wrap glitch and localize genres | Complete ✓ |
-| interactive-question-driven-onboarding | 2026-09-18 | Revamp onboarding with question-driven interactive steps and fluid spring transitions | Complete ✓ |
-| player-cinematic-redesign | 2026-09-18 | Complete visual & UX redesign of video player with cinematic gradients, glowing hero controls, premium scrubber with chapters, and luxury sheets | Complete ✓ |
+| # | Description | Date | Commit | Status | Directory |
+| --- | ------------- | ------ | -------- | -------- | ----------- |
+| 1 | device-profile-platform-fix · Resolve device profile platform via Platform.OS for iOS & Android | 2026-09-14 | — | Complete ✓ | — |
+| 2 | player-quality-selector-fix · Implement dynamic player quality selector with real Jellyfin transcoding | 2026-09-14 | — | Complete ✓ | — |
+| 3 | fix-player-brightness-volume-controls · Fix player brightness/volume controls unavailable and left/right tap not dismissing overlay | 2026-09-14 | — | Complete ✓ | — |
+| 4 | add-vertical-brightness-and-volume-sliders · Add vertical brightness and volume sliders to the player overlay | 2026-09-14 | — | Complete ✓ | — |
+| 5 | lazy-load-series-episodes · Render series episodes incrementally (10 at a time on scroll) instead of all at once | 2026-09-14 | — | Complete ✓ | — |
+| 6 | true-download-resume-after-process-death · Reconstruct and truly resume downloads after a process death from the existing partial file, re-authenticating from SecureStore | 2026-09-14 | — | Complete ✓ | — |
+| 7 | github-presentation-polish · Professionalize GitHub presentation, screenshots section, highlights, accurate technical claims, and bilingual sync | 2026-09-17 | — | Complete ✓ | — |
+| 8 | community-infrastructure · Deploy branch rulesets, CODEOWNERS, 29 curated labels, Issue/PR templates, and community guides | 2026-09-17 | — | Complete ✓ | — |
+| 9 | fix-resume-progress-display · Fix resume button progress placeholder in MovieDetailsView and i18n locales | 2026-09-17 | — | Complete ✓ | — |
+| 10 | revert-liquid-glass-to-netflix-dark · Replace Apple Liquid Glass effects across app with simple Netflix dark design | 2026-09-17 | — | Complete ✓ | — |
+| 11 | fix-series-rating-season-plural-and-genre-tags · Fix series rating layout, season count plural, and genre tag resolution | 2026-09-17 | — | Complete ✓ | — |
+| 12 | fix-download-quality-onboarding-and-direct-download · Add download quality cards to onboarding, optimize 1080p profile (2-3 GB target), and enable direct one-tap download with long-press quality picker | 2026-09-17 | — | Complete ✓ | — |
+| 13 | fix-episode-thumbnail-display · Prioritize episode still frame screenshots over series poster in episode cards and lists | 2026-09-17 | — | Complete ✓ | — |
+| 14 | fix-server-change-and-profile-detection · Fix Jellyfin profile detection via clean unauthenticated client + /Users fallback, separate server change from user login | 2026-09-17 | — | Complete ✓ | — |
+| 15 | fix-server-connect-modal-scroll-layout · Fix server connect modal cut-off layout, safe insets, and scroll touch responder conflicts | 2026-09-18 | — | Complete ✓ | — |
+| 16 | add-github-community-feedback-settings · Add GitHub repository, bug reporting, and feature suggestion links in Settings | 2026-09-18 | — | Complete ✓ | — |
+| 17 | fix-hero-genre-badge-action-and-empty · Prevent hero genre badge line-wrap glitch and localize genres | 2026-09-18 | — | Complete ✓ | — |
+| 18 | interactive-question-driven-onboarding · Revamp onboarding with question-driven interactive steps and fluid spring transitions | 2026-09-18 | — | Complete ✓ | — |
+| 19 | player-cinematic-redesign · Complete visual & UX redesign of video player with cinematic gradients, glowing hero controls, premium scrubber with chapters, and luxury sheets | 2026-09-18 | — | Complete ✓ | — |
+| 261013-pvt | Fix APK signing: unify release keystore signing across preview/beta/stable channels (fail-closed) with cert fingerprint pinning | 2026-10-13 | 345ce8c | complete | [261013-pvt-fix-apk-signing-unify-release-keystore-s](./quick/261013-pvt-fix-apk-signing-unify-release-keystore-s/) |
 
 ## Session Continuity
  
