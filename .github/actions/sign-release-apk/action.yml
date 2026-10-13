@@ -115,8 +115,11 @@ runs:
           exit 1
         fi
 
-        # Assert the pin: the signer must be the FINORA release certificate.
-        if ! grep -qiF "Signer #1 certificate SHA-256 digest: $PINNED_CERT_SHA256" apksigner-verify.txt; then
+        # Assert the pin: the signer must be the FINORA release certificate. Match on the
+        # "certificate SHA-256 digest: <pin>" fragment only — apksigner prefixes vary by
+        # version ("Signer #1 certificate …" locally, "V3.0 Signer: certificate …" on the
+        # CI runner) — while "public key SHA-256 digest" lines can never match this pattern.
+        if ! grep -qiF "certificate SHA-256 digest: $PINNED_CERT_SHA256" apksigner-verify.txt; then
           echo "::error::Signer certificate does not match the pinned FINORA release certificate (expected SHA-256 digest $PINNED_CERT_SHA256). See the rotation procedure in the header of .github/actions/sign-release-apk/action.yml. Refusing to publish."
           exit 1
         fi
