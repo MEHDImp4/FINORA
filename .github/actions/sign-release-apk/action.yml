@@ -1,0 +1,125 @@
+# FINORA release APK signing — composite sign + verify action (fail-closed, certificate-pinned).
+#
+# PINNED_CERT_SHA256 in the script below is the SHA-256 digest of the FINORA release
+# signing certificate (CN=Diouri Mehdi, RSA 4096) — the certificate that signed stable
+# v1.0.0. ANY mismatch with that digest (including a CN=Android Debug signer) fails every
+# channel build (preview, beta, stable) on purpose, before publication: a wrongly signed
+# APK must never ship, and a debug-signed APK must never ship again.
+#
+# Rotation procedure (when the release keystore is replaced):
+#   1. Sign once with the new keystore:  apksigner verify --verbose --print-certs <apk>
+#   2. Read the new signer certificate SHA-256 digest from that output.
+#   3. Update PINNED_CERT_SHA256 in the SAME commit that rotates the ANDROID_KEYSTORE_*
+#      repository secrets.
+# Until step 3 lands, every channel build fails loudly on the stale pin — that is the
+# locked fail-closed behavior, and the failure is recoverable in a single commit.
+name: Sign and verify release APK
+description: >
+  Re-sign a Gradle-built release APK with the FINORA release keystore (fail-closed on
+  missing ANDROID_KEYSTORE_* secrets), then verify the signature and assert the pinned
+  release certificate fingerprint before publishing.
+
+inputs:
+  apk_path:
+    description: Path to the Gradle-built release APK file, or the directory containing it (resolved to the single *.apk inside).
+    required: true
+  output_name:
+    description: Published APK filename; the signed APK is written to the workspace root under this name.
+    required: true
+
+outputs:
+  apk_path:
+    description: Workspace-relative path of the signed APK.
+    value: ${{ steps.sign.outputs.apk_path }}
+
+runs:
+  using: composite
+  steps:
+    - id: sign
+      name: Sign and verify (fail-closed)
+      shell: bash
+      # Secrets reach this action ONLY through this step-level env mapping: the `secrets`
+      # context is unavailable inside composite actions, so callers must set the four
+      # ANDROID_KEYSTORE_* values on the `uses:` step's `env:`. Composite sub-steps do not
+      # inherit the caller's env automatically; `${{ env.* }}` resolves against the calling
+      # step's env. Values are read as quoted shell variables and never echoed.
+      env:
+        INPUT_APK_PATH: ${{ inputs.apk_path }}
+        INPUT_OUTPUT_NAME: ${{ inputs.output_name }}
+        KEYSTORE_BASE64: ${{ env.KEYSTORE_BASE64 }}
+        KEYSTORE_PASSWORD: ${{ env.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ env.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ env.KEY_PASSWORD }}
+      run: |
+        set -euo pipefail
+
+        # SHA-256 of the FINORA release signing certificate (CN=Diouri Mehdi, RSA 4096).
+        # Rotation procedure: see the pinned-certificate comment block at the top of this file.
+        PINNED_CERT_SHA256="5380f4293f2c1cba309cd152dfd064790da80b36bb016d0eaef04a151e7dc8e7"
+
+        # Fail-closed secret gate: never fall back to debug/default signing.
+        # `:-` defaults make an unset variable fail closed with this message instead of a
+        # `set -u` abort.
+        if [ -z "${KEYSTORE_BASE64:-}" ] || [ -z "${KEYSTORE_PASSWORD:-}" ] || [ -z "${KEY_ALIAS:-}" ] || [ -z "${KEY_PASSWORD:-}" ]; then
+          echo "::error::Release signing secrets are not configured (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD). Refusing to sign a production APK."
+          exit 1
+        fi
+
+        # Resolve the APK: a file path is used directly; a directory is resolved to the
+        # single *.apk inside it.
+        if [ -f "$INPUT_APK_PATH" ]; then
+          RELEASE_APK="$INPUT_APK_PATH"
+        else
+          RELEASE_APK=$(find "$INPUT_APK_PATH" -name '*.apk' | head -n 1)
+        fi
+        if [ -z "$RELEASE_APK" ]; then
+          echo "::error::APK not found at $INPUT_APK_PATH"
+          exit 1
+        fi
+
+        # Newest apksigner in the runner's preinstalled Android SDK build-tools.
+        BUILD_TOOLS="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}/build-tools"
+        APKSIGNER=$(find "$BUILD_TOOLS" -name apksigner 2>/dev/null | sort -V | tail -n 1)
+        if [ -z "$APKSIGNER" ]; then
+          echo "::error::apksigner not found in $BUILD_TOOLS"
+          exit 1
+        fi
+
+        # Decode the keystore into $RUNNER_TEMP (never the workspace), so it can never
+        # ride along in an uploaded artifact.
+        KEYSTORE_FILE="$RUNNER_TEMP/finora-release.keystore"
+        printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
+
+        # Explicit v1+v2+v3 — deterministic regardless of apksigner defaults for minSdk 24.
+        "$APKSIGNER" sign \
+          --ks "$KEYSTORE_FILE" \
+          --ks-key-alias "$KEY_ALIAS" \
+          --ks-pass "pass:$KEYSTORE_PASSWORD" \
+          --key-pass "pass:$KEY_PASSWORD" \
+          --v1-signing-enabled true \
+          --v2-signing-enabled true \
+          --v3-signing-enabled true \
+          --out "$INPUT_OUTPUT_NAME" \
+          "$RELEASE_APK"
+
+        # Destroy the temporary keystore immediately after signing.
+        shred -u "$KEYSTORE_FILE" 2>/dev/null || rm -f "$KEYSTORE_FILE"
+
+        # Non-zero exit (with pipefail) fails the job on an invalid signature. Written to
+        # the workspace root because the stable job publishes it as a release asset.
+        "$APKSIGNER" verify --verbose --print-certs "$INPUT_OUTPUT_NAME" | tee apksigner-verify.txt
+
+        # Belt-and-braces: refuse a debug certificate outright.
+        if grep -qiE 'CN=Android Debug' apksigner-verify.txt; then
+          echo "::error::APK is signed with the Android debug certificate. Refusing to publish a production release."
+          exit 1
+        fi
+
+        # Assert the pin: the signer must be the FINORA release certificate.
+        if ! grep -qiF "Signer #1 certificate SHA-256 digest: $PINNED_CERT_SHA256" apksigner-verify.txt; then
+          echo "::error::Signer certificate does not match the pinned FINORA release certificate (expected SHA-256 digest $PINNED_CERT_SHA256). See the rotation procedure in the header of .github/actions/sign-release-apk/action.yml. Refusing to publish."
+          exit 1
+        fi
+
+        echo "apk_path=$INPUT_OUTPUT_NAME" >> "$GITHUB_OUTPUT"
+        echo "Signed and verified $INPUT_OUTPUT_NAME against the pinned release certificate."
