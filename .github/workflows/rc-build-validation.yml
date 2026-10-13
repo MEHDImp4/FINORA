@@ -219,7 +219,7 @@ jobs:
           cat "$APK_NAME.sha256"
 
       - name: Upload RC validation artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: finora-rc-validation
           path: |
