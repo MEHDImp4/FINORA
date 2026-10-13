@@ -143,6 +143,20 @@ jobs:
           echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
           echo "apk_name=FINORA-v${VERSION}-preview-${SHORT_SHA}.apk" >> "$GITHUB_OUTPUT"
           echo "release_name=FINORA v${VERSION} (Preview ${SHORT_SHA})" >> "$GITHUB_OUTPUT"
+      # FAIL-CLOSED: preview/beta must never fall back to debug/default signing.
+      - name: Require release signing secrets
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Release signing secrets are not configured (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD). Refusing to build a production APK."
+            exit 1
+          fi
       - name: Generate Android native project (Expo Prebuild)
         run: npx expo prebuild --platform android --no-install
       - name: Setup Gradle
@@ -153,14 +167,23 @@ jobs:
         run: |
           cd android
           ./gradlew assembleRelease -PreactNativeReleaseLevel=preview
+      - name: Sign APK with release keystore
+        uses: ./.github/actions/sign-release-apk
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        with:
+          apk_path: android/app/build/outputs/apk/release
+          output_name: ${{ steps.meta.outputs.apk_name }}
       - name: Prepare artifact & checksum
         shell: bash
         run: |
           set -euo pipefail
           APK_NAME='${{ steps.meta.outputs.apk_name }}'
-          RELEASE_APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)
-          if [ -z "$RELEASE_APK" ]; then echo "::error::Preview APK not found"; exit 1; fi
-          cp "$RELEASE_APK" "$APK_NAME"
+          # The composite action produced the release-signed APK at the workspace root.
+          if [ ! -f "$APK_NAME" ]; then echo "::error::Signed preview APK not found"; exit 1; fi
           sha256sum "$APK_NAME" > "$APK_NAME.sha256"
           cat "$APK_NAME.sha256"
       - name: Publish preview GitHub Release
@@ -237,6 +260,20 @@ jobs:
           echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
           echo "apk_name=FINORA-v${TAG_VERSION}.apk" >> "$GITHUB_OUTPUT"
           echo "release_name=FINORA v${TAG_VERSION}" >> "$GITHUB_OUTPUT"
+      # FAIL-CLOSED: preview/beta must never fall back to debug/default signing.
+      - name: Require release signing secrets
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Release signing secrets are not configured (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD). Refusing to build a production APK."
+            exit 1
+          fi
       - name: Generate Android native project (Expo Prebuild)
         run: npx expo prebuild --platform android --no-install
       - name: Setup Gradle
@@ -247,14 +284,23 @@ jobs:
         run: |
           cd android
           ./gradlew assembleRelease -PreactNativeReleaseLevel=beta
+      - name: Sign APK with release keystore
+        uses: ./.github/actions/sign-release-apk
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        with:
+          apk_path: android/app/build/outputs/apk/release
+          output_name: ${{ steps.meta.outputs.apk_name }}
       - name: Prepare artifact & checksum
         shell: bash
         run: |
           set -euo pipefail
           APK_NAME='${{ steps.meta.outputs.apk_name }}'
-          RELEASE_APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)
-          if [ -z "$RELEASE_APK" ]; then echo "::error::Beta APK not found"; exit 1; fi
-          cp "$RELEASE_APK" "$APK_NAME"
+          # The composite action produced the release-signed APK at the workspace root.
+          if [ ! -f "$APK_NAME" ]; then echo "::error::Signed beta APK not found"; exit 1; fi
           sha256sum "$APK_NAME" > "$APK_NAME.sha256"
           cat "$APK_NAME.sha256"
       - name: Publish beta GitHub Release
@@ -378,49 +424,16 @@ jobs:
         run: |
           cd android
           ./gradlew assembleRelease -PreactNativeReleaseLevel=stable
-      - name: Sign APK with release keystore
-        shell: bash
+      - name: Sign and verify APK with release keystore
+        uses: ./.github/actions/sign-release-apk
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          APK_NAME='${{ steps.meta.outputs.apk_name }}'
-          RELEASE_APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)
-          if [ -z "$RELEASE_APK" ]; then echo "::error::Release APK not found"; exit 1; fi
-
-          BUILD_TOOLS="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}/build-tools"
-          APKSIGNER=$(find "$BUILD_TOOLS" -name apksigner 2>/dev/null | sort -V | tail -n 1)
-          if [ -z "$APKSIGNER" ]; then echo "::error::apksigner not found in $BUILD_TOOLS"; exit 1; fi
-
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > release.keystore
-          "$APKSIGNER" sign \
-            --ks release.keystore \
-            --ks-key-alias "$KEY_ALIAS" \
-            --ks-pass "pass:$KEYSTORE_PASSWORD" \
-            --key-pass "pass:$KEY_PASSWORD" \
-            --out "$APK_NAME" \
-            "$RELEASE_APK"
-          rm -f release.keystore
-          echo "Signed $APK_NAME"
-      - name: Verify APK signature (fail on debug certificate)
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK_NAME='${{ steps.meta.outputs.apk_name }}'
-          BUILD_TOOLS="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}/build-tools"
-          APKSIGNER=$(find "$BUILD_TOOLS" -name apksigner 2>/dev/null | sort -V | tail -n 1)
-          if [ -z "$APKSIGNER" ]; then echo "::error::apksigner not found"; exit 1; fi
-
-          # Non-zero exit (with pipefail) fails the job on an invalid signature.
-          "$APKSIGNER" verify --verbose --print-certs "$APK_NAME" | tee apksigner-verify.txt
-
-          if grep -qiE 'CN=Android Debug' apksigner-verify.txt; then
-            echo "::error::APK is signed with the Android debug certificate. Refusing to publish a production release."
-            exit 1
-          fi
+        with:
+          apk_path: android/app/build/outputs/apk/release
+          output_name: ${{ steps.meta.outputs.apk_name }}
       - name: Inspect APK manifest and permissions
         shell: bash
         run: |
