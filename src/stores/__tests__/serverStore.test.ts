@@ -24,8 +24,8 @@ jest.mock("../../core/jellyfin/identityTransition", () => ({
 
 jest.mock("../../features/offline/downloadManager", () => ({
   downloadManager: {
-    handleIdentityChange: jest.fn(),
-    initialize: jest.fn()
+    handleIdentityChange: jest.fn(() => Promise.resolve()),
+    initialize: jest.fn(() => Promise.resolve())
   }
 }));
 
