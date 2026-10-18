@@ -174,10 +174,30 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   }
 
   const isContainerSupported = deviceProfile.supportedContainers.includes(mediaContainer);
-  const isVideoSupported =
+  const isVideoCodecSupported =
     !normVideoCodec || deviceProfile.supportedVideoCodecs.includes(normVideoCodec);
   const isAudioSupported =
     !normAudioCodec || deviceProfile.supportedAudioCodecs.includes(normAudioCodec);
+
+  const sourceWidth = videoStream?.width || 0;
+  const sourceHeight = videoStream?.height || 0;
+  const sourceBitrate = videoStream?.bitRate || item.bitRate || 0;
+  const isAutoQuality = quality === "auto";
+  const sourceExceedsDeviceResolution =
+    isAutoQuality &&
+    sourceWidth > 0 &&
+    sourceHeight > 0 &&
+    (sourceWidth > deviceProfile.maxResolution.width ||
+      sourceHeight > deviceProfile.maxResolution.height);
+  const sourceExceedsDeviceBitrate =
+    isAutoQuality &&
+    typeof deviceProfile.maxBitrate === "number" &&
+    sourceBitrate > 0 &&
+    sourceBitrate > deviceProfile.maxBitrate;
+  const isVideoSupported =
+    isVideoCodecSupported &&
+    !sourceExceedsDeviceResolution &&
+    !sourceExceedsDeviceBitrate;
 
   // Quality evaluation
   const qualityPreset = QUALITY_PRESETS[quality] || QUALITY_PRESETS.auto;
@@ -190,18 +210,17 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   if (isConstrainedQuality && qualityPreset.maxBitrate && qualityPreset.maxWidth && qualityPreset.maxHeight) {
     const qualityParams = `&maxWidth=${qualityPreset.maxWidth}&maxHeight=${qualityPreset.maxHeight}&videoBitRate=${qualityPreset.maxBitrate}&maxVideoBitRate=${qualityPreset.maxBitrate}&audioBitRate=192000`;
 
-    // If video is natively supported and its resolution/bitrate are already <= requested target, we can copy video
-    const sourceWidth = videoStream?.width || 0;
-    const sourceHeight = videoStream?.height || 0;
-    const sourceBitrate = videoStream?.bitRate || item.bitRate || 0;
-
+    // Only copy video when the source is fully known to fit under the selected cap.
+    // Unknown bitrate must be transcoded; otherwise a "1080p 10 Mbps" selection can
+    // silently keep a much higher-bitrate source unchanged.
     const canCopyVideo =
-      isVideoSupported &&
+      isVideoCodecSupported &&
       sourceWidth > 0 &&
       sourceWidth <= qualityPreset.maxWidth &&
       sourceHeight > 0 &&
       sourceHeight <= qualityPreset.maxHeight &&
-      (!sourceBitrate || sourceBitrate <= qualityPreset.maxBitrate);
+      sourceBitrate > 0 &&
+      sourceBitrate <= qualityPreset.maxBitrate;
 
     const targetVideoCodec = canCopyVideo ? "copy" : "h264";
     const targetAudioCodec = isAudioSupported && normAudioCodec === "aac" ? "copy" : "aac";
@@ -244,7 +263,8 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     };
   }
 
-  // Direct Play: container, video codec, and audio codec are all natively supported
+  // Direct Play: container, video codec, audio codec and Auto device limits all match.
+  // "original" deliberately bypasses device resolution/bitrate caps above.
   if (isDefaultAudioSelected && isContainerSupported && isVideoSupported && isAudioSupported) {
     const directPlayUrl = `${cleanServerUrl}/Videos/${item.id}/stream?static=true${mediaSourceParam}`;
 
@@ -276,12 +296,20 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     };
   }
 
-  // Transcoding: Video or audio codec requires re-encoding -> HLS stream
-  // When video codec is already supported, copy video directly (0% server overhead, 60fps)
-  // and only transcode audio to AAC stereo to fix audio stutter/silence.
+  // Transcoding: Video/audio codec or the Auto device profile requires re-encoding.
   const unsupportedReasons: string[] = [];
-  if (!isVideoSupported && normVideoCodec) {
+  if (!isVideoCodecSupported && normVideoCodec) {
     unsupportedReasons.push(`video codec '${normVideoCodec}'`);
+  }
+  if (sourceExceedsDeviceResolution) {
+    unsupportedReasons.push(
+      `resolution ${sourceWidth}x${sourceHeight} exceeds ${deviceProfile.maxResolution.width}x${deviceProfile.maxResolution.height}`
+    );
+  }
+  if (sourceExceedsDeviceBitrate && deviceProfile.maxBitrate) {
+    unsupportedReasons.push(
+      `bitrate ${sourceBitrate} exceeds ${deviceProfile.maxBitrate}`
+    );
   }
   if (!isAudioSupported && normAudioCodec) {
     unsupportedReasons.push(`audio codec '${normAudioCodec}'`);
@@ -291,7 +319,16 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   }
 
   const targetVideoCodec = isVideoSupported ? "copy" : "h264";
-  const transcodeUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=${targetVideoCodec}&audioCodec=aac&audioChannels=2${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`;
+  const shouldApplyDeviceCaps =
+    isAutoQuality && (sourceExceedsDeviceResolution || sourceExceedsDeviceBitrate);
+  const deviceResolutionParams = shouldApplyDeviceCaps
+    ? `&maxWidth=${deviceProfile.maxResolution.width}&maxHeight=${deviceProfile.maxResolution.height}`
+    : "";
+  const deviceBitrateParams =
+    shouldApplyDeviceCaps && typeof deviceProfile.maxBitrate === "number"
+      ? `&videoBitRate=${deviceProfile.maxBitrate}&maxVideoBitRate=${deviceProfile.maxBitrate}`
+      : "";
+  const transcodeUrl = `${cleanServerUrl}/Videos/${item.id}/master.m3u8?videoCodec=${targetVideoCodec}&audioCodec=aac&audioChannels=2${deviceResolutionParams}${deviceBitrateParams}${hlsMediaSourceParam}${audioIndexParam}${subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`;
 
   return {
     mode: "transcode",
