@@ -8,8 +8,24 @@ import { serverManager } from "../../core/jellyfin/serverManager";
 jest.mock("../../core/jellyfin/serverManager", () => ({
   serverManager: {
     getSavedAccounts: jest.fn(),
+    getSavedServers: jest.fn(),
+    saveServer: jest.fn(),
+    removeServer: jest.fn(),
     switchAccount: jest.fn(),
     removeAccount: jest.fn()
+  }
+}));
+
+jest.mock("../../core/jellyfin/identityTransition", () => ({
+  runIdentityTransition: jest.fn((operation: () => Promise<unknown>) => operation()),
+  restoreActiveIdentity: jest.fn(async (session) => session),
+  clearActiveIdentity: jest.fn()
+}));
+
+jest.mock("../../features/offline/downloadManager", () => ({
+  downloadManager: {
+    handleIdentityChange: jest.fn(),
+    initialize: jest.fn()
   }
 }));
 
@@ -48,6 +64,7 @@ describe("serverStore multi-account switch", () => {
     });
 
     (serverManager.getSavedAccounts as jest.Mock).mockResolvedValue([]);
+    (serverManager.getSavedServers as jest.Mock).mockResolvedValue([]);
   });
 
   it("clears old queries and publishes only the returned target session", async () => {
