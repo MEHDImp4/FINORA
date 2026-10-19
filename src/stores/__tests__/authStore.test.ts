@@ -9,6 +9,19 @@ jest.mock("../../core/jellyfin/authRepository", () => ({
   }
 }));
 
+jest.mock("../../core/jellyfin/identityTransition", () => ({
+  runIdentityTransition: jest.fn((operation: () => Promise<unknown>) => operation()),
+  restoreActiveIdentity: jest.fn(async (session) => session),
+  clearActiveIdentity: jest.fn()
+}));
+
+jest.mock("../../features/offline/downloadManager", () => ({
+  downloadManager: {
+    handleIdentityChange: jest.fn(() => Promise.resolve()),
+    initialize: jest.fn(() => Promise.resolve())
+  }
+}));
+
 describe("authStore", () => {
   beforeEach(() => {
     useAuthStore.setState({

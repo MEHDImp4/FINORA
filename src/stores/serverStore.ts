@@ -6,6 +6,11 @@ import {
 } from "../core/jellyfin/serverManager";
 import { AuthSession } from "../core/jellyfin/authRepository";
 import {
+  clearActiveIdentity,
+  restoreActiveIdentity,
+  runIdentityTransition
+} from "../core/jellyfin/identityTransition";
+import {
   autoDetectServerConnection,
   isLocalNetworkHost,
   ServerConnectionDetectionResult
@@ -119,63 +124,89 @@ export const useServerStore = create<ServerState>((set, get) => ({
     }
   },
 
-  switchAccount: async (serverId, userId) => {
-    set({ isLoading: true, errorMessage: null });
-    const previousSession = useAuthStore.getState().session;
+  switchAccount: async (serverId, userId) =>
+    runIdentityTransition(async () => {
+      set({ isLoading: true, errorMessage: null });
+      const previousSession = useAuthStore.getState().session;
 
-    // Unmount authenticated screens while the singleton Jellyfin client changes.
-    // This prevents old hooks from issuing requests with the new token/server.
-    useAuthStore.setState({ status: "restoring", errorMessage: null });
-
-    try {
-      await queryClient.cancelQueries().catch(() => {});
-      queryClient.clear();
-      useNotificationStore.getState().resetActiveScope();
-
-      // Stop and detach the previous account's downloads before the singleton
-      // Jellyfin client changes identity.
-      await downloadManager.handleIdentityChange().catch(() => {});
-
-      const session = await serverManager.switchAccount(serverId, userId);
-      await useNotificationStore.getState().loadPersisted(session.serverId, session.userId);
-
-      useAuthStore.getState().adoptSession(session);
-
-      // Load the new account's own download queue (never the previous one).
-      await downloadManager.initialize().catch(() => {});
-
-      const accounts = await serverManager.getSavedAccounts();
-      const isLocal = isLocalNetworkHost(new URL(session.serverUrl).hostname);
-      set({
-        savedAccounts: accounts,
-        isLoading: false,
-        activeResolvedUrl: session.serverUrl,
-        isLocalConnection: isLocal
-      });
-      return session;
-    } catch (error) {
-      // Switching can fail before ServerManager changes the singleton client
-      // (missing account/token). Restore the previous UI identity in that case.
+      // Remove the old identity from the render tree before the singleton client
+      // can change. Old hooks therefore cannot issue requests with target creds.
       useAuthStore.setState({
-        status: previousSession ? "authenticated" : "unauthenticated",
-        session: previousSession,
+        status: "restoring",
+        session: null,
         errorMessage: null
       });
 
-      if (previousSession) {
+      try {
+        await queryClient.cancelQueries().catch(() => {});
+        queryClient.clear();
+        useNotificationStore.getState().resetActiveScope();
+
+        // Stop and persist the previous account's transfers before credentials
+        // change. A failure here aborts the switch instead of risking cross-talk.
+        await downloadManager.handleIdentityChange();
+
+        const session = await serverManager.switchAccount(serverId, userId);
+
+        // Prepare all identity-scoped services before publishing the new account.
         await useNotificationStore
           .getState()
-          .loadPersisted(previousSession.serverId, previousSession.userId)
-          .catch(() => {});
-      }
+          .loadPersisted(session.serverId, session.userId);
+        await downloadManager.initialize();
 
-      set({
-        isLoading: false,
-        errorMessage: (error as Error).message || "Failed to switch account"
-      });
-      throw error;
-    }
-  },
+        const accounts = await serverManager.getSavedAccounts();
+        const isLocal = isLocalNetworkHost(new URL(session.serverUrl).hostname);
+
+        useAuthStore.getState().adoptSession(session);
+        set({
+          savedAccounts: accounts,
+          isLoading: false,
+          activeResolvedUrl: session.serverUrl,
+          isLocalConnection: isLocal
+        });
+        return session;
+      } catch (error) {
+        // The target session may already have been persisted/applied before a
+        // later scoped service failed. Tear it down before restoring the source.
+        await downloadManager.handleIdentityChange().catch(() => {});
+        useNotificationStore.getState().resetActiveScope();
+
+        let rollbackSucceeded = false;
+        if (previousSession) {
+          try {
+            const restored = await restoreActiveIdentity(previousSession);
+            await useNotificationStore
+              .getState()
+              .loadPersisted(restored.serverId, restored.userId);
+            await downloadManager.initialize();
+            useAuthStore.setState({
+              status: "authenticated",
+              session: restored,
+              errorMessage: null
+            });
+            rollbackSucceeded = true;
+          } catch {
+            // Fall through to fail-closed cleanup below.
+          }
+        }
+
+        if (!rollbackSucceeded) {
+          await clearActiveIdentity();
+          useNotificationStore.getState().resetActiveScope();
+          useAuthStore.setState({
+            status: "unauthenticated",
+            session: null,
+            errorMessage: null
+          });
+        }
+
+        set({
+          isLoading: false,
+          errorMessage: (error as Error).message || "Failed to switch account"
+        });
+        throw error;
+      }
+    }),
 
   removeAccount: async (serverId, userId) => {
     set({ isLoading: true, errorMessage: null });
