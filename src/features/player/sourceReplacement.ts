@@ -59,3 +59,70 @@ export function decideSourceChange(ctx: SourceChangeContext): SourceChangeDecisi
 export function isStaleGeneration(generation: number, currentGeneration: number): boolean {
   return generation !== currentGeneration;
 }
+
+export interface SourceReplacementQueueCallbacks {
+  onStart?: (generation: number) => void;
+  onSuccess?: (generation: number) => void;
+  onError?: (generation: number, error: unknown) => void;
+}
+
+/**
+ * Serializes native source replacements and coalesces waiting work to the latest
+ * request. If A is in flight and B then C are enqueued, B is discarded and the
+ * native player receives A followed by C — never overlapping replace calls.
+ */
+export class LatestSourceReplacementQueue<TSource> {
+  private inFlight = false;
+  private latest: { generation: number; source: TSource } | null = null;
+  private disposed = false;
+
+  constructor(
+    private readonly replace: (source: TSource) => Promise<void>,
+    private readonly callbacks: SourceReplacementQueueCallbacks = {}
+  ) {}
+
+  enqueue(generation: number, source: TSource): void {
+    if (this.disposed) return;
+    this.latest = { generation, source };
+    void this.drain();
+  }
+
+  clear(): void {
+    this.latest = null;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    this.latest = null;
+  }
+
+  private async drain(): Promise<void> {
+    if (this.inFlight || this.disposed) return;
+    this.inFlight = true;
+
+    try {
+      while (!this.disposed && this.latest) {
+        const request = this.latest;
+        this.latest = null;
+        this.callbacks.onStart?.(request.generation);
+
+        try {
+          await this.replace(request.source);
+          if (!this.disposed) {
+            this.callbacks.onSuccess?.(request.generation);
+          }
+        } catch (error) {
+          if (!this.disposed) {
+            this.callbacks.onError?.(request.generation, error);
+          }
+        }
+      }
+    } finally {
+      this.inFlight = false;
+      // An enqueue can land between the final loop check and this finally block.
+      if (!this.disposed && this.latest) {
+        void this.drain();
+      }
+    }
+  }
+}

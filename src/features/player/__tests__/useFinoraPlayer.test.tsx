@@ -18,48 +18,68 @@ function getPlayer(root: renderer.ReactTestRenderer): any {
   return root.root.findByProps({ testID: "player-harness" }).props.player;
 }
 
+async function waitUntil(predicate: () => boolean, attempts = 100): Promise<void> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (predicate()) return;
+    await Promise.resolve();
+  }
+  throw new Error("Condition was not reached before the microtask limit");
+}
+
+async function waitForReplaceCount(player: any, expected: number): Promise<void> {
+  await act(async () => {
+    await waitUntil(() => player._replaceCount === expected);
+    // replaceAsync can report ready before its promise settles. Give the queue its
+    // settlement turn so matching seek/play state is applied before assertions.
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
 describe("useFinoraPlayer single-player ownership (BLK-10)", () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it("loads each source exactly once (no useVideoPlayer + replaceAsync double load)", () => {
+  it("loads each source exactly once (no useVideoPlayer + replaceAsync double load)", async () => {
     let root!: renderer.ReactTestRenderer;
-    act(() => {
+    await act(async () => {
       root = renderer.create(<Harness sourceUrl="https://s/1" contentId="A" />);
     });
     const player = getPlayer(root);
-    expect(player._replaceCount).toBe(1);
+    await waitForReplaceCount(player, 1);
 
-    act(() => {
+    await act(async () => {
       root.update(<Harness sourceUrl="https://s/2" contentId="A" />);
     });
-    expect(player._replaceCount).toBe(2);
+    await waitForReplaceCount(player, 2);
 
-    act(() => {
+    await act(async () => {
       root.update(<Harness sourceUrl="https://s/3" contentId="A" />);
     });
-    expect(player._replaceCount).toBe(3);
-    expect(player._source.uri).toBe("https://s/3");
+    await waitForReplaceCount(player, 3);
 
+    expect(player._source.uri).toBe("https://s/3");
     act(() => root.unmount());
   });
 
-  it("preserves the playback position across an audio/quality source change", () => {
+  it("preserves the playback position across an audio/quality source change", async () => {
     let root!: renderer.ReactTestRenderer;
-    act(() => {
+    await act(async () => {
       root = renderer.create(<Harness sourceUrl="https://s/1" contentId="A" />);
     });
 
     const player = getPlayer(root);
+    await waitForReplaceCount(player, 1);
     act(() => {
       player.currentTime = 100;
       player.play();
     });
 
-    act(() => {
+    await act(async () => {
       root.update(<Harness sourceUrl="https://s/2" contentId="A" />);
     });
+    await waitForReplaceCount(player, 2);
 
     expect(player.currentTime).toBe(100);
     expect(player.playing).toBe(true);
@@ -67,21 +87,23 @@ describe("useFinoraPlayer single-player ownership (BLK-10)", () => {
     act(() => root.unmount());
   });
 
-  it("does not force playback after a source change when the user had paused", () => {
+  it("does not force playback after a source change when the user had paused", async () => {
     let root!: renderer.ReactTestRenderer;
-    act(() => {
+    await act(async () => {
       root = renderer.create(<Harness sourceUrl="https://s/1" contentId="A" autoPlay={false} />);
     });
 
     const player = getPlayer(root);
+    await waitForReplaceCount(player, 1);
     act(() => {
       player.currentTime = 50;
     });
     expect(player.playing).toBe(false);
 
-    act(() => {
+    await act(async () => {
       root.update(<Harness sourceUrl="https://s/2" contentId="A" autoPlay={false} />);
     });
+    await waitForReplaceCount(player, 2);
 
     expect(player.currentTime).toBe(50);
     expect(player.playing).toBe(false);
@@ -89,19 +111,20 @@ describe("useFinoraPlayer single-player ownership (BLK-10)", () => {
     act(() => root.unmount());
   });
 
-  it("uses the NEW content resume position when the item changes (next episode)", () => {
+  it("uses the NEW content resume position when the item changes (next episode)", async () => {
     let root!: renderer.ReactTestRenderer;
-    act(() => {
+    await act(async () => {
       root = renderer.create(<Harness sourceUrl="https://s/ep1" contentId="ep1" />);
     });
 
     const player = getPlayer(root);
+    await waitForReplaceCount(player, 1);
     act(() => {
       player.currentTime = 100;
       player.play();
     });
 
-    act(() => {
+    await act(async () => {
       root.update(
         <Harness
           sourceUrl="https://s/ep2"
@@ -110,6 +133,7 @@ describe("useFinoraPlayer single-player ownership (BLK-10)", () => {
         />
       );
     });
+    await waitForReplaceCount(player, 2);
 
     expect(player.currentTime).toBe(30);
     expect(player.playing).toBe(true);
