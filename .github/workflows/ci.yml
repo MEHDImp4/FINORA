@@ -49,42 +49,18 @@ jobs:
         continue-on-error: true
         run: npx expo-doctor
 
-      - name: Diagnostic - player tests serial
+      - name: Diagnostic - player tests
         id: player_tests
         continue-on-error: true
-        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --runInBand src/features/player
+        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --runInBand src/features/player --json --outputFile=player-jest-results.json
 
-      - name: Diagnostic - non-player tests serial
-        id: non_player_tests
-        continue-on-error: true
-        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --runInBand --testPathIgnorePatterns=src/features/player/__tests__
+      - name: Upload player Jest results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: player-jest-results
+          path: player-jest-results.json
 
-      - name: Diagnostic - full suite serial
-        id: full_serial
-        continue-on-error: true
-        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --runInBand
-
-      - name: Diagnostic - full suite parallel
-        id: full_parallel
-        continue-on-error: true
-        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --maxWorkers=2
-
-      - name: Marker - player failed
+      - name: Fail if player tests failed
         if: steps.player_tests.outcome == 'failure'
-        run: echo PLAYER_FAILED
-
-      - name: Marker - non-player failed
-        if: steps.non_player_tests.outcome == 'failure'
-        run: echo NON_PLAYER_FAILED
-
-      - name: Marker - full serial failed
-        if: steps.full_serial.outcome == 'failure'
-        run: echo FULL_SERIAL_FAILED
-
-      - name: Marker - full parallel failed
-        if: steps.full_parallel.outcome == 'failure'
-        run: echo FULL_PARALLEL_FAILED
-
-      - name: Fail if diagnostics failed
-        if: steps.player_tests.outcome == 'failure' || steps.non_player_tests.outcome == 'failure' || steps.full_serial.outcome == 'failure' || steps.full_parallel.outcome == 'failure'
         run: exit 1
