@@ -49,18 +49,5 @@ jobs:
         continue-on-error: true
         run: npx expo-doctor
 
-      - name: Diagnostic - player tests
-        id: player_tests
-        continue-on-error: true
-        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --runInBand src/features/player --json --outputFile=player-jest-results.json
-
-      - name: Upload player Jest results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: player-jest-results
-          path: player-jest-results.json
-
-      - name: Fail if player tests failed
-        if: steps.player_tests.outcome == 'failure'
-        run: exit 1
+      - name: Run tests
+        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --maxWorkers=2
