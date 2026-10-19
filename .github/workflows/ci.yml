@@ -49,5 +49,26 @@ jobs:
         continue-on-error: true
         run: npx expo-doctor
 
-      - name: Run tests
+      - name: Diagnostic - player tests serial
+        id: player_tests
+        continue-on-error: true
+        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --runInBand src/features/player
+
+      - name: Diagnostic - non-player tests serial
+        id: non_player_tests
+        continue-on-error: true
+        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --runInBand --testPathIgnorePatterns=src/features/player/__tests__
+
+      - name: Diagnostic - full suite serial
+        id: full_serial
+        continue-on-error: true
+        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --runInBand
+
+      - name: Diagnostic - full suite parallel
+        id: full_parallel
+        continue-on-error: true
         run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --maxWorkers=2
+
+      - name: Fail if diagnostics failed
+        if: steps.player_tests.outcome == 'failure' || steps.non_player_tests.outcome == 'failure' || steps.full_serial.outcome == 'failure' || steps.full_parallel.outcome == 'failure'
+        run: exit 1
