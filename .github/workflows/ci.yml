@@ -69,6 +69,22 @@ jobs:
         continue-on-error: true
         run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --maxWorkers=2
 
+      - name: Marker - player failed
+        if: steps.player_tests.outcome == 'failure'
+        run: echo PLAYER_FAILED
+
+      - name: Marker - non-player failed
+        if: steps.non_player_tests.outcome == 'failure'
+        run: echo NON_PLAYER_FAILED
+
+      - name: Marker - full serial failed
+        if: steps.full_serial.outcome == 'failure'
+        run: echo FULL_SERIAL_FAILED
+
+      - name: Marker - full parallel failed
+        if: steps.full_parallel.outcome == 'failure'
+        run: echo FULL_PARALLEL_FAILED
+
       - name: Fail if diagnostics failed
         if: steps.player_tests.outcome == 'failure' || steps.non_player_tests.outcome == 'failure' || steps.full_serial.outcome == 'failure' || steps.full_parallel.outcome == 'failure'
         run: exit 1
