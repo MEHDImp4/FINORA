@@ -137,6 +137,44 @@ describe("mediaMapper", () => {
       expect(result.mediaStreams?.[1].channels).toBe(6);
     });
 
+    it("maps Jellyfin media source and stream bitrates used by quality enforcement", () => {
+      const dto = {
+        Id: "movie-bitrate",
+        Name: "High Bitrate Movie",
+        Type: "Movie",
+        MediaSources: [
+          {
+            Id: "source-1",
+            Container: "mkv",
+            Bitrate: 25000000,
+            MediaStreams: [
+              {
+                Type: "Video",
+                Codec: "h264",
+                Width: 1920,
+                Height: 1080,
+                BitRate: 24000000
+              },
+              {
+                Type: "Audio",
+                Codec: "aac",
+                Channels: 2,
+                BitRate: 192000
+              }
+            ]
+          }
+        ]
+      };
+
+      const result = mapJellyfinItemToMediaItem(dto);
+
+      expect(result.mediaSourceId).toBe("source-1");
+      expect(result.container).toBe("mkv");
+      expect(result.bitRate).toBe(25000000);
+      expect(result.mediaStreams?.[0].bitRate).toBe(24000000);
+      expect(result.mediaStreams?.[1].bitRate).toBe(192000);
+    });
+
     it("handles minimal item with missing fields without crashing", () => {
       const dto = { Id: "min-1" };
       const result = mapJellyfinItemToMediaItem(dto);

@@ -122,6 +122,7 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
         isExternal: Boolean(s.IsExternal),
         width: typeof s.Width === "number" ? s.Width : undefined,
         height: typeof s.Height === "number" ? s.Height : undefined,
+        bitRate: typeof s.BitRate === "number" ? s.BitRate : undefined,
         channels: typeof s.Channels === "number" ? s.Channels : undefined,
         isDefault: Boolean(s.IsDefault),
         deliveryUrl: s.DeliveryUrl || undefined,
@@ -136,6 +137,14 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
 
   const container = primaryMediaSource?.Container || dto.Container || undefined;
   const mediaSourceId = primaryMediaSource?.Id || undefined;
+  const bitRate =
+    typeof primaryMediaSource?.Bitrate === "number"
+      ? primaryMediaSource.Bitrate
+      : typeof primaryMediaSource?.BitRate === "number"
+      ? primaryMediaSource.BitRate
+      : typeof dto.BitRate === "number"
+      ? dto.BitRate
+      : undefined;
 
   const chapters = Array.isArray(dto.Chapters)
     ? dto.Chapters.map((c: any) => ({
@@ -229,6 +238,7 @@ export function mapJellyfinItemToMediaItem(dto: any): MediaItem {
     chapters,
     trickplay,
     container,
+    bitRate,
     mediaSourceId,
     locationType: dto.LocationType || undefined,
     isMissing: Boolean(dto.IsMissing)
