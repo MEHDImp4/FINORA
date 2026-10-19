@@ -12,6 +12,24 @@ jest.mock("expo-router", () => ({
   })
 }));
 
+async function waitUntil(predicate: () => boolean, attempts = 100): Promise<void> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (predicate()) return;
+    await Promise.resolve();
+  }
+  throw new Error("Condition was not reached before the microtask limit");
+}
+
+async function waitForReplaceCount(player: any, expected: number): Promise<void> {
+  await act(async () => {
+    await waitUntil(() => player._replaceCount === expected);
+    // replaceAsync can report ready before its promise settles. Let the serialized
+    // replacement queue settle before asserting playback state or triggering UI actions.
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
 describe("PlayerScreen", () => {
   let queryClient: QueryClient;
 
@@ -111,11 +129,11 @@ describe("PlayerScreen", () => {
     });
   });
 
-  it("triggers onBack when back button is pressed", () => {
+  it("triggers onBack when back button is pressed", async () => {
     const onBackMock = jest.fn();
     const mockRepo = createMockRepo();
     let root: any;
-    act(() => {
+    await act(async () => {
       root = renderer.create(
         <QueryClientProvider client={queryClient}>
           <PlayerScreen
@@ -129,6 +147,9 @@ describe("PlayerScreen", () => {
         </QueryClientProvider>
       );
     });
+
+    const player = root.root.findByProps({ testID: "expo-video-view" }).props.player;
+    await waitForReplaceCount(player, 1);
 
     const backButton = root.root.findByProps({ testID: "overlay-back-button" });
     act(() => {
@@ -316,10 +337,10 @@ describe("PlayerScreen", () => {
     }
   });
 
-  it("falls back from direct play to transcode exactly once, then surfaces a terminal error (PLR-01)", () => {
+  it("falls back from direct play to transcode exactly once, then surfaces a terminal error (PLR-01)", async () => {
     const mockRepo = createMockRepo();
     let root: any;
-    act(() => {
+    await act(async () => {
       root = renderer.create(
         <QueryClientProvider client={queryClient}>
           <PlayerScreen
@@ -335,21 +356,23 @@ describe("PlayerScreen", () => {
     });
 
     const player = root.root.findByProps({ testID: "expo-video-view" }).props.player;
+    await waitForReplaceCount(player, 1);
     expect(player._source.uri).toContain("static=true");
-    expect(player._replaceCount).toBe(1);
 
     // Direct play fails to decode.
-    act(() => {
+    await act(async () => {
       player.status = "error";
+      await Promise.resolve();
     });
+    await waitForReplaceCount(player, 2);
 
     // Exactly one fallback: the source is rebuilt as an HLS transcode.
     expect(player._source.uri).toContain("master.m3u8");
-    expect(player._replaceCount).toBe(2);
 
     // The transcode stream also fails: terminal error is shown, no further retry.
-    act(() => {
+    await act(async () => {
       player.status = "error";
+      await Promise.resolve();
     });
 
     expect(root.root.findByProps({ testID: "player-error" })).toBeTruthy();
@@ -360,7 +383,7 @@ describe("PlayerScreen", () => {
     });
   });
 
-  it("pauses playback when PiP is dismissed while the app stays backgrounded", () => {
+  it("pauses playback when PiP is dismissed while the app stays backgrounded", async () => {
     const { AppState } = require("react-native");
     const originalState = AppState.currentState;
     Object.defineProperty(AppState, "currentState", {
@@ -371,7 +394,7 @@ describe("PlayerScreen", () => {
     const mockRepo = createMockRepo();
     let root: any;
     try {
-      act(() => {
+      await act(async () => {
         root = renderer.create(
           <QueryClientProvider client={queryClient}>
             <PlayerScreen
@@ -388,6 +411,7 @@ describe("PlayerScreen", () => {
 
       const videoView = root.root.findByProps({ testID: "expo-video-view" });
       const player = videoView.props.player;
+      await waitForReplaceCount(player, 1);
       expect(player.playing).toBe(true);
 
       act(() => {

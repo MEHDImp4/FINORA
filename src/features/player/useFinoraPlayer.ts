@@ -3,7 +3,12 @@ import { useVideoPlayer, VideoPlayer } from "expo-video";
 import { FinoraPlayerEngine } from "./FinoraPlayerEngine";
 import { FinoraPlayerControls, FinoraPlayerSnapshot, IFinoraPlayerEngine } from "./types";
 import { logger } from "../../core/network/logger";
-import { decideSourceChange, isStaleGeneration, SourceChangeDecision } from "./sourceReplacement";
+import {
+  decideSourceChange,
+  isStaleGeneration,
+  LatestSourceReplacementQueue,
+  SourceChangeDecision
+} from "./sourceReplacement";
 
 export interface UseFinoraPlayerOptions {
   sourceUrl?: string;
@@ -25,6 +30,11 @@ export interface UseFinoraPlayerResult {
   snapshot: FinoraPlayerSnapshot;
   controls: FinoraPlayerControls;
 }
+
+type QueuedVideoSource = {
+  uri: string;
+  headers?: Record<string, string>;
+};
 
 /**
  * Player ownership model B: a single persistent native `VideoPlayer` is created
@@ -49,7 +59,7 @@ export function useFinoraPlayer({
   const engine = engineRef.current;
 
   const headersKey = headers ? JSON.stringify(headers) : "";
-  const videoSource = useMemo(() => {
+  const videoSource = useMemo<QueuedVideoSource | null>(() => {
     if (!sourceUrl) return null;
     if (headers && Object.keys(headers).length > 0) {
       return { uri: sourceUrl, headers };
@@ -68,6 +78,8 @@ export function useFinoraPlayer({
       }
     }
   });
+  const nativePlayerRef = useRef(player);
+  nativePlayerRef.current = player;
 
   // V1 policy: foreground-only playback. Backgrounding pauses and reports progress
   // (see usePlaybackSession). PiP is the only mode that keeps playing.
@@ -108,6 +120,12 @@ export function useFinoraPlayer({
   const prevContentRef = useRef<string | undefined>(undefined);
   const appliedOnceRef = useRef(false);
   const pendingRef = useRef<{ generation: number; decision: SourceChangeDecision } | null>(null);
+  const activeReplacementGenerationRef = useRef<number | null>(null);
+  // A native readyToPlay event can arrive before or after replaceAsync resolves.
+  // Only the generation whose replacement promise has settled may consume its
+  // pending seek/play decision; this blocks a late ready event from source A while
+  // source C is already being replaced.
+  const settledReplacementGenerationRef = useRef<number | null>(null);
 
   const applyPendingSource = useCallback(() => {
     const pending = pendingRef.current;
@@ -116,6 +134,13 @@ export function useFinoraPlayer({
       pendingRef.current = null;
       return;
     }
+    if (
+      activeReplacementGenerationRef.current !== pending.generation ||
+      settledReplacementGenerationRef.current !== pending.generation
+    ) {
+      return;
+    }
+
     pendingRef.current = null;
     try {
       if (pending.decision.seekToSeconds !== null) {
@@ -128,16 +153,83 @@ export function useFinoraPlayer({
       }
     } catch {
       // The player can be released mid-transition; nothing else to do.
+    } finally {
+      if (activeReplacementGenerationRef.current === pending.generation) {
+        activeReplacementGenerationRef.current = null;
+      }
+      if (settledReplacementGenerationRef.current === pending.generation) {
+        settledReplacementGenerationRef.current = null;
+      }
     }
   }, [player]);
+  const applyPendingSourceRef = useRef(applyPendingSource);
+  applyPendingSourceRef.current = applyPendingSource;
 
-  // Apply the stream once it is ready. A stale (superseded) source is ignored.
+  // `replaceAsync` mutates the same native player. Keep the transport ordering in
+  // a pure latest-only queue so an older native replacement can never finish after
+  // a newer request and become the final source.
+  const replacementQueueRef = useRef<LatestSourceReplacementQueue<QueuedVideoSource> | null>(null);
+  if (!replacementQueueRef.current) {
+    replacementQueueRef.current = new LatestSourceReplacementQueue<QueuedVideoSource>(
+      async (source) => {
+        const nativePlayer = nativePlayerRef.current;
+        if (typeof nativePlayer.replaceAsync === "function") {
+          await nativePlayer.replaceAsync(source);
+          return;
+        }
+        const fallback = nativePlayer as unknown as { replace?: (value: unknown) => void };
+        if (typeof fallback.replace === "function") {
+          fallback.replace(source);
+        }
+      },
+      {
+        onStart: (generation) => {
+          activeReplacementGenerationRef.current = generation;
+          settledReplacementGenerationRef.current = null;
+        },
+        onSuccess: (generation) => {
+          if (isStaleGeneration(generation, sourceGenerationRef.current)) return;
+          if (activeReplacementGenerationRef.current !== generation) return;
+          settledReplacementGenerationRef.current = generation;
+
+          const nativePlayer = nativePlayerRef.current;
+          // Some platforms fire readyToPlay before replaceAsync resolves. The event
+          // handler deliberately ignores it until this success callback marks the
+          // generation as settled, so finish immediately when status is already ready.
+          if (nativePlayer.status === "readyToPlay") {
+            applyPendingSourceRef.current();
+          }
+        },
+        onError: (generation, error) => {
+          if (isStaleGeneration(generation, sourceGenerationRef.current)) return;
+          if (pendingRef.current?.generation === generation) {
+            pendingRef.current = null;
+          }
+          if (activeReplacementGenerationRef.current === generation) {
+            activeReplacementGenerationRef.current = null;
+          }
+          if (settledReplacementGenerationRef.current === generation) {
+            settledReplacementGenerationRef.current = null;
+          }
+          logger.warn("[useFinoraPlayer] source replacement failed:", error);
+        }
+      }
+    );
+  }
+
+  // Apply the stream once the matching replacement is ready. A ready event from
+  // an older replacement must never apply the newest pending seek/play decision.
   useEffect(() => {
     if (!player) return;
     const subscription = player.addListener("statusChange", ({ status }) => {
-      if (status === "readyToPlay") {
-        applyPendingSource();
-      }
+      if (status !== "readyToPlay") return;
+
+      const activeGeneration = activeReplacementGenerationRef.current;
+      if (activeGeneration === null) return;
+      if (isStaleGeneration(activeGeneration, sourceGenerationRef.current)) return;
+      if (settledReplacementGenerationRef.current !== activeGeneration) return;
+
+      applyPendingSource();
     });
     return () => {
       subscription?.remove?.();
@@ -178,29 +270,7 @@ export function useFinoraPlayer({
     }
 
     if (!videoSource) return;
-
-    const applySource = async () => {
-      try {
-        if (typeof player.replaceAsync === "function") {
-          await player.replaceAsync(videoSource);
-        } else if (typeof (player as unknown as { replace?: (s: unknown) => void }).replace === "function") {
-          (player as unknown as { replace: (s: unknown) => void }).replace(videoSource);
-        }
-      } catch (error) {
-        if (!isStaleGeneration(generation, sourceGenerationRef.current)) {
-          logger.warn("[useFinoraPlayer] source replacement failed:", error);
-        }
-        return;
-      }
-
-      if (isStaleGeneration(generation, sourceGenerationRef.current)) return;
-      // Some platforms resolve after the player is already ready; apply immediately.
-      if (player.status === "readyToPlay") {
-        applyPendingSource();
-      }
-    };
-
-    applySource();
+    replacementQueueRef.current?.enqueue(generation, videoSource);
   }, [
     player,
     engine,
@@ -209,9 +279,20 @@ export function useFinoraPlayer({
     contentId,
     autoPlay,
     initialPositionSeconds,
-    initialDurationSeconds,
-    applyPendingSource
+    initialDurationSeconds
   ]);
+
+  // Invalidate queued work on unmount so late native completions cannot re-apply
+  // seek/play state after the screen has been released.
+  useEffect(() => {
+    return () => {
+      sourceGenerationRef.current += 1;
+      replacementQueueRef.current?.dispose();
+      pendingRef.current = null;
+      activeReplacementGenerationRef.current = null;
+      settledReplacementGenerationRef.current = null;
+    };
+  }, []);
 
   const subscribe = useCallback(
     (onStoreChange: () => void) => engine.subscribe(onStoreChange),
