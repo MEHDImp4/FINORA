@@ -23,6 +23,11 @@ export interface StatsForNerdsModalProps {
   snapshot: FinoraPlayerSnapshot;
 }
 
+function formatBitrate(bitrate?: number): string {
+  if (!bitrate || bitrate <= 0) return "N/A";
+  return `${(bitrate / 1_000_000).toFixed(bitrate >= 10_000_000 ? 0 : 1)} Mbps`;
+}
+
 export function StatsForNerdsModal({
   visible,
   onClose,
@@ -37,14 +42,36 @@ export function StatsForNerdsModal({
   const audioStream = item.mediaStreams?.find((s) => s.type === "Audio");
 
   const sanitizedUrl = getSanitizedPlaybackUrl(plan.url);
+  const sourceWidth = videoStream?.width;
+  const sourceHeight = videoStream?.height;
+  const sourceBitrate = videoStream?.bitRate || item.bitRate;
+  const sourceCodec = videoStream?.codec || "unknown";
+
+  const requestedWidth = plan.maxWidth || sourceWidth;
+  const requestedHeight = plan.maxHeight || sourceHeight;
+  const requestedBitrate = plan.bitrate || sourceBitrate;
+  const requestedCodec =
+    plan.videoCodec === "copy"
+      ? `${sourceCodec} (copy)`
+      : plan.videoCodec || sourceCodec;
+
+  const sourceResolution =
+    sourceWidth && sourceHeight ? `${sourceWidth}x${sourceHeight}` : "N/A";
+  const requestedResolution =
+    requestedWidth && requestedHeight ? `${requestedWidth}x${requestedHeight}` : "N/A";
 
   const stats = [
     { label: "Item ID", value: item.id },
     { label: "Item Name", value: item.name },
     { label: "Playback Mode", value: plan.mode.toUpperCase() },
+    { label: "Selected Quality", value: (plan.quality || "auto").toUpperCase() },
     {
-      label: "Video Codec / Res",
-      value: `${videoStream?.codec || plan.videoCodec || "unknown"} (${videoStream?.width || "N/A"}x${videoStream?.height || "N/A"})`
+      label: "Source Video",
+      value: `${sourceCodec} · ${sourceResolution} · ${formatBitrate(sourceBitrate)}`
+    },
+    {
+      label: "Requested Output",
+      value: `${requestedCodec} · ${requestedResolution} · ${formatBitrate(requestedBitrate)}`
     },
     {
       label: "Audio Codec / Channels",
