@@ -1,0 +1,197 @@
+name: Apply subtitle native switching fix
+
+on:
+  push:
+    branches:
+      - fix/subtitle-native-switching
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/subtitle-native-switching
+          fetch-depth: 0
+
+      - name: Patch PlayerScreen subtitle routing
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/features/player/components/PlayerScreen.tsx")
+          text = path.read_text()
+
+          old_hook = '  const { cues, isCustomSubtitleActive } = useSubtitleCues({'
+          new_hook = '  const { cues, isLoading: subtitleCuesLoading, isCustomSubtitleActive, hasError: subtitleCuesError } = useSubtitleCues({'
+          if old_hook not in text:
+              raise SystemExit("subtitle hook destructuring marker not found")
+          text = text.replace(old_hook, new_hook, 1)
+
+          marker = '''  useEffect(() => {
+            if (isCustomSubtitleActive && player && player.subtitleTrack !== null) {
+              try {
+                player.subtitleTrack = null;
+              } catch {
+                // Ignored
+              }
+            }
+          }, [isCustomSubtitleActive, player]);
+
+          // Query next episode in advance for series
+          '''
+
+          replacement = '''  useEffect(() => {
+            if (isCustomSubtitleActive && player && player.subtitleTrack !== null) {
+              try {
+                player.subtitleTrack = null;
+              } catch {
+                // Ignored
+              }
+            }
+          }, [isCustomSubtitleActive, player]);
+
+          // Tiered subtitle routing: prefer an already exposed native expo-video track,
+          // then the high-fidelity text overlay, and only rebuild the server stream when
+          // neither client-side option can render the selected subtitle.
+          useEffect(() => {
+            if (selectedSubtitleIndex === null) {
+              if (serverSubtitleIndex !== null) {
+                setServerSubtitleIndex(null);
+              }
+              return;
+            }
+
+            // Once a server fallback is active, do not bounce back merely because that
+            // fallback source itself exposes a native subtitle track. A deliberate new
+            // selection can still leave server mode through the handler below.
+            if (serverSubtitleIndex !== null) {
+              return;
+            }
+
+            if (isCustomSubtitleActive) {
+              return;
+            }
+
+            const subStreams = item.mediaStreams?.filter((s) => s.type === "Subtitle") || [];
+            const currentTracks =
+              player?.availableSubtitleTracks && player.availableSubtitleTracks.length > 0
+                ? player.availableSubtitleTracks
+                : availableSubtitleTracks;
+            const matchedNative =
+              currentTracks && currentTracks.length > 0
+                ? findMatchingSubtitleTrack(currentTracks, subStreams, selectedSubtitleIndex)
+                : undefined;
+
+            if (matchedNative) {
+              return;
+            }
+
+            if (!subtitleCuesLoading && subtitleCuesError) {
+              logger.info(
+                `[PlayerScreen] Client-side subtitles unavailable. Falling back to server subtitle stream index ${selectedSubtitleIndex}`
+              );
+              setServerSubtitleIndex(selectedSubtitleIndex);
+            }
+          }, [
+            selectedSubtitleIndex,
+            serverSubtitleIndex,
+            isCustomSubtitleActive,
+            subtitleCuesLoading,
+            subtitleCuesError,
+            item.mediaStreams,
+            player,
+            availableSubtitleTracks
+          ]);
+
+          // Query next episode in advance for series
+          '''
+
+          if marker not in text:
+              raise SystemExit("subtitle fallback insertion marker not found")
+          text = text.replace(marker, replacement, 1)
+
+          start_marker = '        onSelectSubtitle={(idx) => {'
+          end_marker = '        onSelectQuality={(q) => {'
+          start = text.find(start_marker)
+          if start < 0:
+              raise SystemExit("onSelectSubtitle start marker not found")
+          end = text.find(end_marker, start)
+          if end < 0:
+              raise SystemExit("onSelectSubtitle end marker not found")
+
+          new_handler = '''        onSelectSubtitle={(idx) => {
+            setSelectedSubtitleIndex(idx);
+            setTracksModalVisible(false);
+
+            const subStreams = item.mediaStreams?.filter((s) => s.type === "Subtitle") || [];
+            const targetSubStream = idx !== null ? subStreams.find((s) => s.index === idx) : null;
+
+            // Persist subtitle language preference for this series / media
+            if (item.seriesId) {
+              setSeriesPreference(item.seriesId, {
+                subtitleLanguage: targetSubStream?.language ? normalizeLanguage(targetSubStream.language) : null
+              });
+            }
+
+            if (idx === null) {
+              // Leaving a server fallback genuinely changes the source, so clear it.
+              setServerSubtitleIndex(null);
+              player.subtitleTrack = null;
+              return;
+            }
+
+            const currentTracks =
+              player.availableSubtitleTracks && player.availableSubtitleTracks.length > 0
+                ? player.availableSubtitleTracks
+                : availableSubtitleTracks;
+
+            if (currentTracks && currentTracks.length > 0) {
+              const matchedNative = findMatchingSubtitleTrack(currentTracks, subStreams, idx);
+              if (matchedNative) {
+                logger.info(`[PlayerScreen] Matched native subtitle track: ${matchedNative.id || matchedNative.label}`);
+                // A native selection must not rewrite the Jellyfin source URL. If the
+                // previous selection used server fallback, remove that fallback now.
+                if (serverSubtitleIndex !== null) {
+                  setServerSubtitleIndex(null);
+                }
+                if (!isCustomSubtitleActive) {
+                  player.subtitleTrack = matchedNative;
+                }
+                return;
+              }
+            }
+
+            // Do not rebuild the stream yet. Text subtitles may be rendered by
+            // FinoraSubtitleOverlay; the fallback effect above only asks Jellyfin for a
+            // server-selected stream if both native and custom rendering fail.
+            logger.info(
+              `[PlayerScreen] Native subtitle track not found for index ${idx}. Trying custom subtitle rendering before server fallback.`
+            );
+          }}
+          '''
+
+          text = text[:start] + new_handler + text[end:]
+          path.write_text(text)
+          PY
+
+      - name: Validate patch shape
+        shell: bash
+        run: |
+          git diff --check
+          grep -q "Client-side subtitles unavailable" src/features/player/components/PlayerScreen.tsx
+          grep -q "Trying custom subtitle rendering before server fallback" src/features/player/components/PlayerScreen.tsx
+
+      - name: Commit patch and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/_temp-subtitle-native-fix.yml
+          git add src/features/player/components/PlayerScreen.tsx
+          git commit -m "fix(player): avoid subtitle source reloads"
+          git push origin HEAD:fix/subtitle-native-switching
