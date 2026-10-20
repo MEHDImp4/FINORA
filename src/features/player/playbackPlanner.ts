@@ -45,6 +45,97 @@ export function getSanitizedPlaybackUrl(url: string): string {
   return sanitizeData(url);
 }
 
+interface TranscodeTarget {
+  quality: string;
+  maxWidth?: number;
+  maxHeight?: number;
+  maxBitrate?: number;
+  label: string;
+}
+
+function getAutoCompatibilityTarget(
+  sourceWidth: number,
+  sourceHeight: number,
+  deviceProfile: DeviceProfile
+): TranscodeTarget {
+  const profileWidth = Math.max(1, deviceProfile.maxResolution.width || 1920);
+  const profileHeight = Math.max(1, deviceProfile.maxResolution.height || 1080);
+  const fallbackWidth = Math.min(1920, profileWidth);
+  const fallbackHeight = Math.min(1080, profileHeight);
+  const maxWidth = Math.min(sourceWidth > 0 ? sourceWidth : fallbackWidth, profileWidth);
+  const maxHeight = Math.min(sourceHeight > 0 ? sourceHeight : fallbackHeight, profileHeight);
+
+  let maxBitrate: number;
+  if (maxHeight >= 2160 || maxWidth >= 3000) {
+    maxBitrate = 50_000_000;
+  } else if (maxHeight >= 1080 || maxWidth >= 1900) {
+    maxBitrate = 20_000_000;
+  } else if (maxHeight >= 720 || maxWidth >= 1200) {
+    maxBitrate = 8_000_000;
+  } else {
+    maxBitrate = 2_500_000;
+  }
+
+  if (deviceProfile.maxBitrate && deviceProfile.maxBitrate > 0) {
+    maxBitrate = Math.min(maxBitrate, deviceProfile.maxBitrate);
+  }
+
+  return {
+    quality: "auto",
+    maxWidth,
+    maxHeight,
+    maxBitrate,
+    label: `${maxWidth}x${maxHeight} @ ${(maxBitrate / 1_000_000).toFixed(1)} Mbps`
+  };
+}
+
+function getForcedTranscodeTarget(
+  quality: string,
+  sourceWidth: number,
+  sourceHeight: number,
+  deviceProfile: DeviceProfile
+): TranscodeTarget {
+  const qualityPreset = QUALITY_PRESETS[quality] || QUALITY_PRESETS.auto;
+  const isConstrainedQuality =
+    quality !== "auto" &&
+    quality !== "original" &&
+    Boolean(qualityPreset.maxBitrate && qualityPreset.maxWidth && qualityPreset.maxHeight);
+
+  if (
+    isConstrainedQuality &&
+    qualityPreset.maxBitrate &&
+    qualityPreset.maxWidth &&
+    qualityPreset.maxHeight
+  ) {
+    return {
+      quality: qualityPreset.id,
+      maxWidth: qualityPreset.maxWidth,
+      maxHeight: qualityPreset.maxHeight,
+      maxBitrate: qualityPreset.maxBitrate,
+      label: qualityPreset.label
+    };
+  }
+
+  // "Original" deliberately remains unrestricted. A forced fallback still
+  // changes codecs for compatibility, but it must not silently apply Auto caps.
+  if (quality === "original") {
+    return {
+      quality: "original",
+      label: "Original"
+    };
+  }
+
+  return getAutoCompatibilityTarget(sourceWidth, sourceHeight, deviceProfile);
+}
+
+function buildTranscodeTargetParams(target: TranscodeTarget): string {
+  if (!target.maxWidth || !target.maxHeight || !target.maxBitrate) {
+    return "";
+  }
+
+  return `&maxWidth=${target.maxWidth}&maxHeight=${target.maxHeight}&videoBitRate=${target.maxBitrate}&maxVideoBitRate=${target.maxBitrate}&audioBitRate=192000`;
+}
+
 interface ForcedPlanContext {
   cleanServerUrl: string;
   itemId: string;
@@ -56,6 +147,8 @@ interface ForcedPlanContext {
   normVideoCodec?: string;
   normAudioCodec?: string;
   mediaContainer: string;
+  quality: string;
+  transcodeTarget: TranscodeTarget;
 }
 
 /** Builds a transport plan for a mode that has been explicitly forced by the caller. */
@@ -68,6 +161,7 @@ function buildForcedPlan(mode: PlaybackMode, ctx: ForcedPlanContext): PlaybackPl
       videoCodec: ctx.normVideoCodec,
       audioCodec: ctx.normAudioCodec,
       container: ctx.mediaContainer,
+      quality: ctx.quality,
       reason: "Forced direct play."
     };
   }
@@ -80,20 +174,30 @@ function buildForcedPlan(mode: PlaybackMode, ctx: ForcedPlanContext): PlaybackPl
       videoCodec: ctx.normVideoCodec,
       audioCodec: ctx.normAudioCodec,
       container: ctx.mediaContainer,
+      quality: ctx.quality,
       reason: "Forced direct stream (remux)."
     };
   }
 
-  // Forced transcode re-encodes video to H.264 and audio to AAC: this is the safe
-  // recovery from a decode/container failure, so video must never be copied here.
+  // Decode/container recovery always re-encodes video to H.264 and audio to AAC,
+  // while preserving the user's selected quality semantics.
+  const target = ctx.transcodeTarget;
+  const targetParams = buildTranscodeTargetParams(target);
+
   return {
     mode: "transcode",
-    url: `${ctx.cleanServerUrl}/Videos/${ctx.itemId}/master.m3u8?videoCodec=h264&audioCodec=aac&audioChannels=2${ctx.hlsMediaSourceParam}${ctx.audioIndexParam}${ctx.subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`,
+    url: `${ctx.cleanServerUrl}/Videos/${ctx.itemId}/master.m3u8?videoCodec=h264&audioCodec=aac&audioChannels=2${targetParams}${ctx.hlsMediaSourceParam}${ctx.audioIndexParam}${ctx.subtitleIndexParam}&deviceId=finora-mobile&transcodingProtocol=hls`,
     mediaSourceId: ctx.mediaSourceId,
     videoCodec: "h264",
     audioCodec: "aac",
     container: "m3u8",
-    reason: "Forced transcode fallback after a direct playback failure."
+    quality: target.quality,
+    bitrate: target.maxBitrate,
+    maxWidth: target.maxWidth,
+    maxHeight: target.maxHeight,
+    reason: target.maxBitrate
+      ? `Forced compatibility transcode after a direct playback failure (${target.label}).`
+      : "Forced compatibility transcode after a direct playback failure (Original quality)."
   };
 }
 
@@ -115,6 +219,7 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     return {
       mode: "direct-play",
       url: localPath,
+      quality,
       reason: "Offline local file playback"
     };
   }
@@ -156,8 +261,12 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   // Normalize codecs (e.g. h265 -> hevc, dca -> dts)
   const normVideoCodec = videoCodec === "h265" ? "hevc" : videoCodec;
   const normAudioCodec = audioCodec;
+  const sourceWidth = videoStream?.width || 0;
+  const sourceHeight = videoStream?.height || 0;
+  const sourceBitrate = videoStream?.bitRate || item.bitRate || 0;
 
-  // A forced transport (PLR-01 fallback) bypasses negotiation entirely.
+  // Forced compatibility fallback must resolve quality before returning, otherwise
+  // a later Auto/1080p/720p/480p change can keep the exact same HLS source.
   if (forceMode) {
     return buildForcedPlan(forceMode, {
       cleanServerUrl,
@@ -169,7 +278,14 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
       subtitleIndexParam,
       normVideoCodec,
       normAudioCodec,
-      mediaContainer
+      mediaContainer,
+      quality,
+      transcodeTarget: getForcedTranscodeTarget(
+        quality,
+        sourceWidth,
+        sourceHeight,
+        deviceProfile
+      )
     });
   }
 
@@ -179,9 +295,6 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
   const isAudioSupported =
     !normAudioCodec || deviceProfile.supportedAudioCodecs.includes(normAudioCodec);
 
-  const sourceWidth = videoStream?.width || 0;
-  const sourceHeight = videoStream?.height || 0;
-  const sourceBitrate = videoStream?.bitRate || item.bitRate || 0;
   const isAutoQuality = quality === "auto";
   const sourceExceedsDeviceResolution =
     isAutoQuality &&
