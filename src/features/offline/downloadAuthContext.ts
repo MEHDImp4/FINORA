@@ -2,8 +2,8 @@ import { authRepository } from "../../core/jellyfin/authRepository";
 
 /**
  * Non-sensitive identity of the Jellyfin context a download belongs to.
- * Persisted alongside each download so a download is never resumed with
- * another account's or another server's credentials.
+ * `serverUrl` is retained for persisted-record compatibility and diagnostics,
+ * while `serverId` + `userId` are the stable identity keys across LAN/WAN routes.
  */
 export interface DownloadIdentity {
   serverId: string;
@@ -30,8 +30,8 @@ export function normalizeServerUrl(url: string): string {
  * Resolves a fresh Jellyfin session for downloads.
  *
  * Deliberately does NOT read `useAuthStore` — after a real process death the
- * Zustand store is empty until React has booted. The token is read back from
- * SecureStore through the auth repository instead.
+ * Zustand store is empty until React has booted. The auth repository now resolves
+ * the verified active LAN/WAN transport before returning the restored session.
  *
  * Returns null when no usable session exists.
  */
@@ -53,17 +53,14 @@ export async function getDownloadAuthContext(): Promise<DownloadAuthContext | nu
 }
 
 /**
- * True when a persisted download belongs to the currently authenticated
- * server AND user. URLs are normalized before comparison.
+ * True when a persisted download belongs to the currently authenticated server
+ * AND user. The URL is intentionally not an identity key: the same verified
+ * Jellyfin server may legitimately move between its LAN and WAN transports.
  */
 export function matchesDownloadIdentity(
   stored: Partial<DownloadIdentity>,
   current: DownloadIdentity
 ): boolean {
-  if (!stored.serverId || !stored.userId || !stored.serverUrl) return false;
-  return (
-    stored.serverId === current.serverId &&
-    stored.userId === current.userId &&
-    normalizeServerUrl(stored.serverUrl) === normalizeServerUrl(current.serverUrl)
-  );
+  if (!stored.serverId || !stored.userId) return false;
+  return stored.serverId === current.serverId && stored.userId === current.userId;
 }
