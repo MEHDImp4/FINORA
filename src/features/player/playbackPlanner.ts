@@ -196,8 +196,8 @@ function buildForcedPlan(mode: PlaybackMode, ctx: ForcedPlanContext): PlaybackPl
     maxWidth: target.maxWidth,
     maxHeight: target.maxHeight,
     reason: target.maxBitrate
-      ? `Forced compatibility transcode after a direct playback failure (${target.label}).`
-      : "Forced compatibility transcode after a direct playback failure (Original quality)."
+      ? `Forced transcode fallback after a direct playback failure (${target.label}).`
+      : "Forced transcode fallback after a direct playback failure (Original quality)."
   };
 }
 
