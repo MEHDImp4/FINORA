@@ -6,7 +6,10 @@ import {
 } from "../security/storage";
 import { jellyfinClient, JellyfinClient } from "./jellyfinClient";
 import { getAuthTokenStorageKey, AuthSession, ACTIVE_SESSION_STORAGE_KEY } from "./authRepository";
-import { normalizeServerUrlForCredentials } from "./serverDiscovery";
+import {
+  autoDetectServerConnection,
+  normalizeServerUrlForCredentials
+} from "./serverDiscovery";
 import { FinoraError } from "../errors";
 
 export interface SavedAccount {
@@ -103,14 +106,18 @@ export class ServerManager {
 
   public async removeServer(serverId: string): Promise<void> {
     const servers = await this.getSavedServers();
-    const target = servers.find((s) => s.id === serverId || s.url.replace(/\/+$/, "") === serverId.replace(/\/+$/, ""));
+    const target = servers.find(
+      (s) => s.id === serverId || s.url.replace(/\/+$/, "") === serverId.replace(/\/+$/, "")
+    );
     const filteredServers = servers.filter(
       (s) => s.id !== serverId && s.url.replace(/\/+$/, "") !== serverId.replace(/\/+$/, "")
     );
     await this.prefStorage.setItem(SAVED_SERVERS_STORAGE_KEY, filteredServers);
 
     // Remove accounts associated with this server
-    const targetUrlNorm = target?.url ? target.url.replace(/\/+$/, "") : serverId.replace(/\/+$/, "");
+    const targetUrlNorm = target?.url
+      ? target.url.replace(/\/+$/, "")
+      : serverId.replace(/\/+$/, "");
     const accounts = await this.getSavedAccounts();
     const remainingAccounts: SavedAccount[] = [];
     for (const acc of accounts) {
@@ -174,9 +181,7 @@ export class ServerManager {
       throw new FinoraError("Account not found in registered accounts list", "ACCOUNT_NOT_FOUND");
     }
 
-    // Validate the saved URL before touching the active-session descriptor. This
-    // prevents an account created by an older FINORA version from reactivating a
-    // public cleartext endpoint or corrupting the current session on failure.
+    // Validate the saved canonical URL before touching the active-session descriptor.
     const safeServerUrl = normalizeServerUrlForCredentials(account.serverUrl).url;
 
     const tokenKey = getAuthTokenStorageKey(serverId, userId);
@@ -186,8 +191,24 @@ export class ServerManager {
       throw new FinoraError("No authentication token found for target account", "AUTH_TOKEN_MISSING");
     }
 
-    // Persist the target identity first. If storage fails, the singleton client
-    // remains untouched and the caller can safely restore the previous UI session.
+    // Resolve the runtime route while credentials are still detached. Prefer the
+    // saved server-level LAN/WAN configuration because it can be edited after the
+    // account was originally created.
+    const servers = await this.getSavedServers();
+    const savedServer = servers.find((server) => server.id === serverId);
+    const detection = await autoDetectServerConnection(
+      savedServer?.localUrl || account.localUrl,
+      savedServer?.remoteUrl || account.remoteUrl,
+      savedServer?.url || safeServerUrl,
+      1500,
+      serverId
+    );
+    const activeServerUrl = normalizeServerUrlForCredentials(
+      detection.activeUrl || safeServerUrl
+    ).url;
+
+    // Persist the stable canonical identity first. If storage fails, the singleton
+    // client remains untouched and the caller can safely restore the previous UI session.
     await this.prefStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, {
       userId: account.userId,
       userName: account.userName,
@@ -198,8 +219,8 @@ export class ServerManager {
 
     await this.saveAccount({ ...account, serverUrl: safeServerUrl });
 
-    // Commit the runtime switch only after persistence succeeded.
-    this.client.setServerUrl(safeServerUrl);
+    // Commit the runtime transport switch only after persistence succeeded.
+    this.client.setServerUrl(activeServerUrl);
     this.client.setAuthToken(token);
 
     return {
@@ -207,7 +228,8 @@ export class ServerManager {
       userId: account.userId,
       userName: account.userName,
       serverId: account.serverId,
-      serverUrl: safeServerUrl
+      serverUrl: activeServerUrl,
+      canonicalServerUrl: safeServerUrl
     };
   }
 
