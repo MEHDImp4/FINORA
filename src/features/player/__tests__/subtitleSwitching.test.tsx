@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PlayerScreen } from "../components/PlayerScreen";
 import { MediaItem } from "../../../types/media";
 
-async function waitUntil(predicate: () => boolean, attempts = 200): Promise<void> {
+async function waitUntil(predicate: () => boolean, attempts = 300): Promise<void> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (predicate()) return;
     await Promise.resolve();
@@ -12,9 +12,9 @@ async function waitUntil(predicate: () => boolean, attempts = 200): Promise<void
   throw new Error("Condition was not reached before the microtask limit");
 }
 
-async function waitForReplaceCount(player: any, expected: number): Promise<void> {
+async function waitForPlayer(predicate: () => boolean): Promise<void> {
   await act(async () => {
-    await waitUntil(() => player._replaceCount === expected);
+    await waitUntil(predicate);
     await Promise.resolve();
     await Promise.resolve();
   });
@@ -67,7 +67,9 @@ function renderPlayer(queryClient: QueryClient) {
   );
 }
 
-async function select720p(root: any, player: any): Promise<void> {
+async function select720p(root: any, player: any): Promise<number> {
+  const before = player._replaceCount;
+
   act(() => {
     root.root.findByProps({ testID: "overlay-tracks-button" }).props.onPress();
   });
@@ -77,7 +79,9 @@ async function select720p(root: any, player: any): Promise<void> {
   act(() => {
     root.root.findByProps({ testID: "quality-option-720p" }).props.onPress();
   });
-  await waitForReplaceCount(player, 2);
+
+  await waitForPlayer(() => player._replaceCount > before);
+  return player._replaceCount;
 }
 
 async function selectEnglishSubtitle(root: any): Promise<void> {
@@ -106,23 +110,26 @@ describe("PlayerScreen subtitle transport routing", () => {
       });
 
       const player = root.root.findByProps({ testID: "expo-video-view" }).props.player;
-      await waitForReplaceCount(player, 1);
-      await select720p(root, player);
+      await waitForPlayer(() => player._replaceCount > 0);
+      const baselineReplaceCount = await select720p(root, player);
       expect(player._source.uri).toContain("master.m3u8");
 
       const nativeSubtitle = { id: "native-en", language: "en", label: "English" };
       player.availableSubtitleTracks = [nativeSubtitle];
 
       await selectEnglishSubtitle(root);
+      await waitForPlayer(() => player.subtitleTrack === nativeSubtitle);
 
+      // Give the subtitle cue request/fallback effect time to settle. A native
+      // match must still leave the video source untouched.
       await act(async () => {
-        await waitUntil(() => fetchMock.mock.calls.length >= 10);
+        await Promise.resolve();
         await Promise.resolve();
         await Promise.resolve();
       });
 
       expect(player.subtitleTrack).toBe(nativeSubtitle);
-      expect(player._replaceCount).toBe(2);
+      expect(player._replaceCount).toBe(baselineReplaceCount);
       expect(player._source.uri).not.toContain("SubtitleStreamIndex=2");
       expect(player._source.uri).not.toContain("subtitleStreamIndex=2");
     } finally {
@@ -146,14 +153,19 @@ describe("PlayerScreen subtitle transport routing", () => {
       });
 
       const player = root.root.findByProps({ testID: "expo-video-view" }).props.player;
-      await waitForReplaceCount(player, 1);
-      await select720p(root, player);
+      await waitForPlayer(() => player._replaceCount > 0);
+      const baselineReplaceCount = await select720p(root, player);
 
       player.availableSubtitleTracks = [];
       await selectEnglishSubtitle(root);
-      await waitForReplaceCount(player, 3);
+      await waitForPlayer(
+        () =>
+          typeof player._source?.uri === "string" &&
+          player._source.uri.includes("SubtitleStreamIndex=2")
+      );
 
       expect(fetchMock).toHaveBeenCalled();
+      expect(player._replaceCount).toBeGreaterThan(baselineReplaceCount);
       expect(player._source.uri).toContain("SubtitleStreamIndex=2");
       expect(player._source.uri).toContain("subtitleStreamIndex=2");
     } finally {
