@@ -15,6 +15,7 @@ import {
   isLocalNetworkHost,
   ServerConnectionDetectionResult
 } from "../core/jellyfin/serverDiscovery";
+import { jellyfinClient } from "../core/jellyfin/jellyfinClient";
 import { queryClient } from "../providers/QueryProvider";
 import { useAuthStore } from "./authStore";
 import {
@@ -184,6 +185,10 @@ export const useServerStore = create<ServerState>((set, get) => ({
               session: restored,
               errorMessage: null
             });
+            set({
+              activeResolvedUrl: restored.serverUrl,
+              isLocalConnection: isLocalNetworkHost(new URL(restored.serverUrl).hostname)
+            });
             rollbackSucceeded = true;
           } catch {
             // Fall through to fail-closed cleanup below.
@@ -198,6 +203,7 @@ export const useServerStore = create<ServerState>((set, get) => ({
             session: null,
             errorMessage: null
           });
+          set({ activeResolvedUrl: null, isLocalConnection: false });
         }
 
         set({
@@ -235,16 +241,57 @@ export const useServerStore = create<ServerState>((set, get) => ({
   },
 
   autoDetectActiveConnection: async (serverId?: string) => {
-    const servers = get().savedServers;
+    let servers = get().savedServers;
+    if (servers.length === 0) {
+      servers = await serverManager.getSavedServers();
+      set({ savedServers: servers });
+    }
+
     const session = useAuthStore.getState().session;
     const targetServerId = serverId || session?.serverId;
     const currentServer = servers.find((s) => s.id === targetServerId);
 
     const localUrl = currentServer?.localUrl;
     const remoteUrl = currentServer?.remoteUrl;
-    const fallbackUrl = currentServer?.url || session?.serverUrl;
+    const fallbackUrl =
+      currentServer?.url || session?.canonicalServerUrl || session?.serverUrl;
 
-    const result = await autoDetectServerConnection(localUrl, remoteUrl, fallbackUrl);
+    const result = await autoDetectServerConnection(
+      localUrl,
+      remoteUrl,
+      fallbackUrl,
+      1500,
+      targetServerId
+    );
+
+    // Only mutate the singleton transport when detecting the currently signed-in
+    // server. Saved-server diagnostics for another server must never move creds.
+    if (session && targetServerId === session.serverId && result.activeUrl) {
+      const previousUrl = jellyfinClient.getServerUrl();
+      await queryClient.cancelQueries().catch(() => {});
+      jellyfinClient.setServerUrl(result.activeUrl);
+      const activeUrl = jellyfinClient.getServerUrl();
+
+      useAuthStore.setState({
+        session: {
+          ...session,
+          serverUrl: activeUrl,
+          canonicalServerUrl:
+            session.canonicalServerUrl || currentServer?.url || session.serverUrl
+        }
+      });
+
+      set({
+        isLocalConnection: result.isLocal,
+        activeResolvedUrl: activeUrl
+      });
+
+      if (previousUrl !== activeUrl) {
+        await queryClient.invalidateQueries().catch(() => {});
+      }
+
+      return { ...result, activeUrl };
+    }
 
     set({
       isLocalConnection: result.isLocal,

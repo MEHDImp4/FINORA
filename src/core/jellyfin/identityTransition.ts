@@ -28,12 +28,19 @@ export function runIdentityTransition<T>(operation: () => Promise<T>): Promise<T
  * Restores a previously active identity after a failed transition.
  *
  * The previous in-memory session contains the exact server/user/token tuple that
- * was active before the transition began. Re-persist it and restore the shared
- * Jellyfin client together so UI state and network credentials cannot diverge.
+ * was active before the transition began. Re-persist the stable canonical route
+ * while restoring the effective runtime transport and credentials together.
  */
 export async function restoreActiveIdentity(session: AuthSession): Promise<AuthSession> {
-  const serverUrl = normalizeServerUrlForCredentials(session.serverUrl).url;
-  const restored: AuthSession = { ...session, serverUrl };
+  const activeServerUrl = normalizeServerUrlForCredentials(session.serverUrl).url;
+  const canonicalServerUrl = normalizeServerUrlForCredentials(
+    session.canonicalServerUrl || session.serverUrl
+  ).url;
+  const restored: AuthSession = {
+    ...session,
+    serverUrl: activeServerUrl,
+    canonicalServerUrl
+  };
   const tokenKey = getAuthTokenStorageKey(restored.serverId, restored.userId);
 
   // Persist first. If storage fails, do not mutate the network singleton.
@@ -43,12 +50,12 @@ export async function restoreActiveIdentity(session: AuthSession): Promise<AuthS
     userId: restored.userId,
     userName: restored.userName,
     serverId: restored.serverId,
-    serverUrl: restored.serverUrl,
+    serverUrl: canonicalServerUrl,
     lastActiveAt: Date.now()
   };
   await userPreferencesStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, descriptor);
 
-  jellyfinClient.setServerUrl(restored.serverUrl);
+  jellyfinClient.setServerUrl(activeServerUrl);
   jellyfinClient.setAuthToken(restored.token);
 
   return restored;

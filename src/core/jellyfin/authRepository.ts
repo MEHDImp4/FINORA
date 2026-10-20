@@ -2,6 +2,7 @@ import { Alert } from "react-native";
 import { HttpClient } from "../network/httpClient";
 import { jellyfinClient, JellyfinClient } from "./jellyfinClient";
 import {
+  autoDetectServerConnection,
   normalizeServerUrlForCredentials,
   ServerUrlValidationResult
 } from "./serverDiscovery";
@@ -41,7 +42,10 @@ export interface AuthSession {
   userId: string;
   userName: string;
   serverId: string;
+  /** Effective runtime transport URL (LAN or WAN). */
   serverUrl: string;
+  /** Stable saved URL used for persistence/rollback when runtime transport changes. */
+  canonicalServerUrl?: string;
 }
 
 export interface ActiveSessionDescriptor {
@@ -52,9 +56,17 @@ export interface ActiveSessionDescriptor {
   lastActiveAt: number;
 }
 
+interface SavedServerTransport {
+  id: string;
+  url: string;
+  localUrl?: string;
+  remoteUrl?: string;
+}
+
 export type InsecureHttpConfirmer = (serverUrl: string) => Promise<boolean>;
 
 export const ACTIVE_SESSION_STORAGE_KEY = "finora_active_session";
+const SAVED_SERVERS_STORAGE_KEY = "finora_saved_servers";
 
 export function getAuthTokenStorageKey(serverId: string, userId: string): string {
   return `finora_auth_token_${serverId}_${userId}`;
@@ -134,9 +146,7 @@ export class AuthRepository {
     if (normalized.hasWarning) {
       const approved = await this.confirmInsecureHttp(targetUrl);
       if (!approved) {
-        throw new AuthenticationError(
-          translate("auth.unencryptedHttpCancelled")
-        );
+        throw new AuthenticationError(translate("auth.unencryptedHttpCancelled"));
       }
     }
 
@@ -176,7 +186,8 @@ export class AuthRepository {
         userId: response.User.Id,
         userName: response.User.Name,
         serverId: response.ServerId || "unknown_server",
-        serverUrl: targetUrl
+        serverUrl: targetUrl,
+        canonicalServerUrl: targetUrl
       };
 
       // Store sensitive token strictly in SecureStore
@@ -188,7 +199,7 @@ export class AuthRepository {
         userId: session.userId,
         userName: session.userName,
         serverId: session.serverId,
-        serverUrl: session.serverUrl,
+        serverUrl: targetUrl,
         lastActiveAt: Date.now()
       };
       await this.prefStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, descriptor);
@@ -242,16 +253,42 @@ export class AuthRepository {
         this.client.setAuthToken(null);
         return null;
       }
-      const targetUrl = normalized.url;
+      const canonicalUrl = normalized.url;
+
+      // Resolve LAN/WAN before any saved token is applied. The discovery probe is
+      // unauthenticated and, when a saved server ID exists, only accepts endpoints
+      // proving they are the same Jellyfin server.
+      let activeUrl = canonicalUrl;
+      try {
+        const savedServers =
+          (await this.prefStorage.getItem<SavedServerTransport[]>(SAVED_SERVERS_STORAGE_KEY)) || [];
+        const savedServer = savedServers.find((server) => server.id === descriptor.serverId);
+        const detection = await autoDetectServerConnection(
+          savedServer?.localUrl,
+          savedServer?.remoteUrl,
+          savedServer?.url || canonicalUrl,
+          1500,
+          descriptor.serverId
+        );
+        if (detection.activeUrl) {
+          activeUrl = normalizeServerUrlForCredentials(detection.activeUrl).url;
+        }
+      } catch {
+        // Detection is an optimization. The persisted canonical route remains the
+        // safe fallback if saved candidates are malformed or unavailable.
+        activeUrl = canonicalUrl;
+      }
+
+      const activeNormalized = normalizeServerUrlForCredentials(activeUrl);
       const clientHttp = httpClient || this.client.getHttpClient();
 
       if (typeof this.client.initialize === "function") {
-        await this.client.initialize(targetUrl);
+        await this.client.initialize(activeNormalized.url);
       } else {
-        this.client.setServerUrl(targetUrl);
+        this.client.setServerUrl(activeNormalized.url);
       }
 
-      if (!normalized.isHttps) {
+      if (!activeNormalized.isHttps) {
         // A private cleartext address is not proof of identity: after the user
         // roams to another network a different machine can own the stored IP, so
         // the token must not be sent until the host proves it is the same server
@@ -279,7 +316,7 @@ export class AuthRepository {
 
       this.client.setAuthToken(token);
 
-      // Verify token validity against /System/Info or /Users/{userId} with fast timeout
+      // Verify token validity against the selected transport with a fast timeout.
       try {
         await clientHttp.request(`/System/Info`, { timeoutMs: 2500, retries: 0 });
       } catch (error) {
@@ -296,7 +333,8 @@ export class AuthRepository {
         userId: descriptor.userId,
         userName: descriptor.userName,
         serverId: descriptor.serverId,
-        serverUrl: targetUrl
+        serverUrl: activeNormalized.url,
+        canonicalServerUrl: canonicalUrl
       };
     } catch (error) {
       return null;

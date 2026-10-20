@@ -215,34 +215,46 @@ export interface ServerConnectionDetectionResult {
  * or if the client should connect via remote WAN.
  *
  * Checks the candidate local address first with a fast timeout (default 1500ms).
- * If the local ping succeeds (Jellyfin System/Info/Public responds with a valid ID),
- * FINORA selects the local address to maximize throughput (Direct Play, zero transcoding).
+ * If the local ping succeeds (Jellyfin System/Info/Public responds with the expected
+ * server ID when supplied), FINORA selects the local address to maximize throughput.
  * Otherwise, it falls back to the remote WAN address (or current active URL).
  */
 export async function autoDetectServerConnection(
   localCandidateUrl?: string | null,
   remoteCandidateUrl?: string | null,
   fallbackUrl?: string | null,
-  timeoutMs: number = 1500
+  timeoutMs: number = 1500,
+  expectedServerId?: string | null
 ): Promise<ServerConnectionDetectionResult> {
   const pingServer = async (candidateUrl: string): Promise<boolean> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const normalized = normalizeServerUrl(candidateUrl);
+      // The selected endpoint will carry credentials after detection, so never
+      // consider a route that violates FINORA's credential transport policy.
+      const normalized = normalizeServerUrlForCredentials(candidateUrl);
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      timer = setTimeout(() => controller.abort(), timeoutMs);
 
       const response = await fetch(`${normalized.url}/System/Info/Public`, {
         method: "GET",
         headers: { Accept: "application/json" },
         signal: controller.signal
       });
-      clearTimeout(timer);
 
       if (!response.ok) return false;
       const data = await response.json();
-      return !!(data && (data.Id || data.ServerName));
+      if (!data) return false;
+
+      // A reachable Jellyfin instance is not enough: applying a saved token to a
+      // different server on the same LAN would be a credential-boundary violation.
+      if (expectedServerId) {
+        return Boolean(data.Id && data.Id === expectedServerId);
+      }
+      return Boolean(data.Id || data.ServerName);
     } catch {
       return false;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   };
 
@@ -250,7 +262,7 @@ export async function autoDetectServerConnection(
   if (localCandidateUrl && localCandidateUrl.trim()) {
     const isLocalAlive = await pingServer(localCandidateUrl.trim());
     if (isLocalAlive) {
-      const normalized = normalizeServerUrl(localCandidateUrl.trim());
+      const normalized = normalizeServerUrlForCredentials(localCandidateUrl.trim());
       return {
         activeUrl: normalized.url,
         isLocal: true,
@@ -263,7 +275,7 @@ export async function autoDetectServerConnection(
   if (remoteCandidateUrl && remoteCandidateUrl.trim()) {
     const isRemoteAlive = await pingServer(remoteCandidateUrl.trim());
     if (isRemoteAlive) {
-      const normalized = normalizeServerUrl(remoteCandidateUrl.trim());
+      const normalized = normalizeServerUrlForCredentials(remoteCandidateUrl.trim());
       const hostname = new URL(normalized.url).hostname;
       return {
         activeUrl: normalized.url,
@@ -278,7 +290,7 @@ export async function autoDetectServerConnection(
   let isLocal = false;
   if (targetFallback) {
     try {
-      const normalized = normalizeServerUrl(targetFallback);
+      const normalized = normalizeServerUrlForCredentials(targetFallback);
       const hostname = new URL(normalized.url).hostname;
       isLocal = isLocalNetworkHost(hostname);
       return {
@@ -287,7 +299,8 @@ export async function autoDetectServerConnection(
         strategy: "fallback"
       };
     } catch {
-      // Ignored - return raw fallback below
+      // Ignored - return raw fallback below. The credential boundary will reject
+      // an unsafe URL if a caller later attempts to apply it to JellyfinClient.
     }
   }
 
