@@ -16,20 +16,16 @@ jest.mock("../../../stores/playbackPreferencesStore", () => ({
     })
 }));
 
-async function waitUntil(predicate: () => boolean, attempts = 300): Promise<void> {
+async function waitForPlayer(predicate: () => boolean, attempts = 300): Promise<void> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (predicate()) return;
-    await Promise.resolve();
+    await act(async () => {
+      await Promise.resolve();
+    });
   }
-  throw new Error("Condition was not reached before the microtask limit");
-}
-
-async function waitForPlayer(predicate: () => boolean): Promise<void> {
-  await act(async () => {
-    await waitUntil(predicate);
-    await Promise.resolve();
-    await Promise.resolve();
-  });
+  if (!predicate()) {
+    throw new Error("Condition was not reached before the microtask limit");
+  }
 }
 
 const subtitleItem: MediaItem = {
