@@ -128,7 +128,12 @@ export function PlayerScreen({
   const preserveOrientationOnUnmountRef = useRef(false);
 
   // High-fidelity custom subtitle cues
-  const { cues, isCustomSubtitleActive } = useSubtitleCues({
+  const {
+    cues,
+    isLoading: subtitleCuesLoading,
+    isCustomSubtitleActive,
+    hasError: subtitleCuesError
+  } = useSubtitleCues({
     itemId: item.id,
     mediaSourceId: item.mediaSourceId,
     subtitleStreamIndex: selectedSubtitleIndex,
@@ -495,6 +500,59 @@ export function PlayerScreen({
       }
     }
   }, [isCustomSubtitleActive, player]);
+
+  // Tiered subtitle routing: prefer an already exposed native expo-video track,
+  // then the high-fidelity text overlay, and only rebuild the server stream when
+  // neither client-side option can render the selected subtitle.
+  useEffect(() => {
+    if (selectedSubtitleIndex === null) {
+      if (serverSubtitleIndex !== null) {
+        setServerSubtitleIndex(null);
+      }
+      return;
+    }
+
+    // Once a server fallback is active, do not bounce back merely because that
+    // fallback source itself exposes a native subtitle track. A deliberate new
+    // selection can still leave server mode through the handler below.
+    if (serverSubtitleIndex !== null) {
+      return;
+    }
+
+    if (isCustomSubtitleActive) {
+      return;
+    }
+
+    const subStreams = item.mediaStreams?.filter((s) => s.type === "Subtitle") || [];
+    const currentTracks =
+      player?.availableSubtitleTracks && player.availableSubtitleTracks.length > 0
+        ? player.availableSubtitleTracks
+        : availableSubtitleTracks;
+    const matchedNative =
+      currentTracks && currentTracks.length > 0
+        ? findMatchingSubtitleTrack(currentTracks, subStreams, selectedSubtitleIndex)
+        : undefined;
+
+    if (matchedNative) {
+      return;
+    }
+
+    if (!subtitleCuesLoading && subtitleCuesError) {
+      logger.info(
+        `[PlayerScreen] Client-side subtitles unavailable. Falling back to server subtitle stream index ${selectedSubtitleIndex}`
+      );
+      setServerSubtitleIndex(selectedSubtitleIndex);
+    }
+  }, [
+    selectedSubtitleIndex,
+    serverSubtitleIndex,
+    isCustomSubtitleActive,
+    subtitleCuesLoading,
+    subtitleCuesError,
+    item.mediaStreams,
+    player,
+    availableSubtitleTracks
+  ]);
 
   // Query next episode in advance for series
   useEffect(() => {
@@ -959,7 +1017,6 @@ export function PlayerScreen({
         }}
         onSelectSubtitle={(idx) => {
           setSelectedSubtitleIndex(idx);
-          setServerSubtitleIndex(idx);
           setTracksModalVisible(false);
 
           const subStreams = item.mediaStreams?.filter((s) => s.type === "Subtitle") || [];
@@ -973,6 +1030,8 @@ export function PlayerScreen({
           }
 
           if (idx === null) {
+            // Leaving a server fallback genuinely changes the source, so clear it.
+            setServerSubtitleIndex(null);
             player.subtitleTrack = null;
             return;
           }
@@ -985,12 +1044,32 @@ export function PlayerScreen({
           if (currentTracks && currentTracks.length > 0) {
             const matchedNative = findMatchingSubtitleTrack(currentTracks, subStreams, idx);
             if (matchedNative) {
-              logger.info(`[PlayerScreen] Matched native track: ${matchedNative.id || matchedNative.label}`);
+              logger.info(`[PlayerScreen] Matched native subtitle track: ${matchedNative.id || matchedNative.label}`);
+              // A native selection must not rewrite the Jellyfin source URL. If the
+              // previous selection used server fallback, remove that fallback now.
+              if (serverSubtitleIndex !== null) {
+                setServerSubtitleIndex(null);
+              }
               if (!isCustomSubtitleActive) {
                 player.subtitleTrack = matchedNative;
               }
+              return;
             }
           }
+
+          // A different non-native selection must first leave the previous server
+          // fallback. Otherwise the routing effect would keep returning early for
+          // the stale server stream and never give the new custom subtitle a chance.
+          if (serverSubtitleIndex !== null && serverSubtitleIndex !== idx) {
+            setServerSubtitleIndex(null);
+          }
+
+          // Do not rebuild the stream yet. Text subtitles may be rendered by
+          // FinoraSubtitleOverlay; the fallback effect above only asks Jellyfin for a
+          // server-selected stream if both native and custom rendering fail.
+          logger.info(
+            `[PlayerScreen] Native subtitle track not found for index ${idx}. Trying custom subtitle rendering before server fallback.`
+          );
         }}
         onSelectQuality={(q) => {
           setSelectedQuality(q);

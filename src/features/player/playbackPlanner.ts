@@ -356,9 +356,13 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
     };
   }
 
-  // If user selected a non-default audio track and video is supported:
-  // Use Direct Stream with copy video and copy/transcode audio with AudioStreamIndex
-  if (!isDefaultAudioSelected && isVideoSupported) {
+  const hasServerSubtitleSelected =
+    subtitleStreamIndex !== undefined && subtitleStreamIndex !== null;
+
+  // If user selected a non-default audio track or explicit server subtitle stream,
+  // and video is supported:
+  // Use Direct Stream with copy video and copy/transcode audio with AudioStreamIndex/SubtitleStreamIndex
+  if ((!isDefaultAudioSelected || hasServerSubtitleSelected) && isVideoSupported) {
     const isSourceAac = normAudioCodec === "aac";
     const targetAudioCodec = isSourceAac ? "copy" : "aac";
     const audioChannelsParam = !isSourceAac ? "&audioChannels=2" : "";
@@ -372,13 +376,21 @@ export function createPlaybackPlan(options: PlaybackPlanOptions): PlaybackPlan {
       audioCodec: targetAudioCodec,
       container: "m3u8",
       quality: quality === "original" ? "original" : "auto",
-      reason: `Selected audio track index ${audioStreamIndex}; streaming with video copy.`
+      reason: !isDefaultAudioSelected
+        ? `Selected audio track index ${audioStreamIndex}; streaming with video copy.`
+        : `Selected subtitle track index ${subtitleStreamIndex}; streaming with video copy.`
     };
   }
 
   // Direct Play: container, video codec, audio codec and Auto device limits all match.
   // "original" deliberately bypasses device resolution/bitrate caps above.
-  if (isDefaultAudioSelected && isContainerSupported && isVideoSupported && isAudioSupported) {
+  if (
+    isDefaultAudioSelected &&
+    !hasServerSubtitleSelected &&
+    isContainerSupported &&
+    isVideoSupported &&
+    isAudioSupported
+  ) {
     const directPlayUrl = `${cleanServerUrl}/Videos/${item.id}/stream?static=true${mediaSourceParam}`;
 
     return {
