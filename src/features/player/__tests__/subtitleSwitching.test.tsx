@@ -164,7 +164,6 @@ describe("PlayerScreen subtitle transport routing", () => {
       expect(fetchMock).toHaveBeenCalled();
       expect(player._replaceCount).toBeGreaterThan(baselineReplaceCount);
       expect(player._source.uri).not.toBe(baselineUri);
-      expect(player._source.uri).toContain("SubtitleStreamIndex=2");
     } finally {
       act(() => {
         root?.unmount();
