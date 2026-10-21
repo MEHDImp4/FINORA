@@ -1057,6 +1057,13 @@ export function PlayerScreen({
             }
           }
 
+          // A different non-native selection must first leave the previous server
+          // fallback. Otherwise the routing effect would keep returning early for
+          // the stale server stream and never give the new custom subtitle a chance.
+          if (serverSubtitleIndex !== null && serverSubtitleIndex !== idx) {
+            setServerSubtitleIndex(null);
+          }
+
           // Do not rebuild the stream yet. Text subtitles may be rendered by
           // FinoraSubtitleOverlay; the fallback effect above only asks Jellyfin for a
           // server-selected stream if both native and custom rendering fail.
