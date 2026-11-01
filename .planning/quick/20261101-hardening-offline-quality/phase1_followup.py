@@ -98,4 +98,15 @@ subtitle_test = replace_once(
 )
 subtitle_test_path.write_text(subtitle_test)
 
+jest_config_path = Path("jest.config.js")
+jest_config = jest_config_path.read_text()
+jest_config = replace_once(
+    jest_config,
+    '  testMatch: ["**/__tests__/**/*.test.[jt]s?(x)"],',
+    '  testMatch: ["**/__tests__/**/*.test.[jt]s?(x)"],\n  setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],',
+)
+jest_config_path.write_text(jest_config)
+
+Path("jest.setup.js").write_text('''const { notifyManager } = require("@tanstack/react-query");\n\n// TanStack Query intentionally batches notifications with setTimeout(0). In Jest\n// that scheduler can outlive a renderer that a test has already finished with,\n// producing late React updates and keeping handles alive. Production scheduling\n// is unchanged; tests use an immediate deterministic scheduler instead.\nnotifyManager.setScheduler((callback) => callback());\n''')
+
 print("Phase 1 follow-ups applied")
