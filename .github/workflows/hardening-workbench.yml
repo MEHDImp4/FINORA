@@ -6,23 +6,22 @@ on:
       - fix/hardening-offline-quality-20261101
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: hardening-workbench-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  phase-2-http-trust:
+  quality-baseline:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout work branch
         uses: actions/checkout@v7
         with:
           ref: fix/hardening-offline-quality-20261101
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -30,71 +29,48 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Apply HTTP trust patch
-        run: |
-          python .planning/quick/20261101-hardening-offline-quality/apply_phase2.py
-          python .planning/quick/20261101-hardening-offline-quality/phase2_followup.py
-
       - name: Install dependencies
         run: npm ci
 
       - name: Type check
         run: npm run typecheck
 
-      - name: Jellyfin security tests
-        id: jellyfin_tests
-        shell: bash
-        run: |
-          set +e
-          npm test -- src/core/jellyfin --runInBand > /tmp/jellyfin-tests.log 2>&1
-          status=$?
-          cat /tmp/jellyfin-tests.log
-          exit $status
-
-      - name: Upload Jellyfin test diagnostics
-        if: failure() && steps.jellyfin_tests.outcome == 'failure'
-        uses: actions/upload-artifact@v7
-        with:
-          name: phase2-jellyfin-test-failure
-          path: /tmp/jellyfin-tests.log
-          if-no-files-found: error
-
-      - name: Full test suite with open-handle diagnostics
-        id: full_tests
-        shell: bash
-        run: |
-          set +e
-          timeout 240s npm test -- --runInBand --detectOpenHandles --no-coverage > /tmp/full-tests.log 2>&1
-          status=$?
-          cat /tmp/full-tests.log
-          exit $status
-
-      - name: Upload full-suite diagnostics
-        if: failure() && steps.full_tests.outcome == 'failure'
-        uses: actions/upload-artifact@v7
-        with:
-          name: phase2-full-test-failure
-          path: /tmp/full-tests.log
-          if-no-files-found: error
-
-      - name: Diff sanity
-        run: git diff --check
-
-      - name: Commit validated HTTP trust changes
+      - name: Measure current coverage
         shell: bash
         run: |
           set -euo pipefail
-          files=(
-            src/core/jellyfin/authRepository.ts
-            src/core/jellyfin/__tests__/httpEndpointTrust.test.ts
-            src/core/jellyfin/__tests__/serverIdentityGate.test.ts
-          )
-          if git diff --quiet -- "${files[@]}"; then
-            echo "No phase 2 changes to commit."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "${files[@]}"
-          git commit -m "fix(auth): require trust for local HTTP restore"
-          git push origin HEAD:fix/hardening-offline-quality-20261101
+          npm test -- --ci --coverage --maxWorkers=2 --coverageReporters=text-summary --coverageReporters=json-summary | tee /tmp/coverage.log
+          cp coverage/coverage-summary.json /tmp/coverage-summary.json
+
+      - name: Inspect npm dependency tree
+        shell: bash
+        run: |
+          set +e
+          npm ls --all > /tmp/npm-ls.log 2>&1
+          status=$?
+          echo "npm_ls_exit=$status" > /tmp/npm-ls-status.txt
+          cat /tmp/npm-ls.log
+          exit 0
+
+      - name: Run Expo Doctor diagnostic
+        shell: bash
+        run: |
+          set +e
+          npx expo-doctor > /tmp/expo-doctor.log 2>&1
+          status=$?
+          echo "expo_doctor_exit=$status" > /tmp/expo-doctor-status.txt
+          cat /tmp/expo-doctor.log
+          exit 0
+
+      - name: Upload quality baseline
+        uses: actions/upload-artifact@v7
+        with:
+          name: hardening-quality-baseline
+          path: |
+            /tmp/coverage.log
+            /tmp/coverage-summary.json
+            /tmp/npm-ls.log
+            /tmp/npm-ls-status.txt
+            /tmp/expo-doctor.log
+            /tmp/expo-doctor-status.txt
+          if-no-files-found: error
