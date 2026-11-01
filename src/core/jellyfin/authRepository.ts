@@ -63,10 +63,18 @@ interface SavedServerTransport {
   remoteUrl?: string;
 }
 
+export interface TrustedHttpEndpoint {
+  serverId: string;
+  normalizedUrl: string;
+  approvedAt: number;
+}
+
 export type InsecureHttpConfirmer = (serverUrl: string) => Promise<boolean>;
 
 export const ACTIVE_SESSION_STORAGE_KEY = "finora_active_session";
+export const TRUSTED_HTTP_ENDPOINTS_STORAGE_KEY = "finora_trusted_http_endpoints";
 const SAVED_SERVERS_STORAGE_KEY = "finora_saved_servers";
+const MAX_TRUSTED_HTTP_ENDPOINTS = 50;
 
 export function getAuthTokenStorageKey(serverId: string, userId: string): string {
   return `finora_auth_token_${serverId}_${userId}`;
@@ -131,6 +139,37 @@ export class AuthRepository {
     this.confirmInsecureHttp = confirmInsecureHttp;
   }
 
+  private async getTrustedHttpEndpoints(): Promise<TrustedHttpEndpoint[]> {
+    const stored =
+      (await this.prefStorage.getItem<TrustedHttpEndpoint[]>(TRUSTED_HTTP_ENDPOINTS_STORAGE_KEY)) || [];
+    return stored.filter(
+      (entry) =>
+        Boolean(entry) &&
+        typeof entry.serverId === "string" &&
+        typeof entry.normalizedUrl === "string" &&
+        typeof entry.approvedAt === "number"
+    );
+  }
+
+  private async isHttpEndpointTrusted(serverId: string, normalizedUrl: string): Promise<boolean> {
+    const trusted = await this.getTrustedHttpEndpoints();
+    return trusted.some(
+      (entry) => entry.serverId === serverId && entry.normalizedUrl === normalizedUrl
+    );
+  }
+
+  private async trustHttpEndpoint(serverId: string, normalizedUrl: string): Promise<void> {
+    const trusted = await this.getTrustedHttpEndpoints();
+    const now = Date.now();
+    const next = trusted
+      .filter(
+        (entry) => !(entry.serverId === serverId && entry.normalizedUrl === normalizedUrl)
+      )
+      .concat({ serverId, normalizedUrl, approvedAt: now })
+      .slice(-MAX_TRUSTED_HTTP_ENDPOINTS);
+    await this.prefStorage.setItem(TRUSTED_HTTP_ENDPOINTS_STORAGE_KEY, next);
+  }
+
   public async authenticate(
     credentials: LoginCredentials,
     serverUrl: string,
@@ -189,6 +228,13 @@ export class AuthRepository {
         serverUrl: targetUrl,
         canonicalServerUrl: targetUrl
       };
+
+      // Record only the explicitly approved non-sensitive HTTP route. The
+      // credential remains exclusively in SecureStore and is never co-located
+      // with endpoint trust metadata.
+      if (!normalized.isHttps) {
+        await this.trustHttpEndpoint(session.serverId, targetUrl);
+      }
 
       // Store sensitive token strictly in SecureStore
       const tokenKey = getAuthTokenStorageKey(session.serverId, session.userId);
@@ -282,6 +328,11 @@ export class AuthRepository {
       const activeNormalized = normalizeServerUrlForCredentials(activeUrl);
       const clientHttp = httpClient || this.client.getHttpClient();
 
+      // Detach any previously configured credential before switching transport.
+      // From this point until endpoint validation succeeds, every request is
+      // guaranteed to be unauthenticated.
+      this.client.setAuthToken(null);
+
       if (typeof this.client.initialize === "function") {
         await this.client.initialize(activeNormalized.url);
       } else {
@@ -293,8 +344,6 @@ export class AuthRepository {
         // roams to another network a different machine can own the stored IP, so
         // the token must not be sent until the host proves it is the same server
         // that issued it. This probe is strictly unauthenticated.
-        this.client.setAuthToken(null);
-
         let publicInfo: { Id?: string } | null = null;
         try {
           publicInfo = await clientHttp.request<{ Id?: string }>("/System/Info/Public", {
@@ -311,6 +360,24 @@ export class AuthRepository {
             "[Auth] Cleartext server identity mismatch — session suspended, token withheld."
           );
           return null;
+        }
+
+        const endpointTrusted = await this.isHttpEndpointTrusted(
+          descriptor.serverId,
+          activeNormalized.url
+        );
+        if (!endpointTrusted) {
+          // The server identity matched, but this exact cleartext route has never
+          // been approved. This is the network-change boundary: require explicit
+          // consent before a saved credential can ever be attached to it.
+          const approved = await this.confirmInsecureHttp(activeNormalized.url);
+          if (!approved) {
+            logger.warn(
+              "[Auth] Cleartext endpoint is not trusted — session suspended, token withheld."
+            );
+            return null;
+          }
+          await this.trustHttpEndpoint(descriptor.serverId, activeNormalized.url);
         }
       }
 

@@ -1,4 +1,4 @@
-import { AuthRepository } from "../authRepository";
+import { AuthRepository, ACTIVE_SESSION_STORAGE_KEY, TRUSTED_HTTP_ENDPOINTS_STORAGE_KEY } from "../authRepository";
 
 /**
  * A cleartext session is stored against a private IP. After the user roams to
@@ -58,12 +58,21 @@ function createHarness(options: HarnessOptions = {}) {
   };
 
   const prefStorage = {
-    getItem: jest.fn().mockResolvedValue({
-      userId: "user-1",
-      userName: "LanUser",
-      serverId,
-      serverUrl,
-      lastActiveAt: 1
+    getItem: jest.fn(async (key: string) => {
+      if (key === ACTIVE_SESSION_STORAGE_KEY) {
+        return {
+          userId: "user-1",
+          userName: "LanUser",
+          serverId,
+          serverUrl,
+          lastActiveAt: 1
+        };
+      }
+      if (key === TRUSTED_HTTP_ENDPOINTS_STORAGE_KEY && serverUrl.startsWith("http://")) {
+        return [{ serverId, normalizedUrl: serverUrl, approvedAt: 1 }];
+      }
+      if (key === "finora_saved_servers") return [];
+      return null;
     }),
     setItem: jest.fn(),
     removeItem: jest.fn(),
