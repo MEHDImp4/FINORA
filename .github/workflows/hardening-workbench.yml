@@ -31,7 +31,9 @@ jobs:
           cache: npm
 
       - name: Apply HTTP trust patch
-        run: python .planning/quick/20261101-hardening-offline-quality/apply_phase2.py
+        run: |
+          python .planning/quick/20261101-hardening-offline-quality/apply_phase2.py
+          python .planning/quick/20261101-hardening-offline-quality/phase2_followup.py
 
       - name: Install dependencies
         run: npm ci
@@ -85,6 +87,7 @@ jobs:
           files=(
             src/core/jellyfin/authRepository.ts
             src/core/jellyfin/__tests__/httpEndpointTrust.test.ts
+            src/core/jellyfin/__tests__/serverIdentityGate.test.ts
           )
           if git diff --quiet -- "${files[@]}"; then
             echo "No phase 2 changes to commit."
