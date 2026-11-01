@@ -87,7 +87,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- src/features/offline/offlineStorage.ts src/features/offline/__tests__/offlineStorage.test.ts src/app/player/'[id].tsx' src/app/player/__tests__/playerRouteOffline.test.tsx; then
+          if git diff --quiet -- src/features/offline/offlineStorage.ts src/features/offline/__tests__/offlineStorage.test.ts src/app/player/'[id].tsx' src/app/player/__tests__/playerRouteOffline.test.tsx src/features/settings/components/ServerConnectModal.tsx; then
             echo "No phase 1 changes to commit."
             exit 0
           fi
@@ -96,6 +96,7 @@ jobs:
           git add src/features/offline/offlineStorage.ts \
                   src/features/offline/__tests__/offlineStorage.test.ts \
                   src/app/player/'[id].tsx' \
-                  src/app/player/__tests__/playerRouteOffline.test.tsx
+                  src/app/player/__tests__/playerRouteOffline.test.tsx \
+                  src/features/settings/components/ServerConnectModal.tsx
           git commit -m "fix(offline): serialize mutations and verify local files"
           git push origin HEAD:fix/hardening-offline-quality-20261101
