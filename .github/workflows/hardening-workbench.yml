@@ -42,7 +42,26 @@ jobs:
         run: npm run typecheck
 
       - name: Offline tests
-        run: npm test -- src/features/offline --runInBand
+        id: offline_tests
+        shell: bash
+        run: |
+          set +e
+          npm test -- src/features/offline --runInBand > /tmp/offline-tests.log 2>&1
+          status=$?
+          cat /tmp/offline-tests.log
+          exit $status
+
+      - name: Persist offline test diagnostics
+        if: failure() && steps.offline_tests.outcome == 'failure'
+        shell: bash
+        run: |
+          mkdir -p .planning/quick/20261101-hardening-offline-quality
+          cp /tmp/offline-tests.log .planning/quick/20261101-hardening-offline-quality/offline-test-failure.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .planning/quick/20261101-hardening-offline-quality/offline-test-failure.log
+          git commit -m "chore(debug): capture phase 1 offline test failure"
+          git push origin HEAD:fix/hardening-offline-quality-20261101
 
       - name: Player offline-route regression tests
         run: npm test -- src/app/player/__tests__/playerRouteOffline.test.tsx --runInBand
