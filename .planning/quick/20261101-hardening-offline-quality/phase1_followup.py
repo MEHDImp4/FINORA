@@ -58,4 +58,44 @@ modal = replace_once(
 )
 modal_path.write_text(modal)
 
+modal_test_path = Path("src/features/settings/components/__tests__/ServerConnectModal.test.tsx")
+modal_test = modal_test_path.read_text()
+modal_test = replace_once(
+    modal_test,
+    '''  const mockSaveServer = jest.fn().mockResolvedValue(undefined);\n  const mockRemoveServer = jest.fn().mockResolvedValue(undefined);\n\n  beforeEach(() => {''',
+    '''  const mockSaveServer = jest.fn().mockResolvedValue(undefined);\n  const mockRemoveServer = jest.fn().mockResolvedValue(undefined);\n  let component: any;\n\n  beforeEach(() => {''',
+)
+modal_test = modal_test.replace("    let component: any;\n", "")
+modal_test = replace_once(
+    modal_test,
+    '''  });\n\n  it("renders saved servers list and active server badge", async () => {''',
+    '''  });\n\n  afterEach(() => {\n    if (component) {\n      act(() => component.unmount());\n      component = undefined;\n    }\n    jest.useRealTimers();\n  });\n\n  it("renders saved servers list and active server badge", async () => {''',
+)
+modal_test = replace_once(
+    modal_test,
+    '''  it("removes server when trash button is clicked", async () => {\n    await act(async () => {''',
+    '''  it("removes server when trash button is clicked", async () => {\n    jest.useFakeTimers();\n\n    await act(async () => {''',
+)
+modal_test = replace_once(
+    modal_test,
+    '''    expect(mockRemoveServer).toHaveBeenCalled();\n  });''',
+    '''    expect(mockRemoveServer).toHaveBeenCalled();\n\n    act(() => {\n      jest.advanceTimersByTime(2000);\n    });\n  });''',
+)
+modal_test_path.write_text(modal_test)
+
+subtitle_test_path = Path("src/features/player/__tests__/FinoraSubtitleOverlay.test.tsx")
+subtitle_test = subtitle_test_path.read_text()
+subtitle_test = replace_once(
+    subtitle_test,
+    '''describe("FinoraSubtitleOverlay", () => {\n  beforeEach(() => {''',
+    '''describe("FinoraSubtitleOverlay", () => {\n  let root: any;\n\n  beforeEach(() => {''',
+)
+subtitle_test = subtitle_test.replace("    let root: any;\n", "")
+subtitle_test = replace_once(
+    subtitle_test,
+    '''  });\n\n  const sampleCues = [''',
+    '''  });\n\n  afterEach(() => {\n    if (root) {\n      act(() => root.unmount());\n      root = undefined;\n    }\n  });\n\n  const sampleCues = [''',
+)
+subtitle_test_path.write_text(subtitle_test)
+
 print("Phase 1 follow-ups applied")
