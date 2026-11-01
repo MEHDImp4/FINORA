@@ -95,6 +95,8 @@ jobs:
             src/features/settings/components/ServerConnectModal.tsx
             src/features/settings/components/__tests__/ServerConnectModal.test.tsx
             src/features/player/__tests__/FinoraSubtitleOverlay.test.tsx
+            jest.config.js
+            jest.setup.js
           )
           if git diff --quiet -- "${files[@]}"; then
             echo "No phase 1 changes to commit."
