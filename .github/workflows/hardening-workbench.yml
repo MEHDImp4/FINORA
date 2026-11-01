@@ -6,22 +6,26 @@ on:
       - fix/hardening-offline-quality-20261101
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: hardening-workbench-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  quality-baseline:
+  phase-3-quality:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false
     steps:
       - name: Checkout work branch
         uses: actions/checkout@v7
         with:
           ref: fix/hardening-offline-quality-20261101
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -29,48 +33,117 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Install dependencies
+      - name: Setup Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install baseline dependencies
         run: npm ci
+
+      - name: Align Expo SDK dependencies
+        run: CI=1 npx expo install --fix
+
+      - name: Install ESLint tooling
+        run: npm install --save-dev eslint@^9 eslint-config-expo@latest typescript-eslint@^8
+
+      - name: Apply quality configuration
+        run: python .planning/quick/20261101-hardening-offline-quality/apply_phase3_quality.py
+
+      - name: Audit production dependencies
+        run: node scripts/audit-production.js
 
       - name: Type check
         run: npm run typecheck
 
-      - name: Measure current coverage
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm test -- --ci --coverage --maxWorkers=2 --coverageReporters=text-summary --coverageReporters=json-summary | tee /tmp/coverage.log
-          cp coverage/coverage-summary.json /tmp/coverage-summary.json
-
-      - name: Inspect npm dependency tree
+      - name: Lint
+        id: lint
         shell: bash
         run: |
           set +e
-          npm ls --all > /tmp/npm-ls.log 2>&1
+          npm run lint > /tmp/lint.log 2>&1
           status=$?
-          echo "npm_ls_exit=$status" > /tmp/npm-ls-status.txt
-          cat /tmp/npm-ls.log
-          exit 0
+          cat /tmp/lint.log
+          exit $status
 
-      - name: Run Expo Doctor diagnostic
+      - name: Version consistency
+        run: npm run version:check
+
+      - name: Check i18n parity
+        run: npm run i18n:check
+
+      - name: Test coverage gate
+        id: tests
+        shell: bash
+        run: |
+          set +e
+          npm test -- --ci --coverage --maxWorkers=2 > /tmp/tests.log 2>&1
+          status=$?
+          cat /tmp/tests.log
+          exit $status
+
+      - name: Expo doctor
+        id: doctor
         shell: bash
         run: |
           set +e
           npx expo-doctor > /tmp/expo-doctor.log 2>&1
           status=$?
-          echo "expo_doctor_exit=$status" > /tmp/expo-doctor-status.txt
           cat /tmp/expo-doctor.log
-          exit 0
+          exit $status
 
-      - name: Upload quality baseline
+      - name: Generate Android native project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Compile Android debug APK
+        id: android
+        shell: bash
+        run: |
+          set +e
+          chmod +x android/gradlew
+          (cd android && ./gradlew assembleDebug) > /tmp/android.log 2>&1
+          status=$?
+          tail -200 /tmp/android.log
+          exit $status
+
+      - name: Upload diagnostics on failure
+        if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: hardening-quality-baseline
+          name: phase3-quality-failure
           path: |
-            /tmp/coverage.log
-            /tmp/coverage-summary.json
-            /tmp/npm-ls.log
-            /tmp/npm-ls-status.txt
+            /tmp/lint.log
+            /tmp/tests.log
             /tmp/expo-doctor.log
-            /tmp/expo-doctor-status.txt
-          if-no-files-found: error
+            /tmp/android.log
+          if-no-files-found: ignore
+
+      - name: Diff sanity
+        run: git diff --check
+
+      - name: Commit validated quality gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            package.json
+            package-lock.json
+            eslint.config.js
+            jest.config.js
+            .github/workflows/ci.yml
+            .github/workflows/build-apk.yml
+            .planning/quick/20261101-hardening-offline-quality/NATIVE_COMPATIBILITY.md
+          )
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${files[@]}"
+          if git diff --cached --quiet; then
+            echo "No quality changes to commit."
+            exit 0
+          fi
+          git commit -m "ci: enforce lint coverage and native compatibility"
+          git push origin HEAD:fix/hardening-offline-quality-20261101
