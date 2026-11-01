@@ -62,12 +62,12 @@ jobs:
       - name: Player offline-route regression tests
         run: npm test -- src/app/player/__tests__/playerRouteOffline.test.tsx --runInBand
 
-      - name: Full test suite
+      - name: Full test suite with open-handle diagnostics
         id: full_tests
         shell: bash
         run: |
           set +e
-          npm test -- --runInBand --no-coverage > /tmp/full-tests.log 2>&1
+          timeout 240s npm test -- --runInBand --detectOpenHandles --no-coverage > /tmp/full-tests.log 2>&1
           status=$?
           cat /tmp/full-tests.log
           exit $status
