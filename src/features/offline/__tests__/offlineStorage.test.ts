@@ -8,11 +8,32 @@ import { OfflineMediaRecord } from "../types";
 
 const TEST_SCOPE = { serverId: "server-test", userId: "user-test" };
 
+function makeRecord(
+  itemId: string,
+  overrides: Partial<OfflineMediaRecord> = {}
+): OfflineMediaRecord {
+  return {
+    itemId,
+    title: `Title ${itemId}`,
+    type: "Movie",
+    localPath: `file:///mock-documents/finora_downloads/${itemId}.mp4`,
+    fileSizeBytes: 100,
+    totalTicks: 1000,
+    playbackPositionTicks: 0,
+    savedAt: Date.now(),
+    ...overrides
+  };
+}
+
 describe("OfflineStorageService", () => {
   let service: OfflineStorageService;
 
   beforeEach(async () => {
     await AsyncStorage.clear();
+    const FileSystem = require("expo-file-system/legacy");
+    FileSystem.__reset();
+    (FileSystem.deleteAsync as jest.Mock).mockClear();
+    (FileSystem.getInfoAsync as jest.Mock).mockClear();
     service = new OfflineStorageService(TEST_SCOPE);
   });
 
@@ -322,4 +343,130 @@ describe("OfflineStorageService", () => {
       { idempotent: true }
     );
   });
+
+  it("serializes concurrent catalog inserts without lost updates", async () => {
+    await Promise.all([
+      service.saveOfflineMedia(makeRecord("record-a")),
+      service.saveOfflineMedia(makeRecord("record-b")),
+      service.saveOfflineMedia(makeRecord("record-c"))
+    ]);
+
+    const result = await service.getAllOfflineMedia();
+    expect(result).toHaveLength(3);
+    expect(result.map((item) => item.itemId)).toEqual(
+      expect.arrayContaining(["record-a", "record-b", "record-c"])
+    );
+  });
+
+  it("does not lose simultaneous mutations of different catalog items", async () => {
+    await service.saveOfflineMedia(makeRecord("position-item"));
+    await service.saveOfflineMedia(makeRecord("watched-item"));
+
+    await Promise.all([
+      service.updateLocalPlaybackPosition("position-item", 400),
+      service.markAsWatched("watched-item")
+    ]);
+
+    const positionItem = await service.getOfflineMedia("position-item");
+    const watchedItem = await service.getOfflineMedia("watched-item");
+    expect(positionItem?.playbackPositionTicks).toBe(400);
+    expect(watchedItem?.isPlayed).toBe(true);
+  });
+
+  it("keeps concurrent mutations isolated across different scopes", async () => {
+    const scopeA = { serverId: "server-a", userId: "user-a" };
+    const scopeB = { serverId: "server-b", userId: "user-b" };
+    const serviceA = new OfflineStorageService(scopeA);
+    const serviceB = new OfflineStorageService(scopeB);
+
+    await Promise.all([
+      serviceA.saveOfflineMedia(makeRecord("a-1")),
+      serviceA.saveOfflineMedia(makeRecord("a-2")),
+      serviceB.saveOfflineMedia(makeRecord("b-1")),
+      serviceB.saveOfflineMedia(makeRecord("b-2"))
+    ]);
+
+    expect((await serviceA.getAllOfflineMedia()).map((item) => item.itemId).sort()).toEqual([
+      "a-1",
+      "a-2"
+    ]);
+    expect((await serviceB.getAllOfflineMedia()).map((item) => item.itemId).sort()).toEqual([
+      "b-1",
+      "b-2"
+    ]);
+  });
+
+  it("retains all distinct concurrent progress sync entries", async () => {
+    await Promise.all([
+      service.enqueueProgressSync("sync-a", 100, false),
+      service.enqueueProgressSync("sync-b", 200, false),
+      service.enqueueProgressSync("sync-c", 300, true)
+    ]);
+
+    const entries = await service.getPendingSyncEntries();
+    expect(entries).toHaveLength(3);
+    expect(entries.map((entry) => entry.itemId)).toEqual(
+      expect.arrayContaining(["sync-a", "sync-b", "sync-c"])
+    );
+  });
+
+  it("keeps the catalog valid during a concurrent update and deletion", async () => {
+    await service.saveOfflineMedia(makeRecord("keep-me"));
+    await service.saveOfflineMedia(makeRecord("delete-me"));
+
+    await Promise.all([
+      service.updateLocalPlaybackPosition("keep-me", 700),
+      service.deleteOfflineMedia("delete-me")
+    ]);
+
+    const raw = await AsyncStorage.getItem(getScopedOfflineCatalogKey(TEST_SCOPE));
+    expect(raw).not.toBeNull();
+    expect(() => JSON.parse(raw!)).not.toThrow();
+    const parsed = JSON.parse(raw!) as OfflineMediaRecord[];
+    expect(parsed.find((item) => item.itemId === "keep-me")?.playbackPositionTicks).toBe(700);
+    expect(parsed.some((item) => item.itemId === "delete-me")).toBe(false);
+  });
+
+  it("resolveLocalUri returns a verified existing localPath", async () => {
+    const FileSystem = require("expo-file-system/legacy");
+    FileSystem.__setDefaultFileSize(null);
+    const path = "file:///mock-documents/finora_downloads/existing.mp4";
+    FileSystem.__setFileSize(path, 123);
+
+    await expect(service.resolveLocalUri(makeRecord("existing", { localPath: path }))).resolves.toBe(
+      path
+    );
+  });
+
+  it("resolveLocalUri rebuilds a stale sandbox path when the reconstructed file exists", async () => {
+    const FileSystem = require("expo-file-system/legacy");
+    const stalePath =
+      "file:///old-sandbox/finora_downloads/server-test/user-test/rebuilt.mp4";
+    const rebuiltPath =
+      "file:///mock-documents/finora_downloads/server-test/user-test/rebuilt.mp4";
+    (FileSystem.getInfoAsync as jest.Mock).mockImplementation(async (path: string) => ({
+      exists: path === rebuiltPath,
+      isDirectory: false,
+      uri: path,
+      size: path === rebuiltPath ? 123 : undefined
+    }));
+
+    await expect(
+      service.resolveLocalUri(makeRecord("rebuilt", { localPath: stalePath }))
+    ).resolves.toBe(rebuiltPath);
+  });
+
+  it("resolveLocalUri returns null when no physical candidate exists", async () => {
+    const FileSystem = require("expo-file-system/legacy");
+    FileSystem.__setDefaultFileSize(null);
+
+    await expect(
+      service.resolveLocalUri(
+        makeRecord("missing", {
+          localPath: "file:///old-sandbox/finora_downloads/server-test/user-test/missing.mp4"
+        })
+      )
+    ).resolves.toBeNull();
+  });
+
 });

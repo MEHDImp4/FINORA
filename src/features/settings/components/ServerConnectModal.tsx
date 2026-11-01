@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -58,6 +58,31 @@ export function ServerConnectModal({
   const [discoveryResult, setDiscoveryResult] = useState<ServerDiscoveryResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleClose = (callback: () => void, delayMs: number) => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
+      callback();
+    }, delayMs);
+  };
+
+  const scheduleSuccessClear = () => {
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    successTimerRef.current = setTimeout(() => {
+      successTimerRef.current = null;
+      setSuccessMsg(null);
+    }, 2000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (visible) {
@@ -109,15 +134,13 @@ export function ServerConnectModal({
 
     if (currentNormalized === normalizedTarget) {
       setSuccessMsg(t("settings.serverConnectSuccess"));
-      setTimeout(() => {
-        onClose();
-      }, 500);
+      scheduleClose(onClose, 500);
       return;
     }
 
     // Switch target server and require password verification for security
     setSuccessMsg(t("settings.serverConnectSwitchSuccess"));
-    setTimeout(() => {
+    scheduleClose(() => {
       onClose();
       onServerChanged?.(server.url);
     }, 400);
@@ -146,7 +169,7 @@ export function ServerConnectModal({
 
     hapticService.notificationSuccess();
     setSuccessMsg(t("settings.serverConnectSwitchSuccess"));
-    setTimeout(() => {
+    scheduleClose(() => {
       onClose();
       onServerChanged?.(result!.url);
     }, 400);
@@ -158,7 +181,7 @@ export function ServerConnectModal({
     try {
       await removeServer(serverId);
       setSuccessMsg(t("settings.serverConnectRemoveA11y"));
-      setTimeout(() => setSuccessMsg(null), 2000);
+      scheduleSuccessClear();
     } catch (err) {
       setErrorMsg((err as Error).message);
     }

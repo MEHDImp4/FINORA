@@ -4,11 +4,20 @@ import { FinoraSubtitleOverlay } from "../components/FinoraSubtitleOverlay";
 import { useSubtitleSettingsStore, DEFAULT_SUBTITLE_SETTINGS } from "../../../stores/subtitleSettingsStore";
 
 describe("FinoraSubtitleOverlay", () => {
+  let root: any;
+
   beforeEach(() => {
     useSubtitleSettingsStore.setState({
       settings: { ...DEFAULT_SUBTITLE_SETTINGS },
       isLoaded: true
     });
+  });
+
+  afterEach(() => {
+    if (root) {
+      act(() => root.unmount());
+      root = undefined;
+    }
   });
 
   const sampleCues = [
@@ -17,7 +26,6 @@ describe("FinoraSubtitleOverlay", () => {
   ];
 
   it("renders active subtitle text when within timestamp bounds", () => {
-    let root: any;
     act(() => {
       root = renderer.create(
         <FinoraSubtitleOverlay cues={sampleCues} currentTimeSeconds={2.5} />
@@ -30,7 +38,6 @@ describe("FinoraSubtitleOverlay", () => {
   });
 
   it("renders nothing when current time is in between cues", () => {
-    let root: any;
     act(() => {
       root = renderer.create(
         <FinoraSubtitleOverlay cues={sampleCues} currentTimeSeconds={4.5} />
@@ -41,7 +48,6 @@ describe("FinoraSubtitleOverlay", () => {
   });
 
   it("renders nothing when cue list is empty", () => {
-    let root: any;
     act(() => {
       root = renderer.create(
         <FinoraSubtitleOverlay cues={[]} currentTimeSeconds={2.0} />
@@ -62,7 +68,6 @@ describe("FinoraSubtitleOverlay", () => {
       isLoaded: true
     });
 
-    let root: any;
     act(() => {
       root = renderer.create(
         <FinoraSubtitleOverlay cues={sampleCues} currentTimeSeconds={2.0} />
@@ -79,7 +84,6 @@ describe("FinoraSubtitleOverlay", () => {
   });
 
   it("respects extraBottomOffset when controls are visible", () => {
-    let root: any;
     act(() => {
       root = renderer.create(
         <FinoraSubtitleOverlay
@@ -100,7 +104,6 @@ describe("FinoraSubtitleOverlay", () => {
   });
 
   it("safely transitions across active, inactive, and active states without hook count errors", () => {
-    let root: any;
 
     // 1. Initial render at 0.0s (inactive, no cue)
     act(() => {

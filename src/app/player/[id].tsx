@@ -30,21 +30,38 @@ export default function PlayerRoute() {
   const token = session?.token || jellyfinClient.getAuthToken() || "";
 
   const [offlineRecord, setOfflineRecord] = useState<OfflineMediaRecord | null>(null);
+  const [offlineFileMissing, setOfflineFileMissing] = useState(false);
   const [checkingOffline, setCheckingOffline] = useState(true);
 
   useEffect(() => {
     let active = true;
+    setCheckingOffline(true);
+    setOfflineRecord(null);
+    setOfflineFileMissing(false);
+
     if (rawId) {
       offlineStorageService
         .getOfflineMedia(rawId)
         .then(async (record) => {
+          if (!record) {
+            if (active) setCheckingOffline(false);
+            return;
+          }
+
+          const resolvedUri = await offlineStorageService.resolveLocalUri(record);
           if (!active) return;
-          if (record) {
-            const resolvedUri = await offlineStorageService.resolveLocalUri(record);
-            if (resolvedUri) {
-              record.localPath = resolvedUri;
-            }
-            setOfflineRecord(record);
+
+          if (resolvedUri) {
+            setOfflineRecord({
+              ...record,
+              localPath: resolvedUri
+            });
+            setOfflineFileMissing(false);
+          } else {
+            // Keep the catalog metadata untouched, but never expose its stale
+            // path as a playable source. Online streaming may still succeed.
+            setOfflineRecord(null);
+            setOfflineFileMissing(true);
           }
           setCheckingOffline(false);
         })
@@ -76,6 +93,7 @@ export default function PlayerRoute() {
   );
 
   const isOfflineMode = Boolean(offlineRecord && (!shouldFetchOnline || isError));
+  const showMissingOfflineFile = offlineFileMissing && (!shouldFetchOnline || isError);
 
   useEffect(() => {
     // Only invalidate if the online server lookup returned an error/missing item.
@@ -159,7 +177,7 @@ export default function PlayerRoute() {
     );
   }
 
-  if (!token && !offlineRecord) {
+  if (!token && !offlineRecord && !offlineFileMissing) {
     return (
       <View style={styles.centerContainer} testID="player-route-auth-error">
         {playerScreenOptions}
@@ -186,13 +204,13 @@ export default function PlayerRoute() {
       <View style={styles.centerContainer} testID="player-route-error">
         {playerScreenOptions}
         <FinoraText variant="title" style={styles.errorTitle}>
-          {isOfflineMode ? t("downloads.missingFile") : t("player.mediaNotFoundTitle")}
+          {showMissingOfflineFile ? t("downloads.missingFile") : t("player.mediaNotFoundTitle")}
         </FinoraText>
         <FinoraText
           variant="caption"
           style={{ color: colors.textSecondary, marginBottom: spacing.md, textAlign: "center" }}
         >
-          {isOfflineMode
+          {showMissingOfflineFile
             ? t("downloads.orphanDesc")
             : t("player.mediaNotFoundDesc")}
         </FinoraText>

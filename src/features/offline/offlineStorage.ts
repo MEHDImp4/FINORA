@@ -51,6 +51,37 @@ function parseArray<T>(raw: string | null): T[] {
   }
 }
 
+/**
+ * Serializes storage mutations per Jellyfin account scope. A mutation for one
+ * server/user never waits on a different account, while every read-modify-write
+ * sequence for the same scope is ordered deterministically.
+ */
+const scopeMutationQueues = new Map<string, Promise<void>>();
+const scopeMigrationPromises = new Map<string, Promise<void>>();
+
+async function runScopeMutation<T>(
+  scope: OfflineStorageScope,
+  mutation: () => Promise<T>
+): Promise<T> {
+  const scopeId = getScopeSuffix(scope);
+  const previous = scopeMutationQueues.get(scopeId) ?? Promise.resolve();
+  const result = previous.catch(() => undefined).then(mutation);
+  const tail = result.then(
+    () => undefined,
+    () => undefined
+  );
+
+  scopeMutationQueues.set(scopeId, tail);
+
+  try {
+    return await result;
+  } finally {
+    if (scopeMutationQueues.get(scopeId) === tail) {
+      scopeMutationQueues.delete(scopeId);
+    }
+  }
+}
+
 export class OfflineStorageService {
   private fixedScope?: OfflineStorageScope;
   private migrationCheckedScopes = new Set<string>();
@@ -124,39 +155,57 @@ export class OfflineStorageService {
   private async migrateLegacyIfSafe(scope: OfflineStorageScope): Promise<void> {
     const scopeId = getScopeSuffix(scope);
     if (this.migrationCheckedScopes.has(scopeId)) return;
-    this.migrationCheckedScopes.add(scopeId);
 
+    const inFlight = scopeMigrationPromises.get(scopeId);
+    if (inFlight) {
+      await inFlight;
+      this.migrationCheckedScopes.add(scopeId);
+      return;
+    }
+
+    const migration = runScopeMutation(scope, async () => {
+      try {
+        const accounts = parseArray<Partial<OfflineStorageScope>>(
+          await AsyncStorage.getItem(SAVED_ACCOUNTS_STORAGE_KEY)
+        );
+        const isOnlyAccount =
+          accounts.length === 1 &&
+          accounts[0]?.serverId === scope.serverId &&
+          accounts[0]?.userId === scope.userId;
+
+        if (!isOnlyAccount) return;
+
+        const catalogKey = getScopedOfflineCatalogKey(scope);
+        const syncKey = getScopedOfflineSyncQueueKey(scope);
+        const [scopedCatalog, scopedSync, legacyCatalog, legacySync] = await Promise.all([
+          AsyncStorage.getItem(catalogKey),
+          AsyncStorage.getItem(syncKey),
+          AsyncStorage.getItem(OFFLINE_CATALOG_STORAGE_KEY),
+          AsyncStorage.getItem(OFFLINE_SYNC_QUEUE_STORAGE_KEY)
+        ]);
+
+        if (scopedCatalog === null && legacyCatalog !== null) {
+          await AsyncStorage.setItem(catalogKey, legacyCatalog);
+          await AsyncStorage.removeItem(OFFLINE_CATALOG_STORAGE_KEY);
+        }
+
+        if (scopedSync === null && legacySync !== null) {
+          await AsyncStorage.setItem(syncKey, legacySync);
+          await AsyncStorage.removeItem(OFFLINE_SYNC_QUEUE_STORAGE_KEY);
+        }
+      } catch {
+        // Migration is best effort. Never fall back to exposing a global catalog.
+      }
+    });
+
+    scopeMigrationPromises.set(scopeId, migration.then(() => undefined));
     try {
-      const accounts = parseArray<Partial<OfflineStorageScope>>(
-        await AsyncStorage.getItem(SAVED_ACCOUNTS_STORAGE_KEY)
-      );
-      const isOnlyAccount =
-        accounts.length === 1 &&
-        accounts[0]?.serverId === scope.serverId &&
-        accounts[0]?.userId === scope.userId;
-
-      if (!isOnlyAccount) return;
-
-      const catalogKey = getScopedOfflineCatalogKey(scope);
-      const syncKey = getScopedOfflineSyncQueueKey(scope);
-      const [scopedCatalog, scopedSync, legacyCatalog, legacySync] = await Promise.all([
-        AsyncStorage.getItem(catalogKey),
-        AsyncStorage.getItem(syncKey),
-        AsyncStorage.getItem(OFFLINE_CATALOG_STORAGE_KEY),
-        AsyncStorage.getItem(OFFLINE_SYNC_QUEUE_STORAGE_KEY)
-      ]);
-
-      if (scopedCatalog === null && legacyCatalog !== null) {
-        await AsyncStorage.setItem(catalogKey, legacyCatalog);
-        await AsyncStorage.removeItem(OFFLINE_CATALOG_STORAGE_KEY);
+      await migration;
+      this.migrationCheckedScopes.add(scopeId);
+    } finally {
+      if (scopeMigrationPromises.get(scopeId)) {
+        scopeMigrationPromises.delete(scopeId);
       }
-
-      if (scopedSync === null && legacySync !== null) {
-        await AsyncStorage.setItem(syncKey, legacySync);
-        await AsyncStorage.removeItem(OFFLINE_SYNC_QUEUE_STORAGE_KEY);
-      }
-    } catch {
-      // Migration is best effort. Never fall back to exposing a global catalog.
     }
   }
 
@@ -174,6 +223,42 @@ export class OfflineStorageService {
     return getScopedOfflineSyncQueueKey(resolved);
   }
 
+  /** Direct scoped reads used only while the caller already owns the scope mutation queue. */
+  private async getAllOfflineMediaUnlocked(
+    scope: OfflineStorageScope
+  ): Promise<OfflineMediaRecord[]> {
+    return parseArray<OfflineMediaRecord>(
+      await AsyncStorage.getItem(getScopedOfflineCatalogKey(scope))
+    );
+  }
+
+  private async getOfflineMediaUnlocked(
+    itemId: string,
+    scope: OfflineStorageScope
+  ): Promise<OfflineMediaRecord | null> {
+    const all = await this.getAllOfflineMediaUnlocked(scope);
+    return all.find((item) => item.itemId === itemId) || null;
+  }
+
+  private async saveOfflineMediaUnlocked(
+    record: OfflineMediaRecord,
+    scope: OfflineStorageScope
+  ): Promise<void> {
+    const all = await this.getAllOfflineMediaUnlocked(scope);
+    const updated = all.filter((item) => item.itemId !== record.itemId);
+    updated.push(record);
+    await AsyncStorage.setItem(getScopedOfflineCatalogKey(scope), JSON.stringify(updated));
+  }
+
+  private async getPendingSyncEntriesUnlocked(
+    scope: OfflineStorageScope
+  ): Promise<SyncQueueEntry[]> {
+    return parseArray<SyncQueueEntry>(
+      await AsyncStorage.getItem(getScopedOfflineSyncQueueKey(scope))
+    );
+  }
+
+
   /**
    * Saves or updates an offline media record in account-scoped local storage.
    * Download identity wins over the currently active session when available.
@@ -186,13 +271,7 @@ export class OfflineStorageService {
     if (!resolved) return;
     await this.migrateLegacyIfSafe(resolved);
 
-    const all = await this.getAllOfflineMedia(resolved);
-    const filtered = all.filter((item) => item.itemId !== record.itemId);
-    filtered.push(record);
-    await AsyncStorage.setItem(
-      getScopedOfflineCatalogKey(resolved),
-      JSON.stringify(filtered)
-    );
+    await runScopeMutation(resolved, () => this.saveOfflineMediaUnlocked(record, resolved));
   }
 
   /**
@@ -229,28 +308,32 @@ export class OfflineStorageService {
   ): Promise<void> {
     const resolved = await this.resolveScope(scope);
     if (!resolved) return;
+    await this.migrateLegacyIfSafe(resolved);
 
-    const all = await this.getAllOfflineMedia(resolved);
-    const item = all.find((i) => i.itemId === itemId);
-    const filtered = all.filter((i) => i.itemId !== itemId);
-    await AsyncStorage.setItem(
-      getScopedOfflineCatalogKey(resolved),
-      JSON.stringify(filtered)
-    );
-    if (item?.localPath && typeof FileSystem.deleteAsync === "function") {
-      try {
-        await FileSystem.deleteAsync(item.localPath, { idempotent: true });
-      } catch {
-        // Safe deletion
+    await runScopeMutation(resolved, async () => {
+      const all = await this.getAllOfflineMediaUnlocked(resolved);
+      const item = all.find((candidate) => candidate.itemId === itemId);
+      const remaining = all.filter((candidate) => candidate.itemId !== itemId);
+      await AsyncStorage.setItem(
+        getScopedOfflineCatalogKey(resolved),
+        JSON.stringify(remaining)
+      );
+
+      if (item?.localPath && typeof FileSystem.deleteAsync === "function") {
+        try {
+          await FileSystem.deleteAsync(item.localPath, { idempotent: true });
+        } catch {
+          // Safe deletion
+        }
       }
-    }
-    if (item?.posterLocalPath && typeof FileSystem.deleteAsync === "function") {
-      try {
-        await FileSystem.deleteAsync(item.posterLocalPath, { idempotent: true });
-      } catch {
-        // Safe deletion
+      if (item?.posterLocalPath && typeof FileSystem.deleteAsync === "function") {
+        try {
+          await FileSystem.deleteAsync(item.posterLocalPath, { idempotent: true });
+        } catch {
+          // Safe deletion
+        }
       }
-    }
+    });
   }
 
   /**
@@ -259,35 +342,42 @@ export class OfflineStorageService {
   public async deleteSeriesOfflineMedia(seriesIdOrName: string): Promise<void> {
     const scope = await this.resolveScope();
     if (!scope) return;
+    await this.migrateLegacyIfSafe(scope);
 
-    const all = await this.getAllOfflineMedia(scope);
-    const seriesEpisodes = all.filter(
-      (i) => i.seriesId === seriesIdOrName || (i.seriesName && i.seriesName === seriesIdOrName)
-    );
-    const remaining = all.filter(
-      (i) => i.seriesId !== seriesIdOrName && (!i.seriesName || i.seriesName !== seriesIdOrName)
-    );
-    await AsyncStorage.setItem(
-      getScopedOfflineCatalogKey(scope),
-      JSON.stringify(remaining)
-    );
+    await runScopeMutation(scope, async () => {
+      const all = await this.getAllOfflineMediaUnlocked(scope);
+      const seriesEpisodes = all.filter(
+        (item) =>
+          item.seriesId === seriesIdOrName ||
+          (item.seriesName && item.seriesName === seriesIdOrName)
+      );
+      const remaining = all.filter(
+        (item) =>
+          item.seriesId !== seriesIdOrName &&
+          (!item.seriesName || item.seriesName !== seriesIdOrName)
+      );
+      await AsyncStorage.setItem(
+        getScopedOfflineCatalogKey(scope),
+        JSON.stringify(remaining)
+      );
 
-    for (const ep of seriesEpisodes) {
-      if (ep.localPath && typeof FileSystem.deleteAsync === "function") {
-        try {
-          await FileSystem.deleteAsync(ep.localPath, { idempotent: true });
-        } catch {
-          // Safe deletion
+      for (const episode of seriesEpisodes) {
+        if (episode.localPath && typeof FileSystem.deleteAsync === "function") {
+          try {
+            await FileSystem.deleteAsync(episode.localPath, { idempotent: true });
+          } catch {
+            // Safe deletion
+          }
+        }
+        if (episode.posterLocalPath && typeof FileSystem.deleteAsync === "function") {
+          try {
+            await FileSystem.deleteAsync(episode.posterLocalPath, { idempotent: true });
+          } catch {
+            // Safe deletion
+          }
         }
       }
-      if (ep.posterLocalPath && typeof FileSystem.deleteAsync === "function") {
-        try {
-          await FileSystem.deleteAsync(ep.posterLocalPath, { idempotent: true });
-        } catch {
-          // Safe deletion
-        }
-      }
-    }
+    });
   }
 
   /**
@@ -301,16 +391,23 @@ export class OfflineStorageService {
   ): Promise<void> {
     const scope = await this.resolveScope();
     if (!scope) return;
-    const item = await this.getOfflineMedia(itemId, scope);
-    if (!item) return;
+    await this.migrateLegacyIfSafe(scope);
 
-    item.playbackPositionTicks = positionTicks;
-    const effectiveTotal = totalTicks || item.totalTicks;
-    if (effectiveTotal > 0 && positionTicks / effectiveTotal >= 0.9 && !item.isPlayed) {
-      item.isPlayed = true;
-      item.completedWatchedAt = Date.now();
-    }
-    await this.saveOfflineMedia(item, scope);
+    await runScopeMutation(scope, async () => {
+      const item = await this.getOfflineMediaUnlocked(itemId, scope);
+      if (!item) return;
+
+      const updated: OfflineMediaRecord = {
+        ...item,
+        playbackPositionTicks: positionTicks
+      };
+      const effectiveTotal = totalTicks || item.totalTicks;
+      if (effectiveTotal > 0 && positionTicks / effectiveTotal >= 0.9 && !item.isPlayed) {
+        updated.isPlayed = true;
+        updated.completedWatchedAt = Date.now();
+      }
+      await this.saveOfflineMediaUnlocked(updated, scope);
+    });
   }
 
   /**
@@ -319,12 +416,21 @@ export class OfflineStorageService {
   public async markAsWatched(itemId: string): Promise<void> {
     const scope = await this.resolveScope();
     if (!scope) return;
-    const item = await this.getOfflineMedia(itemId, scope);
-    if (!item) return;
+    await this.migrateLegacyIfSafe(scope);
 
-    item.isPlayed = true;
-    item.completedWatchedAt = Date.now();
-    await this.saveOfflineMedia(item, scope);
+    await runScopeMutation(scope, async () => {
+      const item = await this.getOfflineMediaUnlocked(itemId, scope);
+      if (!item) return;
+
+      await this.saveOfflineMediaUnlocked(
+        {
+          ...item,
+          isPlayed: true,
+          completedWatchedAt: Date.now()
+        },
+        scope
+      );
+    });
   }
 
   /**
@@ -334,45 +440,48 @@ export class OfflineStorageService {
   public async cleanupExpiredWatchedMedia(retentionHours: number = 48): Promise<string[]> {
     const scope = await this.resolveScope();
     if (!scope) return [];
+    await this.migrateLegacyIfSafe(scope);
 
-    const all = await this.getAllOfflineMedia(scope);
-    const now = Date.now();
-    const retentionMs = retentionHours * 60 * 60 * 1000;
-    const expiredIds: string[] = [];
-    const remaining: OfflineMediaRecord[] = [];
+    return runScopeMutation(scope, async () => {
+      const all = await this.getAllOfflineMediaUnlocked(scope);
+      const now = Date.now();
+      const retentionMs = retentionHours * 60 * 60 * 1000;
+      const expiredIds: string[] = [];
+      const remaining: OfflineMediaRecord[] = [];
 
-    for (const item of all) {
-      if (item.completedWatchedAt && now - item.completedWatchedAt >= retentionMs) {
-        expiredIds.push(item.itemId);
+      for (const item of all) {
+        if (item.completedWatchedAt && now - item.completedWatchedAt >= retentionMs) {
+          expiredIds.push(item.itemId);
 
-        if (item.localPath && typeof FileSystem.deleteAsync === "function") {
-          try {
-            await FileSystem.deleteAsync(item.localPath, { idempotent: true });
-          } catch {
-            // Safe deletion
+          if (item.localPath && typeof FileSystem.deleteAsync === "function") {
+            try {
+              await FileSystem.deleteAsync(item.localPath, { idempotent: true });
+            } catch {
+              // Safe deletion
+            }
           }
-        }
 
-        if (item.posterLocalPath && typeof FileSystem.deleteAsync === "function") {
-          try {
-            await FileSystem.deleteAsync(item.posterLocalPath, { idempotent: true });
-          } catch {
-            // Safe deletion
+          if (item.posterLocalPath && typeof FileSystem.deleteAsync === "function") {
+            try {
+              await FileSystem.deleteAsync(item.posterLocalPath, { idempotent: true });
+            } catch {
+              // Safe deletion
+            }
           }
+        } else {
+          remaining.push(item);
         }
-      } else {
-        remaining.push(item);
       }
-    }
 
-    if (expiredIds.length > 0) {
-      await AsyncStorage.setItem(
-        getScopedOfflineCatalogKey(scope),
-        JSON.stringify(remaining)
-      );
-    }
+      if (expiredIds.length > 0) {
+        await AsyncStorage.setItem(
+          getScopedOfflineCatalogKey(scope),
+          JSON.stringify(remaining)
+        );
+      }
 
-    return expiredIds;
+      return expiredIds;
+    });
   }
 
   /**
@@ -565,20 +674,22 @@ export class OfflineStorageService {
   public async purgeScope(scope: OfflineStorageScope): Promise<void> {
     if (!isValidScope(scope)) return;
 
-    // Physical files, confined to this account's namespace.
-    if (FileSystem.documentDirectory && typeof FileSystem.deleteAsync === "function") {
-      const scopeDir = `${FileSystem.documentDirectory}${DOWNLOAD_ROOT_DIR}/${sanitizePathSegment(
-        scope.serverId
-      )}/${sanitizePathSegment(scope.userId)}/`;
-      try {
-        await FileSystem.deleteAsync(scopeDir, { idempotent: true });
-      } catch {
-        // Best effort — metadata removal below still makes the files unreachable.
+    await runScopeMutation(scope, async () => {
+      // Physical files, confined to this account's namespace.
+      if (FileSystem.documentDirectory && typeof FileSystem.deleteAsync === "function") {
+        const scopeDir = `${FileSystem.documentDirectory}${DOWNLOAD_ROOT_DIR}/${sanitizePathSegment(
+          scope.serverId
+        )}/${sanitizePathSegment(scope.userId)}/`;
+        try {
+          await FileSystem.deleteAsync(scopeDir, { idempotent: true });
+        } catch {
+          // Best effort — metadata removal below still makes the files unreachable.
+        }
       }
-    }
 
-    await AsyncStorage.removeItem(getScopedOfflineCatalogKey(scope)).catch(() => {});
-    await AsyncStorage.removeItem(getScopedOfflineSyncQueueKey(scope)).catch(() => {});
+      await AsyncStorage.removeItem(getScopedOfflineCatalogKey(scope)).catch(() => {});
+      await AsyncStorage.removeItem(getScopedOfflineSyncQueueKey(scope)).catch(() => {});
+    });
   }
 
   /**
@@ -593,24 +704,28 @@ export class OfflineStorageService {
     if (!scope) {
       throw new Error("Cannot queue offline progress without an active Jellyfin account scope");
     }
+    await this.migrateLegacyIfSafe(scope);
 
-    const entries = await this.getPendingSyncEntries(scope);
-    const filtered = entries.filter((e) => e.itemId !== itemId);
+    return runScopeMutation(scope, async () => {
+      const entries = await this.getPendingSyncEntriesUnlocked(scope);
+      const updated = entries.filter((entry) => entry.itemId !== itemId);
 
-    const newEntry: SyncQueueEntry = {
-      id: `sync_${itemId}_${Date.now()}`,
-      itemId,
-      positionTicks,
-      isPlayed,
-      createdAt: Date.now()
-    };
+      const now = Date.now();
+      const newEntry: SyncQueueEntry = {
+        id: `sync_${itemId}_${now}`,
+        itemId,
+        positionTicks,
+        isPlayed,
+        createdAt: now
+      };
 
-    filtered.push(newEntry);
-    await AsyncStorage.setItem(
-      getScopedOfflineSyncQueueKey(scope),
-      JSON.stringify(filtered)
-    );
-    return newEntry;
+      updated.push(newEntry);
+      await AsyncStorage.setItem(
+        getScopedOfflineSyncQueueKey(scope),
+        JSON.stringify(updated)
+      );
+      return newEntry;
+    });
   }
 
   /**
@@ -636,14 +751,17 @@ export class OfflineStorageService {
     if (entryIds.length === 0) return;
     const resolved = await this.resolveScope(scope);
     if (!resolved) return;
+    await this.migrateLegacyIfSafe(resolved);
 
-    const current = await this.getPendingSyncEntries(resolved);
-    const idSet = new Set(entryIds);
-    const remaining = current.filter((entry) => !idSet.has(entry.id));
-    await AsyncStorage.setItem(
-      getScopedOfflineSyncQueueKey(resolved),
-      JSON.stringify(remaining)
-    );
+    await runScopeMutation(resolved, async () => {
+      const current = await this.getPendingSyncEntriesUnlocked(resolved);
+      const idSet = new Set(entryIds);
+      const remaining = current.filter((entry) => !idSet.has(entry.id));
+      await AsyncStorage.setItem(
+        getScopedOfflineSyncQueueKey(resolved),
+        JSON.stringify(remaining)
+      );
+    });
   }
 
   /**
@@ -652,8 +770,12 @@ export class OfflineStorageService {
   public async clearAll(scope?: OfflineStorageScope): Promise<void> {
     const resolved = await this.resolveScope(scope);
     if (!resolved) return;
-    await AsyncStorage.removeItem(getScopedOfflineCatalogKey(resolved));
-    await AsyncStorage.removeItem(getScopedOfflineSyncQueueKey(resolved));
+    await this.migrateLegacyIfSafe(resolved);
+
+    await runScopeMutation(resolved, async () => {
+      await AsyncStorage.removeItem(getScopedOfflineCatalogKey(resolved));
+      await AsyncStorage.removeItem(getScopedOfflineSyncQueueKey(resolved));
+    });
   }
 
   /**
@@ -715,36 +837,39 @@ export class OfflineStorageService {
   public async cleanupOrphanMedia(): Promise<number> {
     const scope = await this.resolveScope();
     if (!scope) return 0;
+    await this.migrateLegacyIfSafe(scope);
 
-    const all = await this.getAllOfflineMedia(scope);
-    const remaining: OfflineMediaRecord[] = [];
-    let orphanCount = 0;
+    return runScopeMutation(scope, async () => {
+      const all = await this.getAllOfflineMediaUnlocked(scope);
+      const remaining: OfflineMediaRecord[] = [];
+      let orphanCount = 0;
 
-    for (const record of all) {
-      let exists = false;
-      if (record.localPath && typeof FileSystem.getInfoAsync === "function") {
-        try {
-          const info = await FileSystem.getInfoAsync(record.localPath);
-          exists = !!(info && info.exists);
-        } catch {
-          exists = false;
+      for (const record of all) {
+        let exists = false;
+        if (record.localPath && typeof FileSystem.getInfoAsync === "function") {
+          try {
+            const info = await FileSystem.getInfoAsync(record.localPath);
+            exists = !!(info && info.exists);
+          } catch {
+            exists = false;
+          }
+        }
+        if (exists) {
+          remaining.push(record);
+        } else {
+          orphanCount++;
         }
       }
-      if (exists) {
-        remaining.push(record);
-      } else {
-        orphanCount++;
+
+      if (orphanCount > 0) {
+        await AsyncStorage.setItem(
+          getScopedOfflineCatalogKey(scope),
+          JSON.stringify(remaining)
+        );
       }
-    }
 
-    if (orphanCount > 0) {
-      await AsyncStorage.setItem(
-        getScopedOfflineCatalogKey(scope),
-        JSON.stringify(remaining)
-      );
-    }
-
-    return orphanCount;
+      return orphanCount;
+    });
   }
 
   /**
@@ -810,12 +935,6 @@ export class OfflineStorageService {
           // Check next candidate
         }
       }
-    }
-
-    if (record.localPath) {
-      return record.localPath.startsWith("file://")
-        ? record.localPath
-        : `file://${record.localPath}`;
     }
 
     return null;

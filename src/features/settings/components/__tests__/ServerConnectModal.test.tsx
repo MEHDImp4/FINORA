@@ -15,6 +15,7 @@ describe("ServerConnectModal", () => {
   const mockServerChanged = jest.fn();
   const mockSaveServer = jest.fn().mockResolvedValue(undefined);
   const mockRemoveServer = jest.fn().mockResolvedValue(undefined);
+  let component: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -49,8 +50,15 @@ describe("ServerConnectModal", () => {
     });
   });
 
+  afterEach(() => {
+    if (component) {
+      act(() => component.unmount());
+      component = undefined;
+    }
+    jest.useRealTimers();
+  });
+
   it("renders saved servers list and active server badge", async () => {
-    let component: any;
     await act(async () => {
       component = ReactTestRenderer.create(
         <ServerConnectModal visible={true} onClose={mockClose} onServerChanged={mockServerChanged} />
@@ -76,7 +84,6 @@ describe("ServerConnectModal", () => {
       operatingSystem: "Linux"
     });
 
-    let component: any;
     await act(async () => {
       component = ReactTestRenderer.create(
         <ServerConnectModal visible={true} onClose={mockClose} onServerChanged={mockServerChanged} />
@@ -105,7 +112,6 @@ describe("ServerConnectModal", () => {
   it("switches server via onServerChanged when selecting a saved server", async () => {
     jest.useFakeTimers();
 
-    let component: any;
     await act(async () => {
       component = ReactTestRenderer.create(
         <ServerConnectModal visible={true} onClose={mockClose} onServerChanged={mockServerChanged} />
@@ -138,7 +144,8 @@ describe("ServerConnectModal", () => {
   });
 
   it("removes server when trash button is clicked", async () => {
-    let component: any;
+    jest.useFakeTimers();
+
     await act(async () => {
       component = ReactTestRenderer.create(
         <ServerConnectModal visible={true} onClose={mockClose} onServerChanged={mockServerChanged} />
@@ -155,5 +162,9 @@ describe("ServerConnectModal", () => {
     });
 
     expect(mockRemoveServer).toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(2000);
+    });
   });
 });
