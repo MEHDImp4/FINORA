@@ -72,8 +72,10 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Workflow files are intentionally committed separately through the GitHub API.
+          # GitHub's Actions token may be forbidden from modifying workflow files even
+          # with contents:write, which caused the previous otherwise-green run to fail.
           git add package.json package-lock.json eslint.config.js jest.config.js scripts/audit-production.js \
-            .github/workflows/ci.yml .github/workflows/build-apk.yml \
             .planning/quick/20261101-hardening-offline-quality/NATIVE_COMPATIBILITY.md
           git commit -m "ci: enforce lint coverage and native compatibility"
           git push origin HEAD:fix/hardening-offline-quality-20261101
