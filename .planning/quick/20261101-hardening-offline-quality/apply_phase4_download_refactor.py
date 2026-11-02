@@ -64,11 +64,22 @@ if text.count(resume_block) != 1:
     raise RuntimeError("Expected one inline resume-policy block")
 text = text.replace(resume_block, "", 1)
 
-wifi_expr = 'wifiOnly ? await isWifiConnected() : true'
-count = text.count(wifi_expr)
+# Centralize both compact and expanded Wi-Fi gates. The manager still owns the
+# status transition/queue semantics; only the connectivity policy moves out.
+compact_wifi_expr = 'wifiOnly ? await isWifiConnected() : true'
+compact_count = text.count(compact_wifi_expr)
+text = text.replace(compact_wifi_expr, 'await isDownloadNetworkAllowed(wifiOnly)')
+
+expanded_wifi_expr = 'const isWifi = await isWifiConnected();'
+expanded_count = text.count(expanded_wifi_expr)
+text = text.replace(expanded_wifi_expr, 'const isWifi = await isDownloadNetworkAllowed(true);')
+
+count = compact_count + expanded_count
 if count < 1:
     raise RuntimeError("Expected at least one inline Wi-Fi gate")
-text = text.replace(wifi_expr, 'await isDownloadNetworkAllowed(wifiOnly)')
+if 'isWifiConnected' in text:
+    raise RuntimeError("Direct isWifiConnected usage remains in DownloadManager")
+
 manager_path.write_text(text)
 
 # Focused tests for the extracted pure resume rules. Existing downloadManagerWifi
