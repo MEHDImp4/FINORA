@@ -1,0 +1,76 @@
+name: Phase 5 Final Validation
+
+on:
+  push:
+    branches: [fix/hardening-offline-quality-20261101]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase5-final-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-commit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/hardening-offline-quality-20261101
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install dependencies
+        run: npm ci
+      - name: Apply final download refactor
+        run: python .planning/quick/20261101-hardening-offline-quality/apply_phase5_final.py
+      - name: Production dependency audit
+        run: node scripts/audit-production.js
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Version consistency
+        run: npm run version:check
+      - name: i18n parity
+        run: npm run i18n:check
+      - name: Test coverage gate
+        run: npm test -- --ci --coverage --maxWorkers=2
+      - name: Detect Jest open handles
+        run: npm test -- --ci --runInBand --detectOpenHandles
+      - name: Expo doctor
+        run: npx expo-doctor
+      - name: Generate Android native project
+        run: npx expo prebuild --platform android --no-install
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Compile Android debug APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug
+      - name: Diff sanity
+        run: git diff --check
+      - name: Commit validated final refactor
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --cached --quiet; then
+            echo "No staged changes to commit"
+            exit 0
+          fi
+          git commit -m "refactor: extract download persistence and scheduling"
+          git push origin HEAD:fix/hardening-offline-quality-20261101
