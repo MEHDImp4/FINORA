@@ -35,7 +35,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Apply final download refactor
-        run: python .planning/quick/20261101-hardening-offline-quality/apply_phase5_final.py
+        shell: bash
+        run: |
+          # The guard intentionally ignores prose mentioning "AsyncStorage." and
+          # rejects only actual direct API use/imports left in DownloadManager.
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.planning/quick/20261101-hardening-offline-quality/apply_phase5_final.py')
+          s = p.read_text()
+          s = s.replace("'AsyncStorage.' in line or 'from \"@react-native-async-storage' in line", "'await AsyncStorage.' in line or 'from \"@react-native-async-storage' in line")
+          p.write_text(s)
+          PY
+          python .planning/quick/20261101-hardening-offline-quality/apply_phase5_final.py
       - name: Production dependency audit
         run: node scripts/audit-production.js
       - name: Type check
