@@ -83,113 +83,6 @@ if "coverageThreshold" not in jest:
     )
 jest_path.write_text(jest)
 
-ci_path = Path(".github/workflows/ci.yml")
-ci = ci_path.read_text()
-ci = replace_once(
-    ci,
-    '''      - name: Type check
-        run: npm run typecheck
-
-      - name: Version consistency''',
-    '''      - name: Type check
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Version consistency'''
-)
-ci = replace_once(
-    ci,
-    '''      # Advisory only: known Expo SDK patch mismatches must not fail CI.
-      - name: Expo doctor (advisory)
-        continue-on-error: true
-        run: npx expo-doctor
-
-      - name: Run tests
-        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --maxWorkers=2
-''',
-    '''      - name: Run tests with coverage gate
-        run: npm test -- --ci --coverage --maxWorkers=2
-
-      - name: Expo doctor
-        run: npx expo-doctor
-
-  android-native:
-    name: Android native compatibility
-    needs: quality
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Setup Java 17
-        uses: actions/setup-java@v6
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Generate Android native project
-        run: npx expo prebuild --platform android --no-install
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
-
-      - name: Compile Android debug APK
-        run: |
-          chmod +x android/gradlew
-          cd android
-          ./gradlew assembleDebug
-'''
-)
-ci_path.write_text(ci)
-
-build_path = Path(".github/workflows/build-apk.yml")
-build = build_path.read_text()
-build = replace_once(
-    build,
-    '''      - name: Type check
-        run: npm run typecheck
-
-      - name: Version consistency''',
-    '''      - name: Type check
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Version consistency'''
-)
-build = replace_once(
-    build,
-    '''      - name: Run tests
-        run: npm test -- --ci --no-coverage --passWithNoTests --forceExit --maxWorkers=2
-
-      # Advisory only: known Expo SDK patch mismatches must not block releases.
-      - name: Expo doctor (advisory)
-        continue-on-error: true
-        run: npx expo-doctor''',
-    '''      - name: Run tests with coverage gate
-        run: npm test -- --ci --coverage --maxWorkers=2
-
-      - name: Expo doctor
-        run: npx expo-doctor'''
-)
-build_path.write_text(build)
-
 Path(".planning/quick/20261101-hardening-offline-quality/NATIVE_COMPATIBILITY.md").write_text(r'''# FINORA native compatibility baseline
 
 Measured on 2026-11-01 with Node 22, Expo SDK 57 and React Native 0.86.3.
@@ -222,4 +115,4 @@ Fallback: FINORA's foreground service wrapper treats native-service availability
 The CI native gate records compatibility by compiling the generated Android project for the exact dependency lockfile on each change. Any future Expo/RN/New Architecture upgrade must keep `expo-doctor`, TypeScript/tests, and the Android Gradle build green before merge.
 ''')
 
-print("Phase 3 quality configuration patched")
+print("Phase 3 quality configuration patched; workflow files are updated separately through GitHub")
