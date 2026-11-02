@@ -3,6 +3,14 @@ module.exports = {
   testEnvironment: "node",
   testMatch: ["**/__tests__/**/*.test.[jt]s?(x)"],
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
+  coverageThreshold: {
+    global: {
+      statements: 79,
+      branches: 65,
+      functions: 69,
+      lines: 80
+    }
+  },
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
     "^expo-video$": "<rootDir>/__mocks__/expo-video.js",

@@ -1,9 +1,9 @@
 import { DownloadItem, DownloadStatus, OfflineMediaRecord } from "./types";
 import { offlineStorageService } from "./offlineStorage";
-import * as FileSystem from "expo-file-system/legacy";
+import { fileSystem as FileSystem } from "../../core/filesystem";
 import { logger } from "../../core/network/logger";
 import { notificationService } from "../../core/notifications/notificationService";
-import { isWifiConnected } from "../../core/network/networkStatusService";
+import { isDownloadNetworkAllowed } from "./download/DownloadNetworkPolicy";
 import { usePlaybackPreferencesStore } from "../../stores/playbackPreferencesStore";
 import {
   DownloadQuality,
@@ -22,6 +22,7 @@ import {
 } from "./diskSpace";
 import * as Network from "expo-network";
 import { formatBytes, formatSpeed, formatTimeRemaining } from "./offlineFormatting";
+import { isTranscodedQuality, stripTokensFromUrl } from "./download/DownloadResumeService";
 import {
   DownloadAuthContext,
   DownloadIdentity,
@@ -144,32 +145,6 @@ export const WIFI_REQUIRED_ERROR = "Connexion Wi-Fi requise (mode Wi-Fi uniqueme
  */
 const PROGRESS_PERSIST_INTERVAL_MS = 3000;
 const PROGRESS_PERSIST_MIN_DELTA = 0.01;
-
-/**
- * Transcoded downloads are live Jellyfin streams, not stable byte-addressable
- * artifacts. Only the original-file endpoint is safe to reconstruct with a
- * persisted HTTP Range offset after task loss/process death.
- */
-function isTranscodedQuality(quality?: DownloadQuality): boolean {
-  return (quality ?? "original") !== "original";
-}
-
-/**
- * Strips authentication tokens from a URL query string.
- * Tokens must come from the live secure session, never from persisted storage.
- */
-function stripTokensFromUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    parsed.searchParams.delete("api_key");
-    parsed.searchParams.delete("ApiKey");
-    parsed.searchParams.delete("Token");
-    return parsed.toString();
-  } catch {
-    // URL parsing failed (e.g., relative path) — return as-is
-    return url;
-  }
-}
 
 /**
  * DownloadManager coordinates media downloads, progress tracking,
@@ -893,7 +868,7 @@ export class DownloadManager {
       `wifiOnly=${wifiOnly}, tracked=${this.downloads.size}`
     );
 
-    const onWifi = wifiOnly ? await isWifiConnected() : true;
+    const onWifi = await isDownloadNetworkAllowed(wifiOnly);
 
     for (const item of this.downloads.values()) {
       if (item.status !== "queued") continue;
@@ -1208,7 +1183,7 @@ export class DownloadManager {
     );
 
     const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
-    const isWifi = wifiOnly ? await isWifiConnected() : true;
+    const isWifi = await isDownloadNetworkAllowed(wifiOnly);
     if (wifiOnly && !isWifi) {
       // DWN-03: a Wi-Fi-only download waits for the network instead of failing.
       // It is promoted automatically when Wi-Fi returns (network/foreground hook).
@@ -1532,7 +1507,7 @@ export class DownloadManager {
 
     const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
     if (wifiOnly) {
-      const isWifi = await isWifiConnected();
+      const isWifi = await isDownloadNetworkAllowed(true);
       if (!isWifi) {
         // DWN-03: stay queued and wait for Wi-Fi instead of transitioning to failed.
         logger.warn(`[DownloadManager] Waiting for Wi-Fi before ${downloadItem.title}`);
@@ -1891,7 +1866,7 @@ export class DownloadManager {
 
     const wifiOnly = usePlaybackPreferencesStore.getState().preferences.downloadWifiOnly;
     if (wifiOnly) {
-      const isWifi = await isWifiConnected();
+      const isWifi = await isDownloadNetworkAllowed(true);
       if (!isWifi) {
         // DWN-03: waiting for the network is not a failure.
         item.status = "queued";

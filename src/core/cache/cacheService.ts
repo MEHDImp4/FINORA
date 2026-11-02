@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import * as FileSystem from "expo-file-system/legacy";
+import { fileSystem as FileSystem } from "../filesystem";
 import { QueryClient } from "@tanstack/react-query";
 import { logger } from "../network/logger";
 
@@ -55,8 +55,8 @@ export class CacheService {
               idempotent: true
             });
             deletedCount++;
-          } catch {
-            // Ignore single file deletion failures
+          } catch (error) {
+            logger.debug("[CacheService] One cache entry could not be deleted.", error);
           }
         }
       }

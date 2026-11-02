@@ -1,0 +1,495 @@
+name: Build Android APKs
+
+# Release channels are mutually exclusive:
+#   - push tag vX.Y.Z            -> stable  (prerelease:false, make_latest:true, release-signed)
+#   - push tag vX.Y.Z-beta.N     -> beta    (prerelease:true,  make_latest:false)
+#   - push tag vX.Y.Z-preview-SHA-> preview (prerelease:true,  make_latest:false)
+#   - manual dispatch            -> exactly one channel (preview|beta|release)
+# For any event at most one publication job is eligible.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Release channel to build'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - beta
+          - release
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-apk-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Mandatory quality gate — no build starts until this passes ──────────────
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit production dependencies
+        run: node scripts/audit-production.js
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Version consistency
+        run: npm run version:check
+
+      - name: Check i18n parity
+        run: npm run i18n:check
+
+      - name: Run tests with coverage gate
+        run: npm test -- --ci --coverage --maxWorkers=2
+
+      - name: Expo doctor
+        run: npx expo-doctor
+
+  # ── Classify a pushed tag into exactly one channel ──────────────────────────
+  classify:
+    name: Classify tag
+    needs: quality
+    runs-on: ubuntu-latest
+    outputs:
+      kind: ${{ steps.classify.outputs.kind }}
+    steps:
+      - name: Classify release tag
+        id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+          KIND="none"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            REF="${{ github.ref_name }}"
+            if printf '%s' "$REF" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+              KIND="stable"
+            elif printf '%s' "$REF" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$'; then
+              KIND="beta"
+            elif printf '%s' "$REF" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-preview[-.][A-Za-z0-9]+$'; then
+              KIND="preview"
+            else
+              echo "::error::Unsupported tag format '$REF'. Allowed: vX.Y.Z, vX.Y.Z-beta.N, vX.Y.Z-preview-<sha>."
+              exit 1
+            fi
+          fi
+          echo "kind=$KIND" >> "$GITHUB_OUTPUT"
+          echo "Classified '${{ github.ref_name }}' as '$KIND'."
+
+  # ── Preview (prerelease, never Latest) ──────────────────────────────────────
+  build-preview:
+    name: Build Preview APK
+    needs: [quality, classify]
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.target == 'preview') || (github.event_name == 'push' && needs.classify.outputs.kind == 'preview') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Setup Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v${VERSION}-preview-${SHORT_SHA}"
+          fi
+          node scripts/version.js --tag="$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "apk_name=FINORA-v${VERSION}-preview-${SHORT_SHA}.apk" >> "$GITHUB_OUTPUT"
+          echo "release_name=FINORA v${VERSION} (Preview ${SHORT_SHA})" >> "$GITHUB_OUTPUT"
+      # FAIL-CLOSED: preview/beta must never fall back to debug/default signing.
+      - name: Require release signing secrets
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Release signing secrets are not configured (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD). Refusing to build a production APK."
+            exit 1
+          fi
+      - name: Generate Android native project (Expo Prebuild)
+        run: npx expo prebuild --platform android --no-install
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+      - name: Ensure gradlew is executable
+        run: chmod +x android/gradlew
+      - name: Build Preview APK
+        run: |
+          cd android
+          ./gradlew assembleRelease -PreactNativeReleaseLevel=preview
+      - name: Sign APK with release keystore
+        uses: ./.github/actions/sign-release-apk
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        with:
+          apk_path: android/app/build/outputs/apk/release
+          output_name: ${{ steps.meta.outputs.apk_name }}
+      - name: Prepare artifact & checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_NAME='${{ steps.meta.outputs.apk_name }}'
+          # The composite action produced the release-signed APK at the workspace root.
+          if [ ! -f "$APK_NAME" ]; then echo "::error::Signed preview APK not found"; exit 1; fi
+          sha256sum "$APK_NAME" > "$APK_NAME.sha256"
+          cat "$APK_NAME.sha256"
+      - name: Publish preview GitHub Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.release_name }}
+          prerelease: true
+          make_latest: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            ${{ steps.meta.outputs.apk_name }}
+            ${{ steps.meta.outputs.apk_name }}.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show direct APK download
+        shell: bash
+        run: |
+          {
+            echo "## FINORA Preview"
+            echo ""
+            echo "⬇️ [Download APK directly](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }})"
+            echo ""
+            echo "🔐 [SHA-256 checksum](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }}.sha256)"
+            echo ""
+            echo "_The APK is attached directly to the GitHub Release. No ZIP artifact is created for this release channel._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Beta (prerelease, never Latest) ─────────────────────────────────────────
+  build-beta:
+    name: Build Beta APK
+    needs: [quality, classify]
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.target == 'beta') || (github.event_name == 'push' && needs.classify.outputs.kind == 'beta') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Setup Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Install dependencies
+        run: npm ci
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v${VERSION}-beta.${{ github.run_number }}"
+          fi
+          node scripts/version.js --tag="$TAG"
+          TAG_VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "apk_name=FINORA-v${TAG_VERSION}.apk" >> "$GITHUB_OUTPUT"
+          echo "release_name=FINORA v${TAG_VERSION}" >> "$GITHUB_OUTPUT"
+      # FAIL-CLOSED: preview/beta must never fall back to debug/default signing.
+      - name: Require release signing secrets
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Release signing secrets are not configured (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD). Refusing to build a production APK."
+            exit 1
+          fi
+      - name: Generate Android native project (Expo Prebuild)
+        run: npx expo prebuild --platform android --no-install
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+      - name: Ensure gradlew is executable
+        run: chmod +x android/gradlew
+      - name: Build Beta APK
+        run: |
+          cd android
+          ./gradlew assembleRelease -PreactNativeReleaseLevel=beta
+      - name: Sign APK with release keystore
+        uses: ./.github/actions/sign-release-apk
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        with:
+          apk_path: android/app/build/outputs/apk/release
+          output_name: ${{ steps.meta.outputs.apk_name }}
+      - name: Prepare artifact & checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_NAME='${{ steps.meta.outputs.apk_name }}'
+          # The composite action produced the release-signed APK at the workspace root.
+          if [ ! -f "$APK_NAME" ]; then echo "::error::Signed beta APK not found"; exit 1; fi
+          sha256sum "$APK_NAME" > "$APK_NAME.sha256"
+          cat "$APK_NAME.sha256"
+      - name: Publish beta GitHub Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.release_name }}
+          prerelease: true
+          make_latest: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            ${{ steps.meta.outputs.apk_name }}
+            ${{ steps.meta.outputs.apk_name }}.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show direct APK download
+        shell: bash
+        run: |
+          {
+            echo "## FINORA Beta"
+            echo ""
+            echo "⬇️ [Download APK directly](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }})"
+            echo ""
+            echo "🔐 [SHA-256 checksum](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }}.sha256)"
+            echo ""
+            echo "_The APK is attached directly to the GitHub Release. No ZIP artifact is created for this release channel._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Stable (release-signed, Latest) — fail-closed on signing ────────────────
+  build-release:
+    name: Build Stable APK
+    needs: [quality, classify]
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.target == 'release') || (github.event_name == 'push' && needs.classify.outputs.kind == 'stable') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Setup Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Toolchain versions
+        run: |
+          set -euo pipefail
+          node -v
+          java -version
+          node -p "require('expo/package.json').version"
+          node -p "require('react-native/package.json').version"
+          node -p "require('@react-native/gradle-plugin/package.json').version"
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v${VERSION}"
+          fi
+          node scripts/version.js --tag="$TAG"
+          TAG_VERSION="${TAG#v}"
+          if [ "$TAG_VERSION" != "$VERSION" ]; then
+            echo "::error::Stable tag $TAG does not match package.json version $VERSION. Refusing to publish."
+            exit 1
+          fi
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "apk_name=FINORA-v${VERSION}.apk" >> "$GITHUB_OUTPUT"
+          echo "release_name=FINORA v${VERSION}" >> "$GITHUB_OUTPUT"
+      # FAIL-CLOSED: a stable release can never fall back to debug/default signing.
+      - name: Require release signing secrets
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Release signing secrets are not configured (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD). Refusing to build a production APK."
+            exit 1
+          fi
+      - name: Generate Android native project (Expo Prebuild)
+        run: npx expo prebuild --platform android --no-install
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Ensure gradlew is executable
+        run: chmod +x android/gradlew
+
+      - name: Gradle wrapper + version
+        run: |
+          set -euo pipefail
+          cat android/gradle/wrapper/gradle-wrapper.properties
+          cd android
+          ./gradlew --version
+
+      - name: Build Stable APK
+        run: |
+          cd android
+          ./gradlew assembleRelease -PreactNativeReleaseLevel=stable
+      - name: Sign and verify APK with release keystore
+        uses: ./.github/actions/sign-release-apk
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        with:
+          apk_path: android/app/build/outputs/apk/release
+          output_name: ${{ steps.meta.outputs.apk_name }}
+      - name: Inspect APK manifest and permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_NAME='${{ steps.meta.outputs.apk_name }}'
+          BUILD_TOOLS="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}/build-tools"
+          AAPT=$(find "$BUILD_TOOLS" -name aapt 2>/dev/null | sort -V | tail -n 1)
+          AAPT2=$(find "$BUILD_TOOLS" -name aapt2 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$AAPT" ] || [ -z "$AAPT2" ]; then
+            echo "::error::aapt/aapt2 not found in $BUILD_TOOLS"
+            exit 1
+          fi
+          {
+            echo "### APK: $APK_NAME"
+            echo "## aapt dump badging"
+            "$AAPT" dump badging "$APK_NAME" | grep -E "package:|versionCode|versionName|sdkVersion|targetSdkVersion|uses-permission|application-label|application-debuggable" || true
+            echo ""
+            echo "## Manifest flags (aapt2 xmltree)"
+            "$AAPT2" dump xmltree "$APK_NAME" --file AndroidManifest.xml | grep -iE "debuggable|usesCleartextTraffic|supportsPictureInPicture|foregroundServiceType|allowBackup" || true
+          } | tee apk-inspection.txt
+
+      - name: Compute checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_NAME='${{ steps.meta.outputs.apk_name }}'
+          sha256sum "$APK_NAME" > "$APK_NAME.sha256"
+          cat "$APK_NAME.sha256"
+      - name: Publish stable GitHub Release (Latest)
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.release_name }}
+          prerelease: false
+          make_latest: true
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            ${{ steps.meta.outputs.apk_name }}
+            ${{ steps.meta.outputs.apk_name }}.sha256
+            apk-inspection.txt
+            apksigner-verify.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show direct APK download
+        shell: bash
+        run: |
+          {
+            echo "## FINORA Stable Release"
+            echo ""
+            echo "⬇️ [Download APK directly](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }})"
+            echo ""
+            echo "🔐 [SHA-256 checksum](https://github.com/${{ github.repository }}/releases/download/${{ steps.meta.outputs.tag }}/${{ steps.meta.outputs.apk_name }}.sha256)"
+            echo ""
+            echo "_The APK is attached directly to the GitHub Release. No ZIP artifact is created for this release channel._"
+          } >> "$GITHUB_STEP_SUMMARY"

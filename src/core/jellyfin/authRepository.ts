@@ -527,8 +527,8 @@ export class AuthRepository {
       if (targetUrl) {
         await clientHttp.request(`${targetUrl}/Sessions/Logout`, { method: "POST" });
       }
-    } catch {
-      // Ignore network errors during logout to guarantee local wipe
+    } catch (error) {
+      logger.debug("[AuthRepository] Server logout unavailable; continuing local credential wipe.", error);
     } finally {
       const tokenKey = getAuthTokenStorageKey(serverId, userId);
       await this.secureStorage.deleteToken(tokenKey);

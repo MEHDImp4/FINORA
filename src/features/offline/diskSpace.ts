@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system/legacy";
+import { fileSystem as FileSystem } from "../../core/filesystem";
 import { logger } from "../../core/network/logger";
 import { getEffectiveExpectedBytes } from "./downloadSizing";
 

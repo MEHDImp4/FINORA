@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as FileSystem from "expo-file-system/legacy";
+import { fileSystem as FileSystem } from "../../core/filesystem";
+import { logger } from "../../core/network/logger";
 import { OfflineMediaRecord, SyncQueueEntry } from "./types";
 import { DOWNLOAD_ROOT_DIR, sanitizePathSegment } from "./downloadPaths";
 
@@ -46,7 +47,8 @@ function parseArray<T>(raw: string | null): T[] {
   try {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? (parsed as T[]) : [];
-  } catch {
+  } catch (error) {
+    logger.warn("[OfflineStorage] Ignoring invalid persisted array payload.", error);
     return [];
   }
 }

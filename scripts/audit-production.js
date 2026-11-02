@@ -18,6 +18,22 @@ const { spawnSync } = require('node:child_process');
 
 const ALLOWLIST = new Map([
   [
+    'GHSA-MRHX-C7XC-M3W5',
+    {
+      expires: '2026-11-15',
+      reason:
+        'Zod <4.6.6 is pulled by the Expo SDK 57 CLI line. Expo CLI currently declares Zod 3.x and there is no compatible patched 3.x release; forcing Zod 4 into the CLI is not a safe consumer-side remediation.',
+    },
+  ],
+  [
+    'GHSA-QR28-FPJM-WQ7F',
+    {
+      expires: '2026-11-08',
+      reason:
+        'decode-uri-component is reached transitively through Expo Router/query-string. A patched 0.5.1 exists, but the SDK 57 dependency chain has not yet moved to a compatible range; keep this exception short-lived while upstream catches up.',
+    },
+  ],
+  [
     'GHSA-86W9-CPQP-85RV',
     {
       expires: '2026-11-15',

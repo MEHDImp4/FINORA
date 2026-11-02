@@ -24,6 +24,7 @@ import {
 } from "./notificationStore";
 import { downloadManager } from "../features/offline/downloadManager";
 import { offlineStorageService } from "../features/offline/offlineStorage";
+import { logger } from "../core/network/logger";
 
 export interface ServerState {
   savedAccounts: SavedAccount[];
@@ -190,8 +191,8 @@ export const useServerStore = create<ServerState>((set, get) => ({
               isLocalConnection: isLocalNetworkHost(new URL(restored.serverUrl).hostname)
             });
             rollbackSucceeded = true;
-          } catch {
-            // Fall through to fail-closed cleanup below.
+          } catch (error) {
+            logger.error("[ServerStore] Account-switch rollback failed; applying fail-closed cleanup.", error);
           }
         }
 
