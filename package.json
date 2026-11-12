@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "i18n:check": "node scripts/check-i18n.js",
     "version:check": "node scripts/version.js --check",
-    "version:sync": "node scripts/version.js --sync"
+    "version:sync": "node scripts/version.js --sync",
+    "postinstall": "node scripts/patch-query-string-interoperability.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
