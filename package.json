@@ -65,5 +65,10 @@
         ]
       }
     }
+  },
+  "overrides": {
+    "node-forge": "1.4.3",
+    "zod": "4.6.6",
+    "decode-uri-component": "0.5.1"
   }
 }
