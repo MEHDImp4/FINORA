@@ -7,7 +7,7 @@ Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/)
 
 ---
 
-## [1.0.1] - 2026-11-12
+## [1.0.1] - Non publiée
 
 ### Corrections
 - Évite les rechargements inutiles de la source vidéo lors des changements de sous-titres.
