@@ -38,6 +38,12 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Security dependency interoperability
+        run: node scripts/check-patched-dependency-runtime.js
+
+      - name: Expo CLI configuration
+        run: npx expo config --type public --json > /dev/null
+
       - name: Version consistency
         run: npm run version:check
 

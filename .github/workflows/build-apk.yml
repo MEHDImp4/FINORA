@@ -1,7 +1,7 @@
 name: Build Android APKs
 
 # Release channels are mutually exclusive:
-#   - push tag vX.Y.Z            -> stable  (prerelease:false, make_latest:true, release-signed)
+#   - push tag vX.Y.Z or release/vX.Y.Z branch -> stable  (prerelease:false, make_latest:true, release-signed)
 #   - push tag vX.Y.Z-beta.N     -> beta    (prerelease:true,  make_latest:false)
 #   - push tag vX.Y.Z-preview-SHA-> preview (prerelease:true,  make_latest:false)
 #   - manual dispatch            -> exactly one channel (preview|beta|release)
@@ -19,6 +19,8 @@ on:
           - beta
           - release
   push:
+    branches:
+      - 'release/v*'
     tags:
       - 'v*'
 
@@ -54,6 +56,12 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Security dependency interoperability
+        run: node scripts/check-patched-dependency-runtime.js
+
+      - name: Expo CLI configuration
+        run: npx expo config --type public --json > /dev/null
+
       - name: Version consistency
         run: npm run version:check
 
@@ -84,6 +92,14 @@ jobs:
           KIND="none"
           if [ "${{ github.event_name }}" = "push" ]; then
             REF="${{ github.ref_name }}"
+            # A release/vX.Y.Z branch deliberately requests a stable build.
+            if [[ "${{ github.ref }}" == refs/heads/* ]]; then
+              if ! printf '%s' "$REF" | grep -Eq '^release/v[0-9]+\.[0-9]+\.[0-9]+$'; then
+                echo "::error::Only release/vX.Y.Z branches can publish stable releases."
+                exit 1
+              fi
+              REF="${REF#release/}"
+            fi
             if printf '%s' "$REF" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
               KIND="stable"
             elif printf '%s' "$REF" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$'; then
@@ -377,6 +393,9 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           if [ "${{ github.event_name }}" = "push" ]; then
             TAG="${{ github.ref_name }}"
+            if [[ "${{ github.ref }}" == refs/heads/release/* ]]; then
+              TAG="${TAG#release/}"
+            fi
           else
             TAG="v${VERSION}"
           fi

@@ -1,7 +1,7 @@
 {
   "name": "finora",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "i18n:check": "node scripts/check-i18n.js",
     "version:check": "node scripts/version.js --check",
-    "version:sync": "node scripts/version.js --sync"
+    "version:sync": "node scripts/version.js --sync",
+    "postinstall": "node scripts/patch-query-string-interoperability.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
@@ -65,5 +66,10 @@
         ]
       }
     }
+  },
+  "overrides": {
+    "node-forge": "1.4.3",
+    "zod": "4.6.6",
+    "decode-uri-component": "0.5.1"
   }
 }
