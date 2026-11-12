@@ -7,7 +7,22 @@ Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/)
 
 ---
 
-## [1.0.0] - Non publiée
+## [1.0.1] - 2026-11-12
+
+### Corrections
+- Évite les rechargements inutiles de la source vidéo lors des changements de sous-titres.
+- Corrige le routage de la connexion active avec le mode Auto LAN/WAN.
+- Préserve la qualité de lecture et les limites de débit/appareil en cas de bascule.
+- Renforce la gestion des changements de compte et des autorisations de téléchargement.
+
+### Améliorations
+- Diagnostics plus précis pour la qualité de la source et la qualité de sortie demandée.
+- Tests de non-régression étendus au réseau, aux sous-titres, aux bascules et aux comptes.
+- Publication stable par branche de version avec les contrôles et la signature APK existants.
+
+---
+
+## [1.0.0] - 2026-10-02
 
 ### ✨ Fonctionnalités majeures (Features)
 - **Lecteur Vidéo Avancé** : Intégration moderne d'Expo Video / Media3 avec reprise de lecture, contrôle gestuel (luminosité, volume, double-tap seek), changement de pistes audio et sous-titres avec modal de style personnalisable.

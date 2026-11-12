@@ -7,7 +7,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
-## [1.0.0] - Unreleased
+## [1.0.1] - 2026-11-12
+
+### Fixed
+- Avoid unnecessary video source reloads when subtitles change.
+- Make Auto LAN/WAN routing select the active connection.
+- Preserve playback quality and device/bitrate limits during fallback or source replacement.
+- Harden multi-account identity transitions and per-account download authorization.
+
+### Improved
+- Clarify source and output quality in player diagnostics.
+- Expand regression tests for network routing, subtitles, playback fallback, and accounts.
+- Support stable release branches using existing quality checks and APK signing.
+
+---
+
+## [1.0.0] - 2026-10-02
 
 ### ✨ Key Features
 - **Cinematic Playback Engine**: Modern integration of `expo-video` (AndroidX Media3 / ExoPlayer & AVPlayer) featuring playback resume, gesture controls (brightness, volume, 10s double-tap seek), multi-audio track switching, and subtitle modal styling.
