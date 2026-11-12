@@ -7,7 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
-## [1.0.1] - Unreleased
+## [1.0.1] - 2026-11-12
+
+### Security
+- Patch high-severity transitive vulnerabilities by updating `node-forge` to 1.4.3, `zod` to 4.6.6 and `decode-uri-component` to 0.5.1.
+- Preserve safe `query-string@7` CommonJS compatibility with the patched decoder using a guarded postinstall interop bridge.
+- Require regression checks for patched dependencies and Expo CLI in CI and release workflows.
 
 ### Fixed
 - Avoid unnecessary video source reloads when subtitles change.

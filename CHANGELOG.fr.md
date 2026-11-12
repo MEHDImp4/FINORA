@@ -7,7 +7,12 @@ Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/)
 
 ---
 
-## [1.0.1] - Non publiée
+## [1.0.1] - 2026-11-12
+
+### Sécurité
+- Correction des vulnérabilités transitives de gravité élevée avec `node-forge` 1.4.3, `zod` 4.6.6 et `decode-uri-component` 0.5.1.
+- Conservation de la compatibilité CommonJS de `query-string@7` grâce à une adaptation contrôlée du décodeur corrigé.
+- Ajout de vérifications de non-régression des dépendances et de l'outil Expo à la CI et aux workflows de publication.
 
 ### Corrections
 - Évite les rechargements inutiles de la source vidéo lors des changements de sous-titres.
